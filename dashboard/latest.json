@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-15T21:44:52.590363+08:00",
+  "exported_at": "2026-09-16T02:45:08.339967+08:00",
   "market": {
     "generated_at": "2026-09-15T20:33:22.338582+08:00",
     "status": "success",
@@ -5730,7 +5730,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-15T21:32:10.807269+08:00",
+    "generated_at": "2026-09-16T02:44:07.388566+08:00",
     "status": "partial",
     "calendar_range": null,
     "calendar_agree": null,
@@ -5738,13 +5738,14 @@
     "saved_days": null,
     "pending_days": null,
     "errors": [
-      "stock_basic: cooling down until 2026-09-15T14:23:20.808189+00:00",
-      "trade_cal: cooling down until 2026-09-15T14:29:04.496593+00:00"
+      "trade_cal: rate_limited 抱歉，您访问接口(trade_cal)频率超限(1次/分钟)，具体频次详情：https://tushare.pro/document/1?doc_id=108。"
     ],
-    "stock_counts": null
+    "stock_counts": {
+      "L": 5562
+    }
   },
   "analysis": {
-    "generated_at": "2026-09-15T21:37:36.879629+08:00",
+    "generated_at": "2026-09-16T02:44:44.133318+08:00",
     "status": "waiting_data",
     "start_date": null,
     "end_date": null,
@@ -5770,15 +5771,15 @@
     },
     {
       "kind": "sync",
-      "id": "34975604192-1",
-      "generated_at": "2026-09-15T21:32:10.807269+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/34975604192-1.md"
+      "id": "35009296665-1",
+      "generated_at": "2026-09-16T02:44:07.388566+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35009296665-1.md"
     },
     {
       "kind": "analysis",
-      "id": "34976194278-1",
-      "generated_at": "2026-09-15T21:37:36.879629+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/34976194278-1.md"
+      "id": "35009296590-1",
+      "generated_at": "2026-09-16T02:44:44.133318+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35009296590-1.md"
     }
   ]
 }
