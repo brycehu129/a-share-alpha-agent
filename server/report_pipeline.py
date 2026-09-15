@@ -13,6 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from collect_quotes import CST, collect, open_database
+from daily_data import collect_datasets, dataset_markdown
 
 SYMBOLS = ['sh000001', 'sz399001', 'sh000300', 'sh000852', 'sz399006', 'sh000688']
 LIMITATIONS = [
@@ -67,7 +68,7 @@ def markdown(report):
               '- 原始字段、响应摘要与行情时间保存在同编号 JSON 中。',
               '- 涨跌幅按最新点位与昨收计算；并非策略收益。',
               '- 相同行情时间的重复采集只增加报告数，不增加独立交易日数。', '']
-    return '\n'.join(lines)
+    return '\n'.join(lines) + (dataset_markdown(report['datasets']) if 'datasets' in report else '')
 
 
 def build_report(db, record_id, history):
@@ -160,7 +161,7 @@ def main():
             raise ValueError('历史报告数不符合追加预期')
         print(f'PASS: fresh runner restored {len(history)} reports; prior={r["previous_count"]}; current={r["id"]}')
         print(r['summary'])
-        if r['status'] != 'success':
+        if r['status'] != 'success' or r.get('datasets', {}).get('status', 'success') != 'success':
             return 1
         summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
         if summary_path:
@@ -179,6 +180,13 @@ def main():
         report = build_report(db, args.run_id, history)
     finally:
         db.close()
+    report['datasets'] = collect_datasets()
+    report['version'] = 'snapshot-0.3'
+    report['limitations'] = [
+        '仅6指数快照及固定5只测试股票，不是全市场扫描或候选股。',
+        '历史观察交易日已保存，官方未来休市日历尚未核验。',
+        '板块、新闻、评分、模型预测、虚拟交易及Dashboard接入尚未完成。',
+    ]
     md = persist_report(args.history, report)
     (args.results / 'report.md').write_text(md, encoding='utf-8')
     print(f'已恢复 {len(history)} 份历史；生成 {report["id"]}；状态 {report["status"]}')

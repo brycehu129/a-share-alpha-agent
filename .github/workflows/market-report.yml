@@ -8,6 +8,8 @@ on:
       - '.github/workflows/market-report.yml'
       - 'server/report_pipeline.py'
       - 'server/test_report_pipeline.py'
+      - 'server/daily_data.py'
+      - 'server/test_daily_data.py'
 
 permissions:
   contents: read
@@ -31,7 +33,7 @@ jobs:
         with:
           persist-credentials: false
       - name: 验证历史处理规则
-        run: python3 -m unittest discover -s server -p 'test_report_pipeline.py' -v
+        run: python3 -m unittest discover -s server -p 'test_*.py' -v
       - name: 恢复历史分支
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
