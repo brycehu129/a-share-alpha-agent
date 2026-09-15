@@ -146,14 +146,26 @@ def main():
     started = time.monotonic()
     deadlines = cooldowns(root, now)
     blocked = set()
+    last_calendar_call = None
 
     def call(api, params, fields):
+        nonlocal last_calendar_call
         if api in deadlines:
             raise ValueError(api + ': cooling down until ' + deadlines[api].isoformat())
         if api in blocked:
             raise ValueError(api + ': stopped after unsuccessful response in this run')
         if time.monotonic() - started > 480:
             raise ValueError('Request budget exhausted')
+        if api == 'trade_cal' and last_calendar_call is not None:
+            remaining = 65 - (time.monotonic() - last_calendar_call)
+            if remaining > 0:
+                if time.monotonic() - started + remaining > 480:
+                    raise ValueError('Calendar pacing exceeds request budget')
+                while remaining > 0:
+                    time.sleep(min(remaining, 30))
+                    remaining = 65 - (time.monotonic() - last_calendar_call)
+        if api == 'trade_cal':
+            last_calendar_call = time.monotonic()
         response = probe(api, params, fields, token)
         report['requests'].append({k: v for k, v in response.items() if k not in ('items', 'fields')})
         time.sleep(2)
