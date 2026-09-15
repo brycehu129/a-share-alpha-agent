@@ -35,6 +35,10 @@ jobs:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID"
+      - name: 根据本次数据更新研究报告
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 server/tushare_analysis.py --history .history --run-id "$REPORT_ID"
       - name: 保存数据和更新检查点
         id: save
         working-directory: .history
@@ -44,7 +48,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- tushare_data/
+          git add -- tushare_data/ tushare_analysis/
           git commit -m "Sync Tushare data $REPORT_ID"
           git push origin HEAD:market-data
           echo "data_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -62,6 +66,10 @@ jobs:
           ref: ${{ needs.sync.outputs.data_commit }}
           path: .history
           persist-credentials: false
+      - name: 从仓库重算本次研究报告
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 server/tushare_analysis.py --history .history --run-id "$REPORT_ID" --verify-only
       - name: 从仓库恢复并校验本次数据
         env:
           REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}

@@ -1,12 +1,25 @@
 """Offline descriptive factors from verified checkpoints; never requests market APIs."""
 import argparse
 import html
+import hashlib
+import json
 import re
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from pathlib import Path
 from tushare_sync import read, save, sha, check_day
+
+
+def read_source(path):
+    if path.parent.name != 'research':
+        return read(path)
+    envelope = json.loads(path.read_text())
+    payload = envelope['payload']
+    digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    if digest != envelope['sha256']:
+        raise ValueError('Research source checksum mismatch')
+    return payload
 
 
 def calculate(prices, adjustments, benchmark=None):
@@ -34,7 +47,7 @@ def build(history, now):
     root = history / 'tushare_data'
     r = {'status': 'waiting_data', 'generated_at': now.isoformat(), 'rankings': [], 'issues': [], 'sources': {}, 'excluded': {}}
     def source(path):
-        payload = read(path)
+        payload = read_source(path)
         r['sources'][str(path.relative_to(history))] = sha(payload)
         return payload
     calendar_path = root / 'trade_cal.json'
@@ -66,7 +79,7 @@ def build(history, now):
         adjustments.append({x['ts_code']: x['adj_factor'] for x in data['adj_factor']})
     benchmark = None
     for path in sorted((history / 'research').glob('*.json'), reverse=True):
-        data = read(path)
+        data = read_source(path)
         for item in data.get('daily', []):
             if item.get('symbol') == 'sh000300' and item.get('status') == 'success' and item.get('adjustment') == 'none':
                 bars = {b['date'].replace('-', ''): b['close'] for b in item['bars']}
@@ -126,7 +139,7 @@ def main():
     if args.verify_only:
         report = read(dest)
         for path, expected in report['sources'].items():
-            if sha(read(args.history / path)) != expected:
+            if sha(read_source(args.history / path)) != expected:
                 raise ValueError('Source checksum mismatch')
         regenerated = build(args.history, datetime.fromisoformat(report['generated_at']))
         if regenerated != report or render(report) != dest.with_suffix('.md').read_text():

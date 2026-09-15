@@ -170,13 +170,19 @@ def main():
         report['files'][relative] = sha(payload)
 
     try:
-        stocks = single_batch('stock_basic', {'list_status': 'L'},
+        master_path = root / 'stock_basic.json'
+        previous = read(master_path) if master_path.exists() else {}
+        cached = previous and datetime.fromisoformat(previous['fetched_at']).astimezone(now.tzinfo).date() == now.date()
+        stocks = previous['rows'] if cached else single_batch('stock_basic', {'list_status': 'L'},
             'ts_code,symbol,name,industry,market,exchange,list_status,list_date,delist_date', call)
         if any(r['list_status'] != 'L' for r in stocks):
             raise ValueError('Unexpected listing status')
         if len({r['ts_code'] for r in stocks}) != len(stocks) or not any(r['list_status'] == 'L' for r in stocks):
             raise ValueError('Stock master is empty or duplicated')
-        persist('stock_basic.json', {'rows': stocks})
+        if not cached:
+            persist('stock_basic.json', {'rows': stocks})
+        else:
+            report['files']['stock_basic.json'] = sha(previous)
         report['stock_counts'] = dict(Counter(r['list_status'] for r in stocks))
         hs = [r for r in stocks if r['list_status'] == 'L' and r['exchange'] in ('SSE', 'SZSE')]
         report['active_hs'] = len(hs)
@@ -198,7 +204,10 @@ def main():
             if len(rows) != len(expected) or {r['cal_date'] for r in rows} != expected or any(r['exchange'] != exchange or r['is_open'] not in (0, 1, '0', '1') for r in rows):
                 raise ValueError('Calendar incomplete or invalid: ' + exchange)
             calendars[exchange] = rows
-            persist('calendars/' + exchange + '.json', {'rows': rows, 'start_date': start, 'end_date': end})
+            if rows is old.get('rows'):
+                report['files']['calendars/' + exchange + '.json'] = sha(old)
+            else:
+                persist('calendars/' + exchange + '.json', {'rows': rows, 'start_date': start, 'end_date': end})
         opens = {e: {r['cal_date'] for r in rows if str(r['is_open']) == '1'} for e, rows in calendars.items()}
         report['calendar_agree'] = opens['SSE'] == opens['SZSE']
         if not report['calendar_agree']:

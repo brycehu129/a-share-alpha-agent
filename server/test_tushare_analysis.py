@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+import hashlib
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from tushare_analysis import calculate, build
@@ -20,6 +22,14 @@ class AnalysisTests(unittest.TestCase):
             r = build(history, now)
             self.assertEqual(r['status'], 'partial')
             self.assertEqual(r['rankings'][0]['return20_pct'], '0.00')
+            benchmark = {'daily': [{'symbol': 'sh000300', 'status': 'success', 'adjustment': 'none', 'bars': [{'date': day, 'close': 100} for day in dates]}]}
+            digest = hashlib.sha256(json.dumps(benchmark, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+            archive = history / 'research/1-1.json'
+            archive.parent.mkdir()
+            archive.write_text(json.dumps({'payload': benchmark, 'sha256': digest}))
+            r = build(history, now)
+            self.assertEqual(r['status'], 'ready')
+            self.assertEqual(r['rankings'][0]['excess20_pp'], '0.00')
             (root / 'days' / (dates[0] + '.json')).unlink()
             r = build(history, now)
             self.assertEqual(r['status'], 'waiting_data')
