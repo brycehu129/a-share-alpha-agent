@@ -8,6 +8,7 @@ import os
 import re
 import statistics
 import sys
+import subprocess
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -20,7 +21,7 @@ from collect_quotes import CST
 from daily_data import request, parse_daily
 from report_pipeline import read_history, digest
 from universe_data import BASE
-from research_quality import eastmoney_industries, exclude_reason
+from research_quality import eastmoney_industries, baostock_industries, exclude_reason
 
 
 def industries(raw):
@@ -109,6 +110,17 @@ def build(source):
             data['industry_provider'] = '东方财富行业'
     except (OSError, ValueError, KeyError, TypeError) as exc:
         data['industry_attempts'].append({'provider': '东方财富行业', 'status': 'failed', 'error': str(exc)})
+    if not data['industries']:
+        try:
+            candidate, metadata = baostock_industries(now.date())
+            covered = {s for g in candidate for s in g['symbols']} & members.keys()
+            data['industry_attempts'].append({'provider': 'BaoStock', 'mapped': len(covered),
+                                             'status': 'success', **metadata})
+            if len(covered) >= 0.9 * len(members):
+                data['industries'] = candidate
+                data['industry_provider'] = 'BaoStock / ' + metadata['classification']
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+            data['industry_attempts'].append({'provider': 'BaoStock', 'status': 'failed', 'error': str(exc)})
     try:
         if data['industries']:
             definitions = []
@@ -196,7 +208,7 @@ def render(d):
     lines = ['# 行业与样本相对强度 · 研究验证', '',
              f'报告 {d["id"]} · 状态 {d["status"]} · 生成时间 {d["generated_at"]}', '',
              f'行情来源：历史报告 {d["source_id"]}，采集于 {d["source_generated_at"]}；本次没有重新采集全市场报价。', '',
-             f'行业分类来源：{safe(d.get("industry_provider", "新浪行业"))}，当前映射 {m["mapped_count"]}/{m["universe_count"]} 只；未映射或冲突 {len(m["unmapped"])} 只。不是申万分类，也不是历史成分库。', '',
+             f'行业分类来源：{safe(d.get("industry_provider", "新浪行业"))}，当前映射 {m["mapped_count"]}/{m["universe_count"]} 只；未映射或冲突 {len(m["unmapped"])} 只。分类口径以上述来源为准，不是历史成分库。', '',
              '## 行业内单日表现', '',
              f'报价日期：{d["industry_quote_date"]}。按已映射、同日期股票涨跌幅中位数排序；至少5只有效报价，组内覆盖率至少90%。', '',
              '| 行业 | 有效/纳入/源成员 | 涨跌幅中位数 | 上涨占比 |', '|---|---:|---:|---:|']

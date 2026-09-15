@@ -2,6 +2,10 @@
 import json
 import math
 import re
+import subprocess
+import sys
+from pathlib import Path
+from datetime import date
 from collections import defaultdict
 from decimal import Decimal
 from urllib.parse import urlencode
@@ -64,3 +68,33 @@ def exclude_reason(member, quote, quote_date):
     except (KeyError, ArithmeticError):
         return '价格字段异常'
     return None  # Research eligible only; never equivalent to tradable.
+
+
+def baostock_industries(today):
+    result = subprocess.run([sys.executable, str(Path(__file__).with_name('baostock_industry.py'))],
+                            capture_output=True, text=True, timeout=65, check=True)
+    payload = json.loads(result.stdout)
+    seen, groups, dates, classifications = set(), defaultdict(list), set(), set()
+    for row in payload['rows']:
+        symbol = row['code'].replace('.', '')
+        if not re.fullmatch(r'(sh6\d{5}|sz[03]\d{5})', symbol):
+            continue
+        if symbol in seen:
+            raise ValueError('BaoStock duplicate code')
+        seen.add(symbol)
+        industry, classification = row['industry'], row['industryClassification']
+        if not industry or not classification:
+            continue
+        updated = date.fromisoformat(row['updateDate'])
+        if updated > today or (today - updated).days > 370:
+            raise ValueError('BaoStock classification date out of accepted range')
+        dates.add(updated.isoformat())
+        classifications.add(classification)
+        groups[classification + ':' + industry].append(symbol)
+    if not groups or len(classifications) != 1:
+        raise ValueError('BaoStock empty or mixed classification systems')
+    items = [{'node': 'bs:' + name, 'name': name, 'symbols': symbols,
+              'expected': len(symbols), 'status': 'success'} for name, symbols in sorted(groups.items())]
+    metadata = {'provider_version': payload['provider_version'], 'update_dates': sorted(dates),
+                'classification': next(iter(classifications))}
+    return items, metadata

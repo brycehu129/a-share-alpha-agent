@@ -8,6 +8,7 @@ on:
       - 'server/test_research_pipeline.py'
       - 'server/research_quality.py'
       - 'server/test_research_quality.py'
+      - 'server/baostock_industry.py'
       - '.github/workflows/research-report.yml'
 permissions:
   contents: read
@@ -28,6 +29,9 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s server -p 'test_*.py' -v
+      - name: 安装可选行业数据客户端
+        continue-on-error: true
+        run: python3 -m pip install --disable-pip-version-check --timeout 20 --retries 1 'baostock>=0.8,<0.9'
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: market-data
