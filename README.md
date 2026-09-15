@@ -72,8 +72,10 @@ python3 -m unittest discover -s server -p 'test_report_pipeline.py' -v
 
 [数据与更新进度](https://github.com/brycehu129/a-share-alpha-agent/tree/market-data/tushare_data) · [运行同步](https://github.com/brycehu129/a-share-alpha-agent/actions/workflows/tushare-sync.yml)
 
-仅使用已实测开放的 stock_basic、trade_cal、daily、adj_factor。仓库密钥名 TUSHARE_TOKEN。手动运行工作流；无定时。每轮最多10日期，先最新缺失日，滚动目标60个已过去的沪深交易日；最近2日重复获取用于源修订。每日期全市场分页请求，日线必须匹配同日复权因子才保存，失败保留旧检查点并停止后续日期。
+仅使用已实测开放的 stock_basic、trade_cal、daily、adj_factor。仓库密钥名 TUSHARE_TOKEN。手动运行工作流；无定时。每轮最多10日期，先最新缺失日，滚动目标60个已过去的沪深交易日；最近2日重复获取用于源修订。每日期请求全市场数据，单次上限6000条，触及上限视为完整性未知。日线、复权因子原始结果分别保存，匹配并校验后才形成完整日期检查点；失败停止后续日期。
 
-股票主表包含L/D/P查询结果（非历史每日状态）；日历保存上一年及当年SSE/SZSE全自然日并核对开市日期。行业来自stock_basic字段，不当作申万分类。数据放在tushare_data，独立于旧研究报告，尚未切换旧排名或接入Dashboard。
+股票主表暂取在市L状态，D/P档案暂缓（当前状态非历史每日状态）；日历按交易所分别保存并复用，目标上一年及当年SSE/SZSE全自然日并核对开市日期。行业来自stock_basic字段，不当作申万分类。数据放在tushare_data，独立于旧研究报告，尚未切换旧排名或接入Dashboard。
 
 每日文件、股票主表和日历可被源修订更新，Git保留旧版本；每次运行报告独立追加，并用独立运行机器按本次数据提交校验文件摘要。初次只完成一批，不代表60日已全部齐备。Token仅在请求步骤注入，代码不输出凭证或请求正文。
+
+实测 stock_basic、trade_cal 限频为1次/小时。同步会根据已归档的限频响应跳过冷却期请求，股票主表失败不阻断日历更新。日历未完成双市场核验时不启动批量日线。当前尚未成功完成首次批量导入，具体进度以数据分支最新报告为准；没有自动重试定时器，冷却后需手动运行。
