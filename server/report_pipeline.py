@@ -14,6 +14,7 @@ from pathlib import Path
 
 from collect_quotes import CST, collect, open_database
 from daily_data import collect_datasets, dataset_markdown
+from universe_data import collect_universe, universe_markdown
 
 SYMBOLS = ['sh000001', 'sz399001', 'sh000300', 'sh000852', 'sz399006', 'sh000688']
 LIMITATIONS = [
@@ -68,7 +69,8 @@ def markdown(report):
               '- 原始字段、响应摘要与行情时间保存在同编号 JSON 中。',
               '- 涨跌幅按最新点位与昨收计算；并非策略收益。',
               '- 相同行情时间的重复采集只增加报告数，不增加独立交易日数。', '']
-    return '\n'.join(lines) + (dataset_markdown(report['datasets']) if 'datasets' in report else '')
+    return ('\n'.join(lines) + (dataset_markdown(report['datasets']) if 'datasets' in report else '')
+            + (universe_markdown(report['universe']) if 'universe' in report else ''))
 
 
 def build_report(db, record_id, history):
@@ -129,7 +131,7 @@ def persist_report(root, report):
         stream.write(md)
     entries = read_history(root)
     lines = ['# A股 Alpha Agent · 报告历史', '',
-             '当前阶段：指数快照、固定个股与日线访问验证；无模型选股、无交易、尚未连接 Dashboard。', '',
+             '当前阶段：指数快照、日线样本及沪深批量行情；无模型选股、无交易、尚未连接 Dashboard。', '',
              f'累计报告：{len(entries)} 份。', '',
              '历史文件按报告编号追加保存，最新目录可更新。Git 管理员仍可修改仓库，因此这不是防篡改审计存储。', '',
              '| 采集时间（北京时间） | 状态 | 报告 |', '|---|---|---|']
@@ -161,7 +163,9 @@ def main():
             raise ValueError('历史报告数不符合追加预期')
         print(f'PASS: fresh runner restored {len(history)} reports; prior={r["previous_count"]}; current={r["id"]}')
         print(r['summary'])
-        if r['status'] != 'success' or r.get('datasets', {}).get('status', 'success') != 'success':
+        if (r['status'] != 'success' or r.get('datasets', {}).get('status', 'success') != 'success'
+                or ('universe' in r and (not r['universe']['list_verified']
+                                        or r['universe']['coverage_pct'] < 90))):
             return 1
         summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
         if summary_path:
@@ -181,9 +185,10 @@ def main():
     finally:
         db.close()
     report['datasets'] = collect_datasets()
-    report['version'] = 'snapshot-0.3'
+    report['universe'] = collect_universe()
+    report['version'] = 'snapshot-0.4'
     report['limitations'] = [
-        '仅6指数快照及固定5只测试股票，不是全市场扫描或候选股。',
+        '6指数快照、固定5只日线样本及源清单内沪深批量报价；具体覆盖率见下文，不是候选股。',
         '历史观察交易日已保存，官方未来休市日历尚未核验。',
         '板块、新闻、评分、模型预测、虚拟交易及Dashboard接入尚未完成。',
     ]
