@@ -1,0 +1,67 @@
+name: 行业与样本强度研究
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'server/research_pipeline.py'
+      - 'server/test_research_pipeline.py'
+      - '.github/workflows/research-report.yml'
+permissions:
+  contents: read
+concurrency:
+  group: market-report-history
+  cancel-in-progress: false
+jobs:
+  research:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    outputs:
+      data_commit: ${{ steps.save.outputs.data_commit }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s server -p 'test_*.py' -v
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: market-data
+          path: .history
+      - name: 获取行业与批量日线
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 -u server/research_pipeline.py --history .history --run-id "$REPORT_ID"
+      - name: 追加保存研究报告
+        id: save
+        working-directory: .history
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "research/$REPORT_ID.json" "research/$REPORT_ID.md" research/README.md
+          git commit -m "Archive research $REPORT_ID"
+          git push origin HEAD:market-data
+          echo "data_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  verify:
+    needs: research
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.research.outputs.data_commit }}
+          path: .history
+          persist-credentials: false
+      - name: 从仓库恢复并验证研究结果
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 server/research_pipeline.py --history .history --run-id "$REPORT_ID" --verify-only
