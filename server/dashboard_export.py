@@ -1,0 +1,69 @@
+"""Small, credential-free dashboard snapshot exported from verified archives."""
+import argparse
+import hashlib
+import json
+from collections import Counter
+from datetime import datetime, timezone, timedelta
+from decimal import Decimal
+from pathlib import Path
+
+
+def verified(path, compact=False):
+    envelope = json.loads(path.read_text())
+    payload = envelope['payload']
+    options = {'separators': (',', ':')} if compact else {}
+    digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, **options).encode()).hexdigest()
+    if digest != envelope['sha256']:
+        raise ValueError('Source checksum mismatch: ' + path.name)
+    return payload
+
+
+def latest(history, folder, compact=False):
+    entries = [(p, verified(p, compact)) for p in (history / folder).glob('*.json')]
+    return max(entries, key=lambda x: (x[1]['generated_at'], x[0].name)) if entries else (None, None)
+
+
+def build(history):
+    result = {'schema_version': 1, 'exported_at': datetime.now(timezone(timedelta(hours=8))).isoformat(),
+              'market': None, 'research': None, 'sync': None, 'analysis': None, 'sources': []}
+    for kind, folder, compact in [('market', 'records', True), ('research', 'research', True),
+                                 ('sync', 'tushare_data/runs', False), ('analysis', 'tushare_analysis', False)]:
+        path, d = latest(history, folder, compact)
+        if d is None:
+            continue
+        md = str(path.relative_to(history).with_suffix('.md'))
+        if kind == 'market':
+            md = 'reports/' + path.stem + '.md'
+        result['sources'].append({'kind': kind, 'id': path.stem, 'generated_at': d['generated_at'],
+            'url': 'https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/' + md})
+        if kind == 'market':
+            u = d.get('universe', {})
+            dates = Counter(q['quote_at'][:10] for q in u.get('quotes', []))
+            breadth = None
+            if len(dates) == 1:
+                changes = [(Decimal(str(q['last'])) / Decimal(str(q['previous_close'])) - 1) for q in u['quotes']]
+                breadth = {'up': sum(v > 0 for v in changes), 'down': sum(v < 0 for v in changes), 'flat': sum(v == 0 for v in changes)}
+            result[kind] = {'generated_at': d['generated_at'], 'status': d['status'], 'summary': d['summary'],
+                'quotes': [{k: q[k] for k in ('name', 'symbol', 'last', 'change_pct', 'quote_at')} for q in d['quotes']],
+                'universe': {'status': u.get('status'), 'listed': len(u.get('members', [])), 'quoted': len(u.get('quotes', [])),
+                    'coverage_pct': u.get('coverage_pct'), 'dates': dict(dates), 'breadth': breadth}}
+        elif kind == 'research':
+            result[kind] = {k: d.get(k) for k in ('generated_at', 'status', 'factor_cutoff', 'industry_provider', 'mapping', 'source_id', 'source_generated_at')}
+            result[kind].update(sample_count=len(d.get('sample', [])), factor_count=len(d.get('rankings', [])),
+                rankings=d.get('rankings', [])[:30], industries=d.get('industry_ranking', [])[:12])
+        elif kind == 'sync':
+            result[kind] = {k: d.get(k) for k in ('generated_at', 'status', 'calendar_range', 'calendar_agree', 'target_days', 'saved_days', 'pending_days', 'errors', 'stock_counts')}
+        else:
+            result[kind] = {k: d.get(k) for k in ('generated_at', 'status', 'start_date', 'end_date', 'missing_dates', 'issues')}
+            result[kind].update(rankings=d.get('rankings', [])[:30], factor_count=len(d.get('rankings', [])))
+    return result
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--history', type=Path, required=True)
+    args = parser.parse_args()
+    dest = args.history / 'dashboard/latest.json'
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(build(args.history), ensure_ascii=False, indent=2))
+    print('Dashboard snapshot exported from verified archives')

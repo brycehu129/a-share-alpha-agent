@@ -1,0 +1,38 @@
+name: Dashboard数据快照
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Tushare离线研究报告', 'Tushare基础数据与日线增量同步', 'A股市场快照与历史保存', '行业与样本强度研究']
+    types: [completed]
+  push:
+    branches: [master]
+    paths: ['server/dashboard_export.py', '.github/workflows/dashboard-export.yml']
+permissions:
+  contents: read
+concurrency:
+  group: market-report-history
+  cancel-in-progress: false
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: master
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: market-data
+          path: .history
+      - run: python3 server/dashboard_export.py --history .history
+      - working-directory: .history
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- dashboard/latest.json
+          git commit -m 'Update dashboard data snapshot'
+          git push origin HEAD:market-data
