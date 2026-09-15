@@ -1,0 +1,68 @@
+name: Tushare基础数据与日线增量同步
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'server/tushare_sync.py'
+      - 'server/test_tushare_sync.py'
+      - '.github/workflows/tushare-sync.yml'
+permissions:
+  contents: read
+concurrency:
+  group: market-report-history
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    outputs:
+      data_commit: ${{ steps.save.outputs.data_commit }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s server -p 'test_tushare_*.py' -v
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: market-data
+          path: .history
+      - name: 获取基础数据与缺失交易日
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID"
+      - name: 保存数据和更新检查点
+        id: save
+        working-directory: .history
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tushare_data/
+          git commit -m "Sync Tushare data $REPORT_ID"
+          git push origin HEAD:market-data
+          echo "data_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  verify:
+    needs: sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.sync.outputs.data_commit }}
+          path: .history
+          persist-credentials: false
+      - name: 从仓库恢复并校验本次数据
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 server/tushare_sync.py --history .history --run-id "$REPORT_ID" --verify-only

@@ -67,3 +67,13 @@ python3 -m unittest discover -s server -p 'test_report_pipeline.py' -v
 尝试东方财富批量 f100 行业字段，核对分页总数、去重、有效字段并要求覆盖当前清单至少90%才切换；失败则记录错误并保留新浪分类，禁止拼接不同分类体系。报告显示实际采用来源与验证结果。行业统计也应用基础排除规则。
 
 新增行业备选源：东方财富不可用或覆盖不足时，尝试 BaoStock query_stock_industry；客户端仅在采集任务安装，查询以65秒独立进程超时限制。记录客户端版本、分类体系和源更新日期；混合分类、重复代码、未来日期或超过370天的分类不采用，覆盖低于90%仍回退新浪。不同来源不混用；实际是否采用及失败原因以报告为准。
+
+## Tushare四接口同步
+
+[数据与更新进度](https://github.com/brycehu129/a-share-alpha-agent/tree/market-data/tushare_data) · [运行同步](https://github.com/brycehu129/a-share-alpha-agent/actions/workflows/tushare-sync.yml)
+
+仅使用已实测开放的 stock_basic、trade_cal、daily、adj_factor。仓库密钥名 TUSHARE_TOKEN。手动运行工作流；无定时。每轮最多10日期，先最新缺失日，滚动目标60个已过去的沪深交易日；最近2日重复获取用于源修订。每日期全市场分页请求，日线必须匹配同日复权因子才保存，失败保留旧检查点并停止后续日期。
+
+股票主表包含L/D/P查询结果（非历史每日状态）；日历保存上一年及当年SSE/SZSE全自然日并核对开市日期。行业来自stock_basic字段，不当作申万分类。数据放在tushare_data，独立于旧研究报告，尚未切换旧排名或接入Dashboard。
+
+每日文件、股票主表和日历可被源修订更新，Git保留旧版本；每次运行报告独立追加，并用独立运行机器按本次数据提交校验文件摘要。初次只完成一批，不代表60日已全部齐备。Token仅在请求步骤注入，代码不输出凭证或请求正文。
