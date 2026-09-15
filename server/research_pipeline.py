@@ -33,6 +33,8 @@ def industries(raw):
         count = int(fields[2])
         if not 0 <= count <= 2000:
             raise ValueError('invalid industry count')
+        if fields[1] == '次新股':
+            continue  # Listing-age theme is not an industry classification.
         result.append({'node': key, 'name': fields[1], 'expected': count})
     if not 1 <= len(result) <= 150:
         raise ValueError('invalid industry list size')
@@ -147,9 +149,12 @@ def build(source):
     print('Daily requests completed', flush=True)
     benchmark = data['daily'][0]['bars']
     successful = [s for s in data['daily'][1:] if s['bars']]
-    # Use one shared sample date, then reject laggards instead of mixing dates.
-    cutoff = max((s['bars'][-1]['date'] for s in successful), default=None)
+    # Predefined conservative cutoff, independent of stock returns or availability.
+    # Same-day bars may be provisional or absent in one adjustment series.
+    cutoff = max((b['date'] for b in benchmark if b['date'] < now.date().isoformat()), default=None)
     data['factor_cutoff'] = cutoff
+    data['cutoff_rule'] = '采集当天之前的最近一个基准日线日期；不使用当日日线，不按收益选择日期'
+    data['daily_fetch_success'] = len(successful)
     for item in data['daily'][1:]:
         try:
             item['factors'] = factors(item['bars'], benchmark, cutoff)
@@ -178,6 +183,7 @@ def render(d):
     lines += ['', '这是单日价格表现，不是已验证的 Money Effect Score。未映射股票不参与计算，当前行业成分可能不完整或陈旧。', '',
               '## 120只固定样本内的20日相对强度', '',
               f'按代码SHA-256排序取前120只，不按收益挑样本；有效因子 {len(d["rankings"])}/{len(d["sample"])}。统一截止日：{d["factor_cutoff"]}。', '',
+              d.get('cutoff_rule', '首版按源日线最新日期，缺失者不计算。'), '',
               '20日收益=(末日收盘/20个交易间隔前收盘−1)×100%；超额=股票收益−沪深300同期价格指数收益，单位为百分点。两者21个日期必须完全对齐。', '',
               '| 股票 | 代码 | 20日收益 | 相对沪深300 | 偏离20日均线 |', '|---|---|---:|---:|---:|']
     for r in d['rankings'][:15]:
@@ -208,7 +214,7 @@ def main():
     if args.verify_only:
         envelope = json.loads(path.read_text())
         d = envelope['payload']
-        if envelope['sha256'] != digest(d) or mdpath.read_text() != render(d):
+        if d['id'] != args.run_id or envelope['sha256'] != digest(d) or mdpath.read_text() != render(d):
             raise ValueError('research integrity mismatch')
         print(f'Restored research {d["id"]}: {len(d["rankings"])} factors; status={d["status"]}')
         if os.environ.get('GITHUB_STEP_SUMMARY'):

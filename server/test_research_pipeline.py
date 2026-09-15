@@ -9,6 +9,8 @@ class ResearchTests(unittest.TestCase):
         benchmark = [{**r, 'close': '100'} for r in rows]
         result = factors(rows, benchmark, rows[-1]['date'])
         self.assertEqual(result['excess20_pp'], '20.00')
+        later = rows + [{'date': '2026-01-22', 'close': '999'}]
+        self.assertEqual(factors(later, benchmark, rows[-1]['date']), result)
         with self.assertRaises(ValueError):
             factors(rows[:-1], benchmark, rows[-1]['date'])
         broken = [dict(r) for r in rows]
