@@ -1,0 +1,92 @@
+name: A股市场快照与历史保存
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/market-report.yml'
+      - 'server/report_pipeline.py'
+      - 'server/test_report_pipeline.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-report-history
+  cancel-in-progress: false
+
+jobs:
+  report:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: write
+    outputs:
+      data_commit: ${{ steps.publish.outputs.data_commit }}
+    steps:
+      - name: 读取程序
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: 验证历史处理规则
+        run: python3 -m unittest discover -s server -p 'test_report_pipeline.py' -v
+      - name: 恢复历史分支
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: market-data
+          path: .history
+          persist-credentials: true
+      - name: 获取行情并生成报告
+        env:
+          REPORT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          python3 -u server/report_pipeline.py --history .history --run-id "$REPORT_RUN_ID" 2>&1 | tee results/report.log
+      - name: 保存历史到私有仓库
+        id: publish
+        working-directory: .history
+        env:
+          REPORT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- README.md "records/$REPORT_RUN_ID.json" "reports/$REPORT_RUN_ID.md"
+          git commit -m "Archive market snapshot $REPORT_RUN_ID"
+          git push origin HEAD:market-data
+          DATA_COMMIT=$(git rev-parse HEAD)
+          echo "data_commit=$DATA_COMMIT" >> "$GITHUB_OUTPUT"
+      - name: 保存本次诊断文件
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: market-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: results/
+          retention-days: 7
+          if-no-files-found: warn
+
+  verify-restored:
+    needs: report
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: 读取同版本程序
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: 在全新机器恢复已推送历史
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.report.outputs.data_commit }}
+          path: .history
+          persist-credentials: false
+      - name: 核对报告、数据校验和与历史计数
+        env:
+          REPORT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 server/report_pipeline.py --history .history --run-id "$REPORT_RUN_ID" --verify-only
