@@ -79,3 +79,11 @@ python3 -m unittest discover -s server -p 'test_report_pipeline.py' -v
 每日文件、股票主表和日历可被源修订更新，Git保留旧版本；每次运行报告独立追加，并用独立运行机器按本次数据提交校验文件摘要。初次只完成一批，不代表60日已全部齐备。Token仅在请求步骤注入，代码不输出凭证或请求正文。
 
 实测 stock_basic、trade_cal 限频为1次/小时。同步会根据已归档的限频响应跳过冷却期请求，股票主表失败不阻断日历更新。日历未完成双市场核验时不启动批量日线。当前尚未成功完成首次批量导入，具体进度以数据分支最新报告为准；没有自动重试定时器，冷却后需手动运行。
+
+## Tushare离线分析
+
+[研究报告](https://github.com/brycehu129/a-share-alpha-agent/tree/market-data/tushare_analysis) · [手动生成](https://github.com/brycehu129/a-share-alpha-agent/actions/workflows/tushare-analysis.yml)
+
+只读取已归档数据，不请求行情接口、不使用Tushare密钥。连续21个交易日检查点齐备后计算20日调整收益和MA20偏离；复用已保存且日期完全对齐的沪深300计算超额百分点，缺少基准时留空。未齐备时生成waiting_data状态报告，不输出排名。历史涨幅不代表预测胜率，当前名单有幸存者偏差，不作为回测或交易建议。
+
+工作流绿色仅表示报告成功保存且可在另一台机器重算，不代表行情齐备；请查看报告的ready/partial/waiting_data状态。本任务手动运行，未自动接续采集或发布Dashboard。
