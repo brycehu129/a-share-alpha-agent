@@ -1,0 +1,63 @@
+name: A股行情连接测试
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/quote-smoke-test.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quote-smoke-test-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 获取代码
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: 检查 Python
+        run: |
+          python3 --version
+          python3 -c 'import sys; assert sys.version_info >= (3, 9)'
+
+      - name: 连续采集三次并保存
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          python3 -u server/collect_quotes.py \
+            --symbols sh000001,sz000001 \
+            --repeat 3 --interval 10 --timeout 20 \
+            --db results/alpha_quotes.sqlite3 2>&1 | tee results/collection.log
+
+      - name: 验证数据已保存
+        run: |
+          python3 server/collect_quotes.py --db results/alpha_quotes.sqlite3 --status
+          python3 - <<'PY'
+          import sqlite3
+          with sqlite3.connect('file:results/alpha_quotes.sqlite3?mode=ro', uri=True) as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+              success = db.execute("SELECT count(*) FROM collection_runs WHERE status='success'").fetchone()[0]
+              snapshots = db.execute('SELECT count(*) FROM quote_snapshots').fetchone()[0]
+              assert success == 3, f'Expected 3 successful runs; got {success}'
+              assert snapshots == 6, f'Expected 6 snapshots; got {snapshots}'
+              print('PASS: 3 successful requests, 6 saved snapshots.')
+          PY
+
+      - name: 保存数据库和诊断日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quote-test-${{ github.run_id }}-${{ github.run_attempt }}
+          path: results/
+          retention-days: 7
+          if-no-files-found: warn
