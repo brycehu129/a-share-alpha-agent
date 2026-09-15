@@ -1,7 +1,7 @@
 import json
 import unittest
 from datetime import date
-from daily_data import parse_daily
+from daily_data import parse_daily, quality_warnings
 
 
 class DailyTests(unittest.TestCase):
@@ -18,3 +18,8 @@ class DailyTests(unittest.TestCase):
     def test_no_adjustment_fallback(self):
         with self.assertRaises(ValueError):
             parse_daily(self.raw([['2026-09-14', '10', '11', '12', '9', '100']]), 'sz000001', 'qfq', date(2026, 9, 15))
+
+    def test_adjusted_lag_is_visible(self):
+        series = [{'symbol': 'sz000001', 'adjustment': 'qfq', 'bars': [{'date': '2026-09-14'}]}]
+        self.assertEqual(len(quality_warnings(series, ['2026-09-15'])), 1)
+        self.assertEqual(quality_warnings(series, ['2026-09-14']), [])

@@ -1,5 +1,6 @@
 """Small, explicit data-access sample; no universe selection or predictions."""
 import hashlib
+import html
 import json
 import time
 from datetime import date, datetime
@@ -29,7 +30,7 @@ def parse_daily(raw, symbol, adjustment, today):
     key = 'qfqday' if adjustment == 'qfq' else 'day'
     # Never silently label an unadjusted fallback as adjusted.
     rows = block.get(key)
-    if not isinstance(rows, list) or not rows:
+    if not isinstance(rows, list) or not rows or len(rows) > 320:
         raise ValueError('missing requested series: ' + key)
     result = []
     previous = None
@@ -65,9 +66,11 @@ def collect_datasets(now=None):
         for adjustment in (['none', 'qfq'] if symbol in STOCKS else ['none']):
             url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?' + urlencode({
                 'param': f'{symbol},day,,{now.date().isoformat()},320,' + ('qfq' if adjustment == 'qfq' else '')})
-            item = {'symbol': symbol, 'adjustment': adjustment, 'source_url': url}
+            item = {'symbol': symbol, 'adjustment': adjustment, 'source_url': url,
+                    'requested_at': datetime.now(CST).isoformat()}
             try:
                 raw = request(url)
+                item['fetched_at'] = datetime.now(CST).isoformat()
                 item['response_sha256'] = hashlib.sha256(raw).hexdigest()
                 item['bars'] = parse_daily(raw, symbol, adjustment, now.date())
                 item['status'] = 'success'
@@ -86,7 +89,17 @@ def collect_datasets(now=None):
                           'future_sessions': 'unknown', 'official_calendar_verified': False}
     if output['errors'] or not observed:
         output['status'] = 'partial'
+    output['quality_warnings'] = quality_warnings(output['series'], observed)
     return output
+
+
+def quality_warnings(series, observed):
+    warnings = []
+    if observed:
+        for s in series:
+            if s['bars'] and s['bars'][-1]['date'] != observed[-1]:
+                warnings.append(f'{s["symbol"]}/{s["adjustment"]} 最新日期 {s["bars"][-1]["date"]}，与指数最近日期 {observed[-1]} 不一致；暂停同日因子比较，不补填。')
+    return warnings
 
 
 def dataset_markdown(data):
@@ -106,4 +119,8 @@ def dataset_markdown(data):
               '所有源地址、获取时间、原始响应摘要和解析后日线保存在同编号 JSON 的 datasets 字段。', '']
     if data['errors']:
         lines += ['存在采集失败项，请查看 JSON 中 errors；未以其他复权口径替代。', '']
+    if data.get('quality_warnings'):
+        lines += ['### 日线日期差异', '']
+        lines += ['- ' + html.escape(w) for w in data['quality_warnings']]
+        lines += ['']
     return '\n'.join(lines)

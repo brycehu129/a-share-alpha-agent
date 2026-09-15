@@ -129,7 +129,7 @@ def persist_report(root, report):
         stream.write(md)
     entries = read_history(root)
     lines = ['# A股 Alpha Agent · 报告历史', '',
-             '当前阶段：6指数市场快照；无模型选股、无交易、尚未连接 Dashboard。', '',
+             '当前阶段：指数快照、固定个股与日线访问验证；无模型选股、无交易、尚未连接 Dashboard。', '',
              f'累计报告：{len(entries)} 份。', '',
              '历史文件按报告编号追加保存，最新目录可更新。Git 管理员仍可修改仓库，因此这不是防篡改审计存储。', '',
              '| 采集时间（北京时间） | 状态 | 报告 |', '|---|---|---|']
