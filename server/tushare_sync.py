@@ -73,6 +73,29 @@ def select_days(sessions, existing, batch):
     return list(dict.fromkeys(list(reversed(sessions[-2:])) + missing))[:batch]
 
 
+def cooldowns(root, now):
+    deadlines = {}
+    for path in (root / 'runs').glob('*.json'):
+        for request in read(path).get('requests', []):
+            if request.get('status') != 'rate_limited':
+                continue
+            message = request.get('message', '')
+            delay = timedelta(days=1) if '天' in message else timedelta(hours=1) if '小时' in message else timedelta(minutes=1)
+            until = datetime.fromisoformat(request['fetched_at']) + delay
+            if until > now:
+                deadlines[request['api']] = max(until, deadlines.get(request['api'], until))
+    return deadlines
+
+
+def single_batch(api, params, fields, call):
+    rows = call(api, {**params, 'limit': 6000}, fields)
+    if len(rows) >= 6000:
+        raise ValueError(api + ': reached row ceiling; completeness unknown')
+    if not rows or len({r['ts_code'] for r in rows}) != len(rows):
+        raise ValueError(api + ': empty or duplicate symbols')
+    return rows
+
+
 def render(r):
     safe = lambda x: html.escape(str(x)).replace('|', '&#124;').replace('\n', ' ')
     lines = ['# Tushare 数据同步', '', f'运行：{r["id"]} · 时间：{r["generated_at"]} · 状态：{r["status"]}', '',
@@ -80,10 +103,10 @@ def render(r):
              f'股票基础信息：{r.get("stock_counts", {})}；沪深在市股票行业字段非空：{r.get("industry_count", 0)}/{r.get("active_hs", 0)}。', '',
              '行业字段为 Tushare 基础信息分类，不等同申万分类；当前上市/退市状态不是历史每日状态，也不代表当前可交易。', '',
              f'日历范围：{r.get("calendar_range", "未取得")}；沪深开市日期一致：{r.get("calendar_agree", False)}。', '',
-             f'滚动目标最近60个已过去的沪深交易日：已保存 {r.get("saved_days", 0)}/{r.get("target_days", 0)} 天，尚缺 {r.get("pending_days", 0)} 天。', '',
+             f'滚动目标最近60个已过去的沪深交易日：已保存 {r.get("saved_days", "待确定")}/{r.get("target_days", "待确定")} 天，尚缺 {r.get("pending_days", "待确定")} 天。', '',
              '| 本次日期 | 状态 | 日线条数 | 复权因子条数 |', '|---|---|---:|---:|']
     lines += [f'| {x["date"]} | {x["status"]} | {x.get("daily", 0)} | {x.get("adj_factor", 0)} |' for x in r['days']]
-    lines += ['', '每日按接口返回的全体股票分页获取，非300只抽样；没有日线的股票不能直接认定停牌。北交所可能随接口返回，但本版调度日历仅核验沪深。', '',
+    lines += ['', '每日请求全体股票，单次上限6000条，触及上限不认定完整；没有日线的股票不能直接认定停牌。北交所可能随接口返回，但本版调度日历仅核验沪深。基础信息暂取在市L状态，退市和暂停上市档案暂缓。', '',
               '每轮最多处理10个日期，优先最近日期；已完成日期作为检查点，最近2日重取以接受源修订。当前文件可更新，旧版本由Git提交历史保留。', '',
               '日线与复权因子分开原样保存，所有有日线的股票必须有同日因子；未直接生成前复权价格或策略收益。日线量额单位沿用接口（成交量：手，成交额：千元）。', '',
               '尚未开启定时运行、交易或Dashboard数据接入。日期计数表示已通过分页及字段检查，不是与交易所逐股核验后的完整率。', '',
@@ -121,14 +144,21 @@ def main():
     now = datetime.now(timezone(timedelta(hours=8)))
     report = {'id': args.run_id, 'generated_at': now.isoformat(), 'days': [], 'errors': [], 'files': {}, 'requests': []}
     started = time.monotonic()
+    deadlines = cooldowns(root, now)
+    blocked = set()
 
     def call(api, params, fields):
+        if api in deadlines:
+            raise ValueError(api + ': cooling down until ' + deadlines[api].isoformat())
+        if api in blocked:
+            raise ValueError(api + ': stopped after unsuccessful response in this run')
         if time.monotonic() - started > 480:
             raise ValueError('Request budget exhausted')
         response = probe(api, params, fields, token)
         report['requests'].append({k: v for k, v in response.items() if k not in ('items', 'fields')})
         time.sleep(2)
         if response['status'] not in ('success', 'empty'):
+            blocked.add(api)
             raise ValueError(api + ': ' + response['status'] + ' ' + response['message'])
         if set(fields.split(',')) - set(response['fields']):
             raise ValueError(api + ': missing requested fields')
@@ -140,13 +170,10 @@ def main():
         report['files'][relative] = sha(payload)
 
     try:
-        stocks = []
-        for status in ('L', 'D', 'P'):
-            rows = fetch_pages('stock_basic', {'list_status': status},
-                'ts_code,symbol,name,industry,market,exchange,list_status,list_date,delist_date', ('ts_code',), call)
-            if any(r['list_status'] != status for r in rows):
-                raise ValueError('Unexpected listing status')
-            stocks.extend(rows)
+        stocks = single_batch('stock_basic', {'list_status': 'L'},
+            'ts_code,symbol,name,industry,market,exchange,list_status,list_date,delist_date', call)
+        if any(r['list_status'] != 'L' for r in stocks):
+            raise ValueError('Unexpected listing status')
         if len({r['ts_code'] for r in stocks}) != len(stocks) or not any(r['list_status'] == 'L' for r in stocks):
             raise ValueError('Stock master is empty or duplicated')
         persist('stock_basic.json', {'rows': stocks})
@@ -154,15 +181,24 @@ def main():
         hs = [r for r in stocks if r['list_status'] == 'L' and r['exchange'] in ('SSE', 'SZSE')]
         report['active_hs'] = len(hs)
         report['industry_count'] = sum(bool(r['industry'] and r['industry'] not in ('-', '--')) for r in hs)
+    except (ValueError, KeyError, TypeError, ArithmeticError) as exc:
+        report['errors'].append(str(exc).replace(token, '[REDACTED]'))
+    try:
         start, end = f'{now.year - 1}0101', f'{now.year}1231'
         calendars = {}
         for exchange in ('SSE', 'SZSE'):
-            rows = call('trade_cal', {'exchange': exchange, 'start_date': start, 'end_date': end}, 'exchange,cal_date,is_open,pretrade_date')
+            cache = root / 'calendars' / (exchange + '.json')
+            old = read(cache) if cache.exists() else {}
+            if old.get('start_date') == start and old.get('end_date') == end:
+                rows = old['rows']
+            else:
+                rows = call('trade_cal', {'exchange': exchange, 'start_date': start, 'end_date': end}, 'exchange,cal_date,is_open,pretrade_date')
             first, last = datetime.strptime(start, '%Y%m%d').date(), datetime.strptime(end, '%Y%m%d').date()
             expected = {(first + timedelta(days=i)).strftime('%Y%m%d') for i in range((last-first).days + 1)}
             if len(rows) != len(expected) or {r['cal_date'] for r in rows} != expected or any(r['exchange'] != exchange or r['is_open'] not in (0, 1, '0', '1') for r in rows):
                 raise ValueError('Calendar incomplete or invalid: ' + exchange)
             calendars[exchange] = rows
+            persist('calendars/' + exchange + '.json', {'rows': rows, 'start_date': start, 'end_date': end})
         opens = {e: {r['cal_date'] for r in rows if str(r['is_open']) == '1'} for e, rows in calendars.items()}
         report['calendar_agree'] = opens['SSE'] == opens['SZSE']
         if not report['calendar_agree']:
@@ -177,8 +213,10 @@ def main():
             existing.add(path.stem)
         for day in select_days(sessions, existing, 10):
             try:
-                prices = fetch_pages('daily', {'trade_date': day}, 'ts_code,trade_date,open,high,low,close,pre_close,vol,amount', ('ts_code', 'trade_date'), call)
-                factors = fetch_pages('adj_factor', {'trade_date': day}, 'ts_code,trade_date,adj_factor', ('ts_code', 'trade_date'), call)
+                prices = single_batch('daily', {'trade_date': day}, 'ts_code,trade_date,open,high,low,close,pre_close,vol,amount', call)
+                persist('raw/daily/' + day + '.json', {'trade_date': day, 'rows': prices})
+                factors = single_batch('adj_factor', {'trade_date': day}, 'ts_code,trade_date,adj_factor', call)
+                persist('raw/adj_factor/' + day + '.json', {'trade_date': day, 'rows': factors})
                 check_day(day, prices, factors)
                 persist('days/' + day + '.json', {'trade_date': day, 'daily': prices, 'adj_factor': factors})
                 existing.add(day)
