@@ -9,6 +9,7 @@ import re
 import statistics
 import sys
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from decimal import Decimal
@@ -19,6 +20,7 @@ from collect_quotes import CST
 from daily_data import request, parse_daily
 from report_pipeline import read_history, digest
 from universe_data import BASE
+from research_quality import eastmoney_industries, exclude_reason
 
 
 def industries(raw):
@@ -61,7 +63,7 @@ def factors(stock, benchmark, cutoff):
 
 def build(source):
     now = datetime.now(CST)
-    data = {'id': '', 'version': 'research-0.5', 'generated_at': now.isoformat(),
+    data = {'id': '', 'version': 'research-0.6', 'generated_at': now.isoformat(),
             'source_id': source['id'], 'source_generated_at': source['generated_at'],
             'requests': [], 'errors': [], 'industries': [], 'daily': [], 'rankings': []}
     started = time.monotonic()
@@ -95,14 +97,29 @@ def build(source):
             item.update(symbols=[], status='failed', error=str(exc))
         return item
 
+    members = {m['symbol']: m for m in source['universe']['members']}
+    data['industry_provider'] = '新浪行业'
+    data['industry_attempts'] = []
     try:
-        definitions = industries(get('https://vip.stock.finance.sina.com.cn/q/view/newSinaHy.php'))
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            data['industries'] = list(pool.map(sector, definitions))
+        candidate = eastmoney_industries(get)
+        covered = {s for g in candidate for s in g['symbols']} & members.keys()
+        data['industry_attempts'].append({'provider': '东方财富行业', 'mapped': len(covered), 'status': 'success'})
+        if len(covered) >= 0.9 * len(members):
+            data['industries'] = candidate
+            data['industry_provider'] = '东方财富行业'
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        data['industry_attempts'].append({'provider': '东方财富行业', 'status': 'failed', 'error': str(exc)})
+    try:
+        if data['industries']:
+            definitions = []
+        else:
+            definitions = industries(get('https://vip.stock.finance.sina.com.cn/q/view/newSinaHy.php'))
+        if definitions:
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                data['industries'] = list(pool.map(sector, definitions))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         data['errors'].append('行业分类: ' + str(exc))
     print('Industry requests completed', flush=True)
-    members = {m['symbol']: m for m in source['universe']['members']}
     membership = {}
     for item in data['industries']:
         for symbol in item['symbols']:
@@ -115,10 +132,15 @@ def build(source):
     quotes = {q['symbol']: q for q in source['universe']['quotes']}
     quote_dates = {q['quote_at'][:10] for q in quotes.values()}
     data['industry_quote_date'] = next(iter(quote_dates)) if len(quote_dates) == 1 else None
+    excluded = {symbol: reason for symbol, member in members.items()
+                if (reason := exclude_reason(member, quotes.get(symbol), data['industry_quote_date']))}
+    data['screening'] = {'excluded': excluded, 'counts': dict(Counter(excluded.values())),
+                         'remaining': len(members) - len(excluded),
+                         'tradability': 'unknown: 未核验官方停牌、上市状态、涨跌停及实际成交能力'}
     data['industry_ranking'] = []
     if len(quote_dates) == 1:
         for item in data['industries']:
-            eligible = [s for s in item['symbols'] if unique.get(s) == item['node']]
+            eligible = [s for s in item['symbols'] if unique.get(s) == item['node'] and s not in excluded]
             values = [float(quotes[s]['change_pct']) for s in eligible if s in quotes]
             coverage = len(values) / len(eligible) if eligible else 0
             if len(values) >= 5 and coverage >= 0.9:
@@ -129,7 +151,7 @@ def build(source):
                     'up_pct': round(sum(v > 0 for v in values) * 100 / len(values), 2)})
         data['industry_ranking'].sort(key=lambda r: (-r['median_change_pct'], r['node']))
     # Stable code hash sample is reproducible, but not representative or a recommendation.
-    selected = sorted(members, key=lambda s: hashlib.sha256(s.encode()).hexdigest())[:120]
+    selected = sorted(set(members) - excluded.keys(), key=lambda s: hashlib.sha256(s.encode()).hexdigest())[:300]
     data['sample'] = selected
 
     def daily(symbol):
@@ -163,7 +185,7 @@ def build(source):
         except (ValueError, TypeError, ArithmeticError) as exc:
             item['factor_error'] = str(exc)
     data['rankings'].sort(key=lambda r: (-Decimal(r['excess20_pp']), r['symbol']))
-    data['status'] = 'success' if data['industry_ranking'] and len(data['rankings']) >= 108 else 'partial'
+    data['status'] = 'success' if data['industry_ranking'] and len(data['rankings']) >= 270 else 'partial'
     data['finished_at'] = datetime.now(CST).isoformat()
     return data
 
@@ -174,15 +196,15 @@ def render(d):
     lines = ['# 行业与样本相对强度 · 研究验证', '',
              f'报告 {d["id"]} · 状态 {d["status"]} · 生成时间 {d["generated_at"]}', '',
              f'行情来源：历史报告 {d["source_id"]}，采集于 {d["source_generated_at"]}；本次没有重新采集全市场报价。', '',
-             f'行业分类来源：新浪行业，当前映射 {m["mapped_count"]}/{m["universe_count"]} 只；未映射或冲突 {len(m["unmapped"])} 只。不是申万分类，也不是历史成分库。', '',
+             f'行业分类来源：{safe(d.get("industry_provider", "新浪行业"))}，当前映射 {m["mapped_count"]}/{m["universe_count"]} 只；未映射或冲突 {len(m["unmapped"])} 只。不是申万分类，也不是历史成分库。', '',
              '## 行业内单日表现', '',
              f'报价日期：{d["industry_quote_date"]}。按已映射、同日期股票涨跌幅中位数排序；至少5只有效报价，组内覆盖率至少90%。', '',
              '| 行业 | 有效/纳入/源成员 | 涨跌幅中位数 | 上涨占比 |', '|---|---:|---:|---:|']
     for r in d['industry_ranking'][:15]:
         lines.append(f'| {safe(r["name"])} | {r["count"]}/{r["eligible"]}/{r["source_members"]} | {r["median_change_pct"]}% | {r["up_pct"]}% |')
     lines += ['', '这是单日价格表现，不是已验证的 Money Effect Score。未映射股票不参与计算，当前行业成分可能不完整或陈旧。', '',
-              '## 120只固定样本内的20日相对强度', '',
-              f'按代码SHA-256排序取前120只，不按收益挑样本；有效因子 {len(d["rankings"])}/{len(d["sample"])}。统一截止日：{d["factor_cutoff"]}。', '',
+              f'## {len(d["sample"])}只样本内的20日相对强度', '',
+              f'通过基础排除规则后按代码SHA-256排序抽样，不按收益挑样本；有效因子 {len(d["rankings"])}/{len(d["sample"])}。统一截止日：{d["factor_cutoff"]}。', '',
               d.get('cutoff_rule', '首版按源日线最新日期，缺失者不计算。'), '',
               '20日收益=(末日收盘/20个交易间隔前收盘−1)×100%；超额=股票收益−沪深300同期价格指数收益，单位为百分点。两者21个日期必须完全对齐。', '',
               '| 股票 | 代码 | 20日收益 | 相对沪深300 | 偏离20日均线 |', '|---|---|---:|---:|---:|']
@@ -192,10 +214,16 @@ def render(d):
               '- 这是样本内历史描述，不是全市场龙头排名、胜率预测或买入建议。',
               '- 个股使用本次获取的前复权日线；基准为价格指数，收益口径并非严格总回报对齐，也未扣交易成本。',
               '- 前复权历史可能随除权变化；当前名单存在幸存者偏差，不用于宣布策略Alpha。',
-              '- 未过滤ST、停牌、退市或无法成交状态；缺失日期拒绝计算，不补价。',
+              '- 已按当前源名称排除ST及退市标记，并排除缺失、日期不齐及无效报价；不等同官方停牌/上市资格过滤，实际可交易状态仍未知。',
               '- 行业快照与日线可能截止于不同日期，上文分别列出；不将其拼成交易信号。',
               '- 全量映射、因子、日线、失败原因及请求摘要保存在同编号JSON。', '']
     lines += ['- ' + safe(e) for e in d['errors']]
+    if d.get('screening'):
+        lines += ['', '## 基础排除统计', '', f'排除后研究清单：{d["screening"]["remaining"]} 只。', '']
+        lines += [f'- {safe(k)}：{v}只' for k, v in d['screening']['counts'].items()]
+    if d.get('industry_attempts'):
+        lines += ['', '## 新行业源验证', '']
+        lines += ['- ' + safe(json.dumps(a, ensure_ascii=False)) for a in d['industry_attempts']]
     return '\n'.join(lines) + '\n'
 
 

@@ -6,6 +6,8 @@ on:
     paths:
       - 'server/research_pipeline.py'
       - 'server/test_research_pipeline.py'
+      - 'server/research_quality.py'
+      - 'server/test_research_quality.py'
       - '.github/workflows/research-report.yml'
 permissions:
   contents: read
