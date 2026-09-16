@@ -1,0 +1,274 @@
+{
+  "reports": {},
+  "updated_at": "2026-09-16T20:07:16.455835+08:00",
+  "latest_run": {
+    "id": "35093969999-1",
+    "slot": "manual",
+    "report_date": "2026-09-16",
+    "expected_date": "2026-09-16",
+    "started_at": "2026-09-16T20:07:16.455835+08:00",
+    "updated_at": "2026-09-16T20:07:16.455835+08:00",
+    "status": "running",
+    "data_date": null,
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35093969999"
+  },
+  "calendar": [
+    {
+      "date": "2026-08-17",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-18",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-19",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-20",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-21",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-22",
+      "state": "closed"
+    },
+    {
+      "date": "2026-08-23",
+      "state": "closed"
+    },
+    {
+      "date": "2026-08-24",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-25",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-26",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-27",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-28",
+      "state": "open"
+    },
+    {
+      "date": "2026-08-29",
+      "state": "closed"
+    },
+    {
+      "date": "2026-08-30",
+      "state": "closed"
+    },
+    {
+      "date": "2026-08-31",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-01",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-02",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-03",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-04",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-05",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-06",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-07",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-08",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-09",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-10",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-11",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-12",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-13",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-14",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-15",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-16",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-17",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-18",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-19",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-20",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-21",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-22",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-23",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-24",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-25",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-26",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-27",
+      "state": "closed"
+    },
+    {
+      "date": "2026-09-28",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-29",
+      "state": "open"
+    },
+    {
+      "date": "2026-09-30",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-01",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-02",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-03",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-04",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-05",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-06",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-07",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-08",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-09",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-10",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-11",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-12",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-13",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-14",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-15",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-16",
+      "state": "open"
+    },
+    {
+      "date": "2026-10-17",
+      "state": "closed"
+    }
+  ],
+  "schedule": {
+    "prepare": "07:10",
+    "premarket_start": "08:40",
+    "premarket_target": "09:00",
+    "close_start": "15:35",
+    "close_final": "18:20",
+    "timezone": "Asia/Shanghai"
+  }
+}
