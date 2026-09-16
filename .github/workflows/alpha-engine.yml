@@ -1,9 +1,12 @@
 name: Alpha候选与虚拟账户
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ['Tushare基础数据与日线增量同步']
+    types: [completed]
   push:
     branches: [master]
-    paths: ['server/data_source_policy.py', 'server/tushare_bridge.py']
+    paths: ['server/data_source_policy.py']
 permissions:
   contents: read
 concurrency:
@@ -11,6 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   research:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 70
     permissions:

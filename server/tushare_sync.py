@@ -267,7 +267,8 @@ def main():
             raise ValueError('SSE and SZSE sessions differ; requires exchange-specific scheduling')
         persist('trade_cal.json', {'calendars': calendars, 'start_date': start, 'end_date': end})
         report['calendar_range'] = start + '—' + end
-        sessions = sorted(d for d in opens['SSE'] if d < now.strftime('%Y%m%d'))[-60:]
+        sessions = sorted(d for d in opens['SSE'] if d < now.strftime('%Y%m%d')
+                          or (d == now.strftime('%Y%m%d') and now.hour >= 18))[-60:]
         existing = set()
         for path in (root / 'days').glob('*.json'):
             old = read(path)

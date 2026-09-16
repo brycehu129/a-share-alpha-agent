@@ -33,7 +33,9 @@ def run(history, run_id):
     now = datetime.now(CST)
     root = history / 'tushare_data'
     calendar = read(root / 'trade_cal.json')['calendars']
-    opens = [{r['cal_date'] for r in calendar[e] if str(r['is_open']) == '1' and r['cal_date'] < now.strftime('%Y%m%d')} for e in ('SSE','SZSE')]
+    opens = [{r['cal_date'] for r in calendar[e] if str(r['is_open']) == '1'
+              and (r['cal_date'] < now.strftime('%Y%m%d') or
+                   (r['cal_date'] == now.strftime('%Y%m%d') and now.hour >= 18))} for e in ('SSE','SZSE')]
     if opens[0] != opens[1]:
         raise ValueError('Exchange calendars disagree')
     dates = sorted(opens[0])[-60:]
