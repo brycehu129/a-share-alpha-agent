@@ -110,6 +110,20 @@ def cooldowns(root, now, endpoint=ENDPOINT):
     return deadlines
 
 
+def bounded_probe(call, record, remaining, sleep=time.sleep):
+    """At most three attempts for transport/JSON failures, never access errors."""
+    for attempt in range(1, 4):
+        response = call()
+        record({k: v for k, v in {**response, 'attempt': attempt}.items() if k not in ('items', 'fields')})
+        transient = (response['status'] == 'connection_error'
+                     or (response['status'] == 'invalid_response' and response.get('message') == 'JSONDecodeError')
+                     or (response['status'] == 'http_error' and response.get('code') in (502, 503, 504)))
+        delay = 5 * attempt
+        if not transient or attempt == 3 or remaining() < delay + 25:
+            return response
+        sleep(delay)
+
+
 def single_batch(api, params, fields, call):
     rows = call(api, {**params, 'limit': 6000}, fields)
     if len(rows) >= 6000:
@@ -192,8 +206,9 @@ def main():
                     remaining = 65 - (time.monotonic() - last_calendar_call)
         if api == 'trade_cal':
             last_calendar_call = time.monotonic()
-        response = probe(api, params, fields, token, endpoint)
-        report['requests'].append({k: v for k, v in response.items() if k not in ('items', 'fields')})
+        response = bounded_probe(lambda: probe(api, params, fields, token, endpoint),
+                                 report['requests'].append,
+                                 lambda: args.budget_seconds - (time.monotonic() - started))
         time.sleep(2)
         if response['status'] not in ('success', 'empty'):
             blocked.add(api)

@@ -4,9 +4,31 @@ from pathlib import Path
 from datetime import datetime, timezone
 from tushare_sync import fetch_pages, check_day, select_days, cooldowns, save, single_batch
 from tushare_sync import partition_daily
+from tushare_sync import bounded_probe
 
 
 class SyncTests(unittest.TestCase):
+    def test_transient_json_failure_recovers_without_logging_payload(self):
+        replies = iter([{'status':'invalid_response','message':'JSONDecodeError'}, {'status':'success','items':[['private-row']], 'fields':['x']}])
+        records, sleeps = [], []
+        result = bounded_probe(lambda: next(replies), records.append, lambda: 100, sleeps.append)
+        self.assertEqual(result['status'], 'success')
+        self.assertEqual(sleeps, [5])
+        self.assertNotIn('items', records[-1])
+        self.assertEqual(records[-1]['attempt'], 2)
+
+    def test_retry_limits_and_denials(self):
+        for response in ({'status':'rate_limited'}, {'status':'permission_denied'}, {'status':'authentication_error'}, {'status':'http_error','code':429}, {'status':'invalid_response','message':'ValueError'}):
+            records=[]
+            bounded_probe(lambda: response, records.append, lambda: 100, lambda _: self.fail('must not retry'))
+            self.assertEqual(len(records), 1)
+        records=[]
+        bounded_probe(lambda: {'status':'invalid_response','message':'JSONDecodeError'}, records.append, lambda:100, lambda _:None)
+        self.assertEqual(len(records), 3)
+        records=[]
+        bounded_probe(lambda: {'status':'connection_error'}, records.append, lambda:20, lambda _:self.fail('budget'))
+        self.assertEqual(len(records), 1)
+
     def test_exact_zero_activity_placeholder_is_quarantined(self):
         row = dict(ts_code='000016.SZ',trade_date='20260915',open=0,high=0,low=0,close=2.46,pre_close=2.46,vol=0,amount=0)
         valid, excluded = partition_daily('20260915',[row])
