@@ -110,6 +110,11 @@ def raw_bars(history, codes, now):
         time.sleep(0.15)
     missing = [code for code, item in result.items() if not item['bars']]
     if missing:
+        from data_source_policy import BAOSTOCK_BLOCK_REASON
+        if BAOSTOCK_BLOCK_REASON:
+            for code in missing:
+                result[code]['fallback_error'] = BAOSTOCK_BLOCK_REASON
+            return result
         try:
             import socket
             import baostock as bs

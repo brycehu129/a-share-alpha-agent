@@ -9,6 +9,7 @@ from pathlib import Path
 from collect_quotes import CST
 from tushare_sync import read, save, sha
 from alpha_data import symbol, completed_day
+from data_source_policy import BAOSTOCK_BLOCK_REASON
 
 
 def normalize(rows):
@@ -37,6 +38,9 @@ def partition(args):
     root = Path(history)/'alpha_data'
     now = datetime.now(CST)
     report = {'generated_at':now.isoformat(),'provider':'BaoStock','requests':[],'errors':[], 'status':'partial'}
+    if BAOSTOCK_BLOCK_REASON:
+        report.update(status='blocked', errors=[BAOSTOCK_BLOCK_REASON], finished_at=now.isoformat())
+        return report
     started = time.monotonic()
     socket.setdefaulttimeout(15)
     try:
@@ -93,6 +97,11 @@ def collect(history, run_id, budget=2100, workers=6):
     if path.exists():
         raise ValueError('Fallback run exists')
     report = {'generated_at':now.isoformat(),'provider':'BaoStock','status':'partial','requests':[], 'errors':[]}
+    if BAOSTOCK_BLOCK_REASON:
+        report.update(status='blocked', errors=[BAOSTOCK_BLOCK_REASON], finished_at=now.isoformat())
+        save(path, report)
+        print(BAOSTOCK_BLOCK_REASON, flush=True)
+        return
     master = read(history/'tushare_data/stock_basic.json')
     stocks = [s for s in master['rows'] if s['exchange'] in ('SSE','SZSE') and s['list_status']=='L']
     bench = root/'series/sh000300.json'

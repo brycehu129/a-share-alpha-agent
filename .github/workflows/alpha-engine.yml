@@ -1,6 +1,9 @@
 name: Alpha候选与虚拟账户
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths: ['server/data_source_policy.py']
 permissions:
   contents: read
 concurrency:
