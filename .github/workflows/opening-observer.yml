@@ -1,0 +1,44 @@
+name: 开盘报价观察与虚拟执行
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '31 1 * * 1-5'
+  push:
+    branches: [master]
+    paths: ['server/opening_observer.py']
+permissions:
+  contents: read
+concurrency:
+  group: market-report-history
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s server -p 'test_*.py'
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: market-data
+          path: .history
+      - name: 采集当前报价并决定虚拟成交
+        env:
+          XIAODEFA_TOKEN: ${{ secrets.XIAODEFA_TOKEN }}
+        run: python3 -u server/opening_observer.py --history .history --run-id "$REPORT_ID"
+      - run: python3 server/dashboard_export.py --history .history
+      - name: 保存报价证据与执行记录
+        working-directory: .history
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m "Archive observed opening execution $REPORT_ID"
+          git push origin HEAD:market-data

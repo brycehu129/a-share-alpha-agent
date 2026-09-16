@@ -8,7 +8,7 @@ import statistics
 from collections import Counter, defaultdict
 from datetime import date
 
-VERSION = 'alpha-shadow-0.1'
+VERSION = 'alpha-shadow-0.2-observed'
 POLICY = {'capital': 100000, 'max_positions': 3, 'max_weight': 0.30,
           'risk_per_trade': 0.02, 'stop_pct': 0.06, 'target_pct': 0.12,
           'hold_sessions': 10, 'entry_gap_min': -0.03, 'entry_gap_max': 0.03,

@@ -35,7 +35,7 @@ def corporate_event(raw, adjusted, entry_day, day):
     return abs(ratio1/ratio0-1) > 0.000001
 
 
-def advance(previous, forecasts, raw, adjusted, benchmark, cutoff):
+def advance(previous, forecasts, raw, adjusted, benchmark, cutoff, execute=True):
     state = copy.deepcopy(previous)
     state['issues'] = []
     state['valuation_status'] = 'current'
@@ -61,7 +61,7 @@ def advance(previous, forecasts, raw, adjusted, benchmark, cutoff):
         for pos in list(state['positions']):
             code = pos['symbol']
             bar = raw[code][day]
-            if pos.get('exit_signal') and pos['entry_day'] < day and tradable(bar, raw[code].get(prev_day), code):
+            if execute and pos.get('exit_signal') and pos['entry_day'] < day and tradable(bar, raw[code].get(prev_day), code):
                 price = round(float(bar['open'])*(1-POLICY['slippage']), 2)
                 gross = round(price*pos['shares'], 2)
                 costs = fee(gross, 'sell')
@@ -72,6 +72,8 @@ def advance(previous, forecasts, raw, adjusted, benchmark, cutoff):
                     'pnl': pnl, 'return_pct': round(pnl/pos['cost']*100, 4), 'reason': pos['exit_signal']})
                 state['positions'].remove(pos)
         for f in sorted(forecasts, key=lambda f: (f['created_at'], f['id'])):
+            if not execute:
+                break
             if f['id'] in state['attempted'] or not f['paper_eligible']:
                 continue
             created = datetime.fromisoformat(f['created_at'])

@@ -148,7 +148,7 @@ def run(history, run_id):
     immutable(history / 'execution_inputs' / (run_id+'.json'), {'generated_at': now.isoformat(), 'series': raw})
     raw_series = {s: [b for b in d['bars'] if b['date'] <= cutoff] for s, d in raw.items()}
     old_state = old_state or initial(cutoff, float(benchmark[-1]['close']))
-    report['portfolio'] = advance(old_state, forecasts, raw_series, series, benchmark, cutoff)
+    report['portfolio'] = advance(old_state, forecasts, raw_series, series, benchmark, cutoff, execute=False)
     report['issues'].extend(report['portfolio']['issues'])
     created = datetime.now(CST)  # Actual freeze time after all requests, not job start.
     for c in report['candidates'][:3]:
@@ -169,6 +169,7 @@ def run(history, run_id):
         if report['portfolio']['paused']: plan_reasons.append('账户回撤风控暂停')
         forecast = {'id': identity, 'version': VERSION, 'created_at': created.isoformat(), 'as_of': cutoff,
             'plan_reasons': plan_reasons,
+            'execution_mode': 'observed-quote-v1',
             'eligible_from': eligible_from(created), 'symbol': c['symbol'], 'name': c['name'], 'industry': c['industry'],
             'score': c['score'], 'bucket': c['bucket'], 'regime': c['regime'], 'probability': c['probability'],
             'reference_price': float(ref['close']), 'target': TARGET, 'paper_eligible': can_trade,
@@ -205,7 +206,7 @@ def render(r):
                   f'已平仓 {p.get("closed_trades",0)}笔；实测虚拟交易胜率：{trade_rate}。', '',
                   '成本假设：每边滑点0.1%，佣金0.03%且至少5元，过户费0.001%，卖出税费0.05%；仅为模拟参数，非券商报价。',
                   '只在预测留档后的下一合格日期模拟开盘成交。9:20之后生成的计划最早下一自然日开始等待实际基准交易日。',
-                  '开盘偏离参考价超过±3%、接近涨跌停、一字行情或缺价不成交；T+1，收盘触发止盈/止损后下一交易日开盘退出，可能跳空超损。',
+                  '新计划在09:30–09:35按采集时有效报价判断；偏离参考价超过±3%、接近涨跌停或报价无法核验不成交。T+1，收盘退出信号等待下次观察窗口；不补记日线成交。',
                   '最多3只、单只30%、计划单笔风险2%；回撤20%暂停加仓并排队退出。除权变化或持仓缺价暂停整个账本推进，等待可核验数据。', '']
     lines += ['## 预测验收', '', f'冻结预测 {len(r["forecasts"])} 条；5/10/20日已验收记录 {len(r["outcomes"])} 条。预测标签与实际虚拟成交盈亏分开统计。', '',
               '验收等待真实交易日自然到期；跳过成交不删除预测。错误归因先展示可计算结果，因果判断留待复核，不编造责任百分比。', '']
