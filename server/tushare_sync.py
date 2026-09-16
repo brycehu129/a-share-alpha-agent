@@ -130,7 +130,7 @@ def render(r):
              '| 本次日期 | 状态 | 日线条数 | 复权因子条数 |', '|---|---|---:|---:|']
     lines += [f'| {x["date"]} | {x["status"]} | {x.get("daily", 0)} | {x.get("adj_factor", 0)} |' for x in r['days']]
     lines += ['', '每日请求全体股票，单次上限6000条，触及上限不认定完整；没有日线的股票不能直接认定停牌。北交所可能随接口返回，但本版调度日历仅核验沪深。基础信息暂取在市L状态，退市和暂停上市档案暂缓。', '',
-              '每轮最多处理10个日期，优先最近日期；已完成日期作为检查点，最近2日重取以接受源修订。当前文件可更新，旧版本由Git提交历史保留。', '',
+              f'本轮最多处理{r.get("batch_days", 10)}个日期，优先最近日期；已完成日期作为检查点，最近2日重取以接受源修订。当前文件可更新，旧版本由Git提交历史保留。', '',
               '日线与复权因子分开原样保存，所有有日线的股票必须有同日因子；未直接生成前复权价格或策略收益。日线量额单位沿用接口（成交量：手，成交额：千元）。', '',
               '日期计数表示已通过字段检查，不是与交易所逐股核验后的完整率。无成交占位记录单独保存且不参与有效日线，不据此确认停牌。', '',
               '## 错误', '']
@@ -144,6 +144,8 @@ def main():
     p.add_argument('--history', type=Path, required=True)
     p.add_argument('--run-id', required=True)
     p.add_argument('--verify-only', action='store_true')
+    p.add_argument('--batch-days', type=int, default=10, choices=range(1, 61))
+    p.add_argument('--budget-seconds', type=int, default=480, choices=range(60, 1801))
     args = p.parse_args()
     if not re.fullmatch(r'\d+-\d+', args.run_id):
         raise ValueError('Invalid run ID')
@@ -166,7 +168,7 @@ def main():
     if not token:
         raise ValueError('Missing data-source token')
     now = datetime.now(timezone(timedelta(hours=8)))
-    report = {'id': args.run_id, 'generated_at': now.isoformat(), 'days': [], 'errors': [], 'files': {}, 'requests': []}
+    report = {'id': args.run_id, 'generated_at': now.isoformat(), 'days': [], 'errors': [], 'files': {}, 'requests': [], 'batch_days': args.batch_days}
     started = time.monotonic()
     deadlines = cooldowns(root, now, endpoint)
     blocked = set()
@@ -178,12 +180,12 @@ def main():
             raise ValueError(api + ': cooling down until ' + deadlines[api].isoformat())
         if api in blocked:
             raise ValueError(api + ': stopped after unsuccessful response in this run')
-        if time.monotonic() - started > 480:
+        if time.monotonic() - started > args.budget_seconds:
             raise ValueError('Request budget exhausted')
         if api == 'trade_cal' and last_calendar_call is not None:
             remaining = 65 - (time.monotonic() - last_calendar_call)
             if remaining > 0:
-                if time.monotonic() - started + remaining > 480:
+                if time.monotonic() - started + remaining > args.budget_seconds:
                     raise ValueError('Calendar pacing exceeds request budget')
                 while remaining > 0:
                     time.sleep(min(remaining, 30))
@@ -256,7 +258,7 @@ def main():
             old = read(path)
             check_day(path.stem, old['daily'], old['adj_factor'])
             existing.add(path.stem)
-        for day in select_days(sessions, existing, 10):
+        for day in select_days(sessions, existing, args.batch_days):
             try:
                 prices = single_batch('daily', {'trade_date': day}, 'ts_code,trade_date,open,high,low,close,pre_close,vol,amount', call)
                 persist('raw/daily/' + day + '.json', {'trade_date': day, 'rows': prices})

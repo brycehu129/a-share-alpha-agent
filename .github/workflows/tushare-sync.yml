@@ -16,7 +16,7 @@ jobs:
   sync:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 40
     permissions:
       contents: write
     outputs:
@@ -35,7 +35,7 @@ jobs:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           XIAODEFA_TOKEN: ${{ secrets.XIAODEFA_TOKEN }}
           REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-        run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID"
+        run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID" --batch-days 60 --budget-seconds 1800
       - name: 根据本次数据更新研究报告
         env:
           REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
