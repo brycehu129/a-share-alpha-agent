@@ -1,52 +1,52 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-16T19:56:41.283458+08:00",
+  "exported_at": "2026-09-16T20:15:22.241498+08:00",
   "market": {
-    "generated_at": "2026-09-16T13:34:54.169538+08:00",
+    "generated_at": "2026-09-16T20:07:50.744697+08:00",
     "status": "success",
     "summary": "源数据日期 2026-09-16：所监测6个指数中，6个上涨、0个下跌、0个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
     "quotes": [
       {
         "name": "上证指数",
         "symbol": "sh000001",
-        "last": "3884.56",
-        "change_pct": "0.52%",
-        "quote_at": "2026-09-16T13:34:48+08:00"
+        "last": "3891.60",
+        "change_pct": "0.71%",
+        "quote_at": "2026-09-16T16:14:03+08:00"
       },
       {
         "name": "沪深300",
         "symbol": "sh000300",
-        "last": "4469.92",
-        "change_pct": "0.45%",
-        "quote_at": "2026-09-16T13:34:51+08:00"
+        "last": "4480.27",
+        "change_pct": "0.68%",
+        "quote_at": "2026-09-16T16:14:15+08:00"
       },
       {
         "name": "科创50",
         "symbol": "sh000688",
-        "last": "1608.48",
-        "change_pct": "3.64%",
-        "quote_at": "2026-09-16T13:34:51+08:00"
+        "last": "1616.19",
+        "change_pct": "4.14%",
+        "quote_at": "2026-09-16T16:14:15+08:00"
       },
       {
         "name": "中证1000",
         "symbol": "sh000852",
-        "last": "7585.42",
-        "change_pct": "1.99%",
-        "quote_at": "2026-09-16T13:34:51+08:00"
+        "last": "7587.43",
+        "change_pct": "2.01%",
+        "quote_at": "2026-09-16T16:14:03+08:00"
       },
       {
         "name": "深证成指",
         "symbol": "sz399001",
-        "last": "13436.61",
-        "change_pct": "1.12%",
-        "quote_at": "2026-09-16T13:34:48+08:00"
+        "last": "13454.74",
+        "change_pct": "1.26%",
+        "quote_at": "2026-09-16T16:14:27+08:00"
       },
       {
         "name": "创业板指",
         "symbol": "sz399006",
-        "last": "3306.59",
-        "change_pct": "1.81%",
-        "quote_at": "2026-09-16T13:34:48+08:00"
+        "last": "3311.47",
+        "change_pct": "1.96%",
+        "quote_at": "2026-09-16T16:14:42+08:00"
       }
     ],
     "universe": {
@@ -58,14 +58,14 @@
         "2026-09-16": 5219
       },
       "breadth": {
-        "up": 3942,
-        "down": 1112,
-        "flat": 165
+        "up": 3888,
+        "down": 1133,
+        "flat": 198
       }
     }
   },
   "research": {
-    "generated_at": "2026-09-16T13:39:25.457885+08:00",
+    "generated_at": "2026-09-16T20:11:39.931315+08:00",
     "status": "success",
     "factor_cutoff": "2026-09-15",
     "industry_provider": "新浪行业",
@@ -5301,8 +5301,8 @@
         "sz002565": "new_zzhy"
       }
     },
-    "source_id": "35060073973-1",
-    "source_generated_at": "2026-09-16T13:34:54.169538+08:00",
+    "source_id": "35093969999-1",
+    "source_generated_at": "2026-09-16T20:07:50.744697+08:00",
     "sample_count": 300,
     "factor_count": 292,
     "rankings": [
@@ -5615,18 +5615,8 @@
         "eligible": 136,
         "source_members": 152,
         "coverage_pct": 100.0,
-        "median_change_pct": 2.12,
-        "up_pct": 94.12
-      },
-      {
-        "name": "家具行业",
-        "node": "new_jjhy",
-        "count": 12,
-        "eligible": 12,
-        "source_members": 16,
-        "coverage_pct": 100.0,
-        "median_change_pct": 1.64,
-        "up_pct": 66.67
+        "median_change_pct": 2.46,
+        "up_pct": 94.85
       },
       {
         "name": "有色金属",
@@ -5635,18 +5625,8 @@
         "eligible": 61,
         "source_members": 72,
         "coverage_pct": 100.0,
-        "median_change_pct": 1.58,
-        "up_pct": 86.89
-      },
-      {
-        "name": "化工行业",
-        "node": "new_hghy",
-        "count": 132,
-        "eligible": 132,
-        "source_members": 150,
-        "coverage_pct": 100.0,
-        "median_change_pct": 1.31,
-        "up_pct": 80.3
+        "median_change_pct": 1.78,
+        "up_pct": 88.52
       },
       {
         "name": "纺织行业",
@@ -5656,17 +5636,27 @@
         "source_members": 42,
         "coverage_pct": 100.0,
         "median_change_pct": 1.28,
-        "up_pct": 87.1
+        "up_pct": 90.32
       },
       {
-        "name": "塑料制品",
-        "node": "new_slzp",
-        "count": 27,
-        "eligible": 27,
-        "source_members": 33,
+        "name": "化工行业",
+        "node": "new_hghy",
+        "count": 132,
+        "eligible": 132,
+        "source_members": 150,
         "coverage_pct": 100.0,
         "median_change_pct": 1.28,
-        "up_pct": 85.19
+        "up_pct": 83.33
+      },
+      {
+        "name": "家具行业",
+        "node": "new_jjhy",
+        "count": 12,
+        "eligible": 12,
+        "source_members": 16,
+        "coverage_pct": 100.0,
+        "median_change_pct": 1.27,
+        "up_pct": 83.33
       },
       {
         "name": "电器行业",
@@ -5676,17 +5666,17 @@
         "source_members": 58,
         "coverage_pct": 100.0,
         "median_change_pct": 1.23,
-        "up_pct": 80.77
+        "up_pct": 78.85
       },
       {
-        "name": "环保行业",
-        "node": "new_hbhy",
-        "count": 24,
-        "eligible": 24,
-        "source_members": 27,
+        "name": "塑料制品",
+        "node": "new_slzp",
+        "count": 27,
+        "eligible": 27,
+        "source_members": 33,
         "coverage_pct": 100.0,
-        "median_change_pct": 1.17,
-        "up_pct": 87.5
+        "median_change_pct": 1.19,
+        "up_pct": 81.48
       },
       {
         "name": "造纸行业",
@@ -5695,43 +5685,53 @@
         "eligible": 21,
         "source_members": 24,
         "coverage_pct": 100.0,
-        "median_change_pct": 1.14,
+        "median_change_pct": 1.19,
         "up_pct": 76.19
       },
       {
-        "name": "化纤行业",
-        "node": "new_hqhy",
-        "count": 20,
-        "eligible": 20,
-        "source_members": 26,
+        "name": "印刷包装",
+        "node": "new_ysbz",
+        "count": 17,
+        "eligible": 17,
+        "source_members": 20,
         "coverage_pct": 100.0,
-        "median_change_pct": 1.11,
-        "up_pct": 85.0
+        "median_change_pct": 1.09,
+        "up_pct": 88.24
       },
       {
-        "name": "房地产",
-        "node": "new_fdc",
-        "count": 89,
-        "eligible": 89,
-        "source_members": 123,
+        "name": "发电设备",
+        "node": "new_fdsb",
+        "count": 56,
+        "eligible": 56,
+        "source_members": 65,
         "coverage_pct": 100.0,
-        "median_change_pct": 1.1,
-        "up_pct": 77.53
+        "median_change_pct": 1.04,
+        "up_pct": 76.79
       },
       {
-        "name": "物资外贸",
-        "node": "new_wzwm",
-        "count": 20,
-        "eligible": 20,
-        "source_members": 21,
+        "name": "环保行业",
+        "node": "new_hbhy",
+        "count": 24,
+        "eligible": 24,
+        "source_members": 27,
         "coverage_pct": 100.0,
-        "median_change_pct": 1.1,
-        "up_pct": 75.0
+        "median_change_pct": 0.97,
+        "up_pct": 79.17
+      },
+      {
+        "name": "机械行业",
+        "node": "new_jxhy",
+        "count": 179,
+        "eligible": 179,
+        "source_members": 211,
+        "coverage_pct": 100.0,
+        "median_change_pct": 0.97,
+        "up_pct": 78.21
       }
     ]
   },
   "sync": {
-    "generated_at": "2026-09-16T19:54:09.094953+08:00",
+    "generated_at": "2026-09-16T20:07:18.716485+08:00",
     "status": "success",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5744,7 +5744,7 @@
     }
   },
   "analysis": {
-    "generated_at": "2026-09-16T19:54:53.911365+08:00",
+    "generated_at": "2026-09-16T20:14:59.446395+08:00",
     "status": "ready",
     "start_date": "20260818",
     "end_date": "20260915",
@@ -5997,43 +5997,43 @@
   "sources": [
     {
       "kind": "market",
-      "id": "35060073973-1",
-      "generated_at": "2026-09-16T13:34:54.169538+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/35060073973-1.md"
+      "id": "35093969999-1",
+      "generated_at": "2026-09-16T20:07:50.744697+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/35093969999-1.md"
     },
     {
       "kind": "research",
-      "id": "35060073973-1",
-      "generated_at": "2026-09-16T13:39:25.457885+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/35060073973-1.md"
+      "id": "35093969999-1",
+      "generated_at": "2026-09-16T20:11:39.931315+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/35093969999-1.md"
     },
     {
       "kind": "sync",
-      "id": "35092791831-1",
-      "generated_at": "2026-09-16T19:54:09.094953+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35092791831-1.md"
+      "id": "35093969999-1",
+      "generated_at": "2026-09-16T20:07:18.716485+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35093969999-1.md"
     },
     {
       "kind": "analysis",
-      "id": "35092791831-1",
-      "generated_at": "2026-09-16T19:54:53.911365+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35092791831-1.md"
+      "id": "35093969999-1",
+      "generated_at": "2026-09-16T20:14:59.446395+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35093969999-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "35092934426-1",
-      "generated_at": "2026-09-16T19:56:40.823548+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35092934426-1.md"
+      "id": "35093969999-1",
+      "generated_at": "2026-09-16T20:15:21.479144+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35093969999-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "35092934426-1",
-      "generated_at": "2026-09-16T19:56:40.704189+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35092934426-1.md"
+      "id": "35093969999-1",
+      "generated_at": "2026-09-16T20:15:21.347641+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35093969999-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-16T19:56:40.704189+08:00",
+    "generated_at": "2026-09-16T20:15:21.347641+08:00",
     "version": "alpha-shadow-0.1",
     "status": "ready",
     "target": "下一可验证交易日开盘至第10个交易间隔收盘，扣0.5%假设往返成本后盈利且跑赢沪深300价格指数",
@@ -7128,28 +7128,6 @@
     },
     "forecasts": [
       {
-        "id": "alpha-shadow-0.1-2026-09-16-sh605277",
-        "created_at": "2026-09-16T19:56:40.703438+08:00",
-        "as_of": "2026-09-16",
-        "eligible_from": "2026-09-17",
-        "symbol": "sh605277",
-        "name": "新亚电子",
-        "score": 88.61,
-        "probability": {
-          "n": 3,
-          "cohorts": 1,
-          "wins": 1,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        },
-        "reference_price": 17.78,
-        "paper_eligible": true
-      },
-      {
         "id": "alpha-shadow-0.1-2026-09-16-sh600293",
         "created_at": "2026-09-16T19:56:40.703438+08:00",
         "as_of": "2026-09-16",
@@ -7169,6 +7147,28 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 3.09,
+        "paper_eligible": true
+      },
+      {
+        "id": "alpha-shadow-0.1-2026-09-16-sh605277",
+        "created_at": "2026-09-16T19:56:40.703438+08:00",
+        "as_of": "2026-09-16",
+        "eligible_from": "2026-09-17",
+        "symbol": "sh605277",
+        "name": "新亚电子",
+        "score": 88.61,
+        "probability": {
+          "n": 3,
+          "cohorts": 1,
+          "wins": 1,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 17.78,
         "paper_eligible": true
       },
       {
