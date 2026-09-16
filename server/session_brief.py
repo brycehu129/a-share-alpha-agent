@@ -62,7 +62,14 @@ def main():
         lines += [f'- [{name}]({url})：{payload["generated_at"]} · {payload["status"]} · ' + ('本次生成' if current else '历史记录，未冒充本次新数据')]
         if folder == 'records':
             lines += ['  ' + html.escape(payload['summary'])]
-    lines += ['', 'GitHub定时任务可能延迟，以上以实际生成时间为准。网页“检查更新”读取最新已生成快照，不会启动新采集。', '']
+            universe = payload.get('universe', {})
+            quotes = len(universe.get('quotes', []))
+            lines += [f'  全市场报价：{universe.get("status", "unknown")}，有效{quotes}条。指数成功不等于全市场采集成功。']
+            if universe.get('status') != 'success' or not quotes:
+                report['status'] = 'partial'
+        if payload['status'] not in ('success', 'ready'):
+            report['status'] = 'partial'
+    lines += ['', f'数据完整性：{report["status"]}。', '', 'GitHub定时任务可能延迟，以上以实际生成时间为准。网页“检查更新”读取最新已生成快照，不会启动新采集。', '']
     root = args.history / 'briefs'
     root.mkdir(exist_ok=True)
     path = root / (args.run_id + '.json')

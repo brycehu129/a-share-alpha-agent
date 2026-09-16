@@ -4,9 +4,6 @@ on:
   schedule:
     - cron: '0 1 * * 1-5'
     - cron: '30 7 * * 1-5'
-  push:
-    branches: [master]
-    paths: ['server/session_brief.py', 'server/test_session_brief.py', '.github/workflows/daily-agent.yml']
 permissions:
   contents: read
 concurrency:
