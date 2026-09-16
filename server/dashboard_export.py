@@ -56,6 +56,10 @@ def build(history):
         else:
             result[kind] = {k: d.get(k) for k in ('generated_at', 'status', 'start_date', 'end_date', 'missing_dates', 'issues')}
             result[kind].update(rankings=d.get('rankings', [])[:30], factor_count=len(d.get('rankings', [])))
+    brief_path, brief = latest(history, 'briefs')
+    if brief is not None:
+        result['sources'].append({'kind': '盘前/收盘日报', 'id': brief_path.stem, 'generated_at': brief['generated_at'],
+            'url': 'https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/' + brief_path.stem + '.md'})
     return result
 
 

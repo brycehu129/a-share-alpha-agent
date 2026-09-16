@@ -1,0 +1,71 @@
+name: A股盘前与收盘数据整理
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * 1-5'
+    - cron: '30 7 * * 1-5'
+  push:
+    branches: [master]
+    paths: ['server/session_brief.py', 'server/test_session_brief.py', '.github/workflows/daily-agent.yml']
+permissions:
+  contents: read
+concurrency:
+  group: market-report-history
+  cancel-in-progress: false
+jobs:
+  daily:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      REPORT_SCHEDULE: ${{ github.event.schedule }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s server -p 'test_*.py'
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: market-data
+          path: .history
+      - name: 补齐历史与交易日历
+        continue-on-error: true
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID"
+      - name: 核验是否休市
+        id: gate
+        run: python3 server/session_brief.py --history .history --gate-only
+      - name: 更新市场行情
+        if: steps.gate.outputs.collect == 'true'
+        continue-on-error: true
+        run: python3 -u server/report_pipeline.py --history .history --run-id "$REPORT_ID"
+      - name: 更新行业与样本强度
+        if: steps.gate.outputs.collect == 'true'
+        continue-on-error: true
+        run: python3 -u server/research_pipeline.py --history .history --run-id "$REPORT_ID"
+      - name: 生成历史窗口分析
+        continue-on-error: true
+        run: python3 server/tushare_analysis.py --history .history --run-id "$REPORT_ID"
+      - name: 整理日报并导出网页数据
+        run: |
+          python3 server/session_brief.py --history .history --run-id "$REPORT_ID"
+          python3 server/dashboard_export.py --history .history
+      - name: 保存数据与报告
+        working-directory: .history
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- README.md records/ reports/ research/ tushare_data/ tushare_analysis/ briefs/ dashboard/
+          git commit -m "Archive scheduled data brief $REPORT_ID"
+          git push origin HEAD:market-data
+      - name: 展示本次整理报告
+        if: always()
+        run: |
+          if [ -f ".history/briefs/$REPORT_ID.md" ]; then
+            cat ".history/briefs/$REPORT_ID.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
