@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-16T13:54:47.717181+08:00",
+  "exported_at": "2026-09-16T14:18:37.085720+08:00",
   "market": {
     "generated_at": "2026-09-16T13:34:54.169538+08:00",
     "status": "success",
@@ -5784,19 +5784,19 @@
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "35060073973-1",
-      "generated_at": "2026-09-16T13:54:46.978440+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35060073973-1.md"
+      "id": "35061818497-1",
+      "generated_at": "2026-09-16T14:18:36.673752+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35061818497-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "35060073973-1",
-      "generated_at": "2026-09-16T13:54:46.857817+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35060073973-1.md"
+      "id": "35061818497-1",
+      "generated_at": "2026-09-16T14:18:36.548949+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35061818497-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-16T13:54:46.857817+08:00",
+    "generated_at": "2026-09-16T14:18:36.548949+08:00",
     "version": "alpha-shadow-0.1",
     "status": "partial",
     "target": "下一可验证交易日开盘至第10个交易间隔收盘，扣0.5%假设往返成本后盈利且跑赢沪深300价格指数",
@@ -5822,16 +5822,16 @@
       "cutoff": "2026-09-15",
       "listed": 5219,
       "eligible": 4972,
-      "valid": 691,
-      "coverage_pct": 13.9,
+      "valid": 1521,
+      "coverage_pct": 30.59,
       "complete": false,
       "market_score": 38.33,
       "regime": "偏弱",
       "exclusion_counts": {
         "ST或退市名称标记": 201,
-        "日线窗口缺失或无有效成交": 4281,
+        "日线窗口缺失或无有效成交": 3451,
         "上市未满180自然日": 46,
-        "行业未进入强势前10%": 691
+        "行业未进入强势前10%": 1521
       }
     },
     "portfolio": {
