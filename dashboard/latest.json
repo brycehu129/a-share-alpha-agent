@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-16T08:53:56.656955+08:00",
+  "exported_at": "2026-09-16T09:17:20.967800+08:00",
   "market": {
     "generated_at": "2026-09-16T08:49:23.616218+08:00",
     "status": "success",
@@ -5781,5 +5781,6 @@
       "generated_at": "2026-09-16T08:53:40.649852+08:00",
       "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35041571237-1.md"
     }
-  ]
+  ],
+  "agent": null
 }
