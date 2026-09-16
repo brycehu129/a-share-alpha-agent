@@ -60,6 +60,20 @@ def build(history):
     if brief is not None:
         result['sources'].append({'kind': '盘前/收盘日报', 'id': brief_path.stem, 'generated_at': brief['generated_at'],
             'url': 'https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/' + brief_path.stem + '.md'})
+    agent_path, agent = latest(history, 'agent')
+    result['agent'] = None
+    if agent is not None:
+        screening = agent.get('screen')
+        portfolio = agent.get('portfolio')
+        result['agent'] = {k: agent.get(k) for k in ('generated_at', 'version', 'status', 'target', 'issues', 'calibration', 'candidates')}
+        result['agent']['screen'] = ({k: screening[k] for k in ('cutoff', 'listed', 'eligible', 'valid', 'coverage_pct', 'complete', 'market_score', 'regime', 'exclusion_counts')} if screening else None)
+        result['agent']['portfolio'] = ({**portfolio, 'trades': portfolio['trades'][-30:], 'curve': portfolio['curve'][-250:], 'attempted': []} if portfolio else None)
+        result['agent']['forecasts'] = [{k: f[k] for k in ('id', 'created_at', 'as_of', 'eligible_from', 'symbol', 'name', 'score', 'probability', 'reference_price', 'paper_eligible')} for f in agent['forecasts'][:30]]
+        result['agent']['outcomes'] = agent['outcomes'][:30]
+        result['agent']['forecast_count'] = len(agent['forecasts'])
+        result['agent']['outcome_count'] = len(agent['outcomes'])
+        result['sources'].append({'kind': '候选预测与虚拟组合', 'id': agent_path.stem, 'generated_at': agent['generated_at'],
+            'url': 'https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/' + agent_path.stem + '.md'})
     return result
 
 

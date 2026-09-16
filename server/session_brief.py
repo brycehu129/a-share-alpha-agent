@@ -43,12 +43,12 @@ def main():
     mode = '盘前数据整理' if schedule == '0 1 * * 1-5' else '收盘数据整理' if schedule == '30 7 * * 1-5' else '手动数据整理'
     report = {'id': args.run_id, 'generated_at': now.isoformat(), 'mode': mode, 'calendar': state, 'sources': [], 'status': 'data_only'}
     lines = [f'# A股 {mode}', '', f'生成时间：{now.isoformat()}（北京时间）', '', f'交易日状态：{state}。', '',
-             '本阶段只整理已采集事实。盘前预测胜率、买卖信号、虚拟成交与盈亏复盘尚未启用。', '']
+             '候选筛选、研究胜率和虚拟账户见下方独立报告；数据不足时不补造概率或成交。', '']
     if state == 'closed':
         lines += ['今日已核验休市，跳过行情及行业扫描；以下仅列历史记录。', '']
     elif state == 'unknown':
         lines += ['交易日历尚不完整，不能确认今日是否开市；不生成交易信号。', '']
-    for name, folder, compact in [('市场快照', 'records', True), ('行业与样本研究', 'research', True), ('Tushare同步', 'tushare_data/runs', False), ('Tushare分析', 'tushare_analysis', False)]:
+    for name, folder, compact in [('市场快照', 'records', True), ('行业与样本研究', 'research', True), ('Tushare同步', 'tushare_data/runs', False), ('Tushare分析', 'tushare_analysis', False), ('候选预测与虚拟组合', 'agent', False)]:
         path, payload = latest(args.history, folder, compact)
         if payload is None:
             lines += [f'- {name}：尚无数据。']
