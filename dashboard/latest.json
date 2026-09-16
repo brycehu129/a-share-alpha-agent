@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-16T09:17:20.967800+08:00",
+  "exported_at": "2026-09-16T09:29:07.486863+08:00",
   "market": {
     "generated_at": "2026-09-16T08:49:23.616218+08:00",
     "status": "success",
@@ -5777,10 +5777,87 @@
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "35041571237-1",
-      "generated_at": "2026-09-16T08:53:40.649852+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35041571237-1.md"
+      "id": "35043472856-1",
+      "generated_at": "2026-09-16T09:29:06.894307+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35043472856-1.md"
+    },
+    {
+      "kind": "候选预测与虚拟组合",
+      "id": "35043472856-1",
+      "generated_at": "2026-09-16T09:29:06.788545+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35043472856-1.md"
     }
   ],
-  "agent": null
+  "agent": {
+    "generated_at": "2026-09-16T09:29:06.788545+08:00",
+    "version": "alpha-shadow-0.1",
+    "status": "partial",
+    "target": "下一可验证交易日开盘至第10个交易间隔收盘，扣0.5%假设往返成本后盈利且跑赢沪深300价格指数",
+    "issues": [
+      "有效日线覆盖不足95%，候选仅供观察，本轮不建立虚拟入场计划。",
+      "市场趋势评分低于40，暂停新虚拟计划。"
+    ],
+    "calibration": {
+      "walk_forward_n": 0,
+      "brier": null,
+      "limitations": [
+        "当前在市名单与当前行业分类回看历史，存在幸存者及分类回看偏差",
+        "历史标签按次日开盘估计，未复现停牌/涨跌停成交、公告与历史风险标记",
+        "历史频率仅为研究估计，不能视为已验证的个股真实胜率；分数不是概率",
+        "同日股票相关，区间按日期样本量保守放宽，仍不是严格校准保证"
+      ],
+      "historical_n": 0,
+      "live_n": 0,
+      "live_win_rate": null
+    },
+    "candidates": [],
+    "screen": {
+      "cutoff": "2026-09-15",
+      "listed": 5219,
+      "eligible": 4972,
+      "valid": 586,
+      "coverage_pct": 11.79,
+      "complete": false,
+      "market_score": 38.33,
+      "regime": "偏弱",
+      "exclusion_counts": {
+        "ST或退市名称标记": 201,
+        "日线窗口缺失或无有效成交": 4386,
+        "上市未满180自然日": 46,
+        "行业未进入强势前10%": 586
+      }
+    },
+    "portfolio": {
+      "cash": 100000,
+      "equity": 100000,
+      "nav": 1.0,
+      "positions": [],
+      "trades": [],
+      "attempted": [],
+      "last_date": "2026-09-15",
+      "inception_date": "2026-09-15",
+      "benchmark_start": 4450.04,
+      "benchmark_return_pct": 0,
+      "excess_pp": 0,
+      "peak": 100000,
+      "max_drawdown_pct": 0,
+      "drawdown_pct": 0,
+      "paused": false,
+      "curve": [
+        {
+          "date": "2026-09-15",
+          "nav": 1.0,
+          "benchmark_nav": 1.0
+        }
+      ],
+      "valuation_status": "current",
+      "issues": [],
+      "closed_trades": 0,
+      "trade_win_rate": null
+    },
+    "forecasts": [],
+    "outcomes": [],
+    "forecast_count": 0,
+    "outcome_count": 0
+  }
 }
