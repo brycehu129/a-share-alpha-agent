@@ -1,0 +1,1 @@
+{"sha256": "56763ecd6c32c49fa793b20a0c312c7a504253c39c03f7a30d05005bcb0b917a", "payload": {"generated_at": "2026-09-16T19:56:34.782147+08:00", "provider": "BaoStock", "status": "blocked", "requests": [], "errors": ["BaoStock已暂停：源返回“黑名单用户，请与管理员联系”；需服务方确认恢复访问后才能启用。已下载数据继续保留。"], "finished_at": "2026-09-16T19:56:34.782147+08:00"}}
