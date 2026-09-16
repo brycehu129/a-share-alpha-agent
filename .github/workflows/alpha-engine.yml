@@ -25,6 +25,7 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s server -p 'test_*.py'
+      - run: python3 -m pip install baostock==0.9.3
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: market-data
@@ -33,6 +34,10 @@ jobs:
         continue-on-error: true
         run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID"
       - name: 预测及验收
+        # A hung external SDK is bounded independently of the overall workflow.
+        run: timeout 960 python3 -u server/alpha_baostock.py --history .history --run-id "$REPORT_ID"
+        continue-on-error: true
+      - name: 生成候选及账户报告
         run: python3 -u server/alpha_engine.py --history .history --run-id "$REPORT_ID"
       - name: 导出日报与网页
         run: |

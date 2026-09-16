@@ -4,10 +4,12 @@ import hashlib
 import json
 import re
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 from collect_quotes import CST
 from daily_data import request, parse_daily
 from tushare_sync import read, save
@@ -28,6 +30,7 @@ def collect(history, run_id, budget=1200):
     if not 1000 < len(stocks) < 10000 or len({s['ts_code'] for s in stocks}) != len(stocks):
         raise ValueError('Stock list incomplete or duplicated')
     started = time.monotonic()
+    stopped = threading.Event()
     jobs = [('sh000300', 'none')] + [(symbol(s['ts_code']), 'qfq') for s in stocks]
 
     def fetch(job):
@@ -42,6 +45,8 @@ def collect(history, run_id, budget=1200):
                 return {'symbol': code, 'status': 'cached', 'fetched_at': old['fetched_at']}
         if time.monotonic() - started > budget:
             return {'symbol': code, 'status': 'failed', 'error': '本轮请求预算已用尽'}
+        if stopped.is_set():
+            return {'symbol': code, 'status': 'failed', 'error': '源连续不可用，本轮停止新增请求'}
         url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?' + urlencode({
             'param': f'{code},day,,{now.date().isoformat()},320,' + ('qfq' if adj == 'qfq' else '')})
         try:
@@ -51,13 +56,17 @@ def collect(history, run_id, budget=1200):
                     'session': session, 'url': url, 'response_sha256': hashlib.sha256(raw).hexdigest(), 'bars': bars}
             save(cache, data)
             return {'symbol': code, 'status': 'success', 'bars': len(bars), 'fetched_at': data['fetched_at']}
+        except HTTPError as exc:
+            if exc.code in (401, 403, 429, 501, 503):
+                stopped.set()
+            return {'symbol': code, 'status': 'failed', 'error': str(exc)[:200]}
         except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
             return {'symbol': code, 'status': 'failed', 'error': str(exc)[:200]}
         finally:
             time.sleep(0.15)
 
     results = []
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         for r in pool.map(fetch, jobs):
             results.append(r)
             if len(results) % 500 == 0:
