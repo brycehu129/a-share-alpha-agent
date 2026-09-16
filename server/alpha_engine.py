@@ -3,6 +3,7 @@ import argparse
 import html
 import json
 import re
+from collections import Counter
 from datetime import datetime, timedelta, time
 from pathlib import Path
 from alpha_data import raw_bars, symbol
@@ -29,6 +30,10 @@ def resolve(forecasts, series, benchmark, now, history):
     outcomes = []
     dates = [b['date'] for b in benchmark]
     for f in forecasts:
+        if not dates or f['eligible_from'] < dates[0]:
+            # A rolling provider window cannot redefine an old forecast's entry.
+            outcomes.extend(read(p) for p in (history / 'outcomes').glob(f['id']+'-*.json'))
+            continue
         entry = next((d for d in dates if d >= f['eligible_from']), None)
         if entry is None:
             continue
@@ -85,11 +90,18 @@ def run(history, run_id):
             series[code] = [b for b in data['bars'] if b['date'] <= cutoff]
     screened = screen(stocks, series, benchmark, cutoff)
     report['screen'] = screened
-    stale = (now - datetime.fromisoformat(master['fetched_at'])).days > 7 or (now - datetime.fromisoformat(bench_source['fetched_at'])).total_seconds() > 86400
+    stale = (now - datetime.fromisoformat(master['fetched_at'])).days > 7 or (now - datetime.fromisoformat(bench_source['fetched_at'])).total_seconds() > 86400 or (now.date()-datetime.fromisoformat(cutoff).date()).days > 5
     if stale:
-        report['issues'].append('股票清单超过7日或基准采集超过24小时，只展示研究，不产生新虚拟计划。')
+        report['issues'].append('股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。')
     if not screened['complete']:
         report['issues'].append('有效日线覆盖不足95%，候选仅供观察，本轮不建立虚拟入场计划。')
+        _, scan = latest(history, 'alpha_data/runs')
+        if scan:
+            failures = Counter(x.get('error','未知错误') for x in scan['requests'] if x['status']=='failed')
+            report['issues'].extend(f'最近腾讯扫描：{reason}（{count}只）' for reason,count in failures.most_common(3))
+        _, backup = latest(history, 'alpha_data/fallback_runs')
+        if backup:
+            report['issues'].extend('备用源：'+e for e in backup.get('errors',[])[:3])
     if screened['market_score'] < 40:
         report['issues'].append('市场趋势评分低于40，暂停新虚拟计划。')
     calibration = walk_forward(stocks, series, benchmark, cutoff)

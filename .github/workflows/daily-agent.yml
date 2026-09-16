@@ -52,7 +52,8 @@ jobs:
         if: steps.gate.outputs.collect == 'true'
         continue-on-error: true
         run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID"
-      - name: 筛选、预测留档及虚拟组合验收
+      - name: 补充独立日线源
+        if: steps.gate.outputs.collect == 'true'
         continue-on-error: true
         run: timeout 960 python3 -u server/alpha_baostock.py --history .history --run-id "$REPORT_ID"
       - name: 生成候选及账户报告

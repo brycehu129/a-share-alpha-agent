@@ -59,6 +59,8 @@ def features(bars, benchmark, cutoff):
     if any(d not in by_date for d in dates):
         raise ValueError('21交易日窗口缺数或停牌')
     closes = [float(by_date[d]['close']) for d in dates]
+    if by_date[cutoff].get('is_st') == '1':
+        raise ValueError('源日线风险警示标记')
     volumes = [float(by_date[d]['volume_raw']) for d in dates]
     if min(closes) <= 0 or min(volumes[-5:]) <= 0:
         raise ValueError('价格或最近成交量无效')

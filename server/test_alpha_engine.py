@@ -7,6 +7,7 @@ from alpha_engine import eligible_from, immutable, resolve
 from alpha_model import features, estimate, label, screen, POLICY, percentiles
 from alpha_portfolio import initial, advance, fee
 from collect_quotes import CST
+from alpha_baostock import normalize
 
 
 def bars(n=70, start='2026-01-05', growth=0.001):
@@ -128,6 +129,49 @@ class AlphaTests(unittest.TestCase):
         r=advance(r,[f],{'sh600000':b},{'sh600000':b},b,b[2]['date'])
         self.assertTrue(r['paused'])
         self.assertGreater(r['max_drawdown_pct'],20)
+
+    def test_complete_scan_produces_candidates(self):
+        benchmark=bars(growth=0.0005)
+        stocks=[]
+        series={}
+        for i in range(60):
+            code=f'{600000+i}.SH'
+            stocks.append({'ts_code':code,'name':'样本'+str(i),'list_date':'20000101',
+                           'industry':'行业'+str(i//10),'list_status':'L'})
+            series['sh'+code[:6]]=bars(growth=0.001+(i//10)*0.0004)
+        result=screen(stocks,series,benchmark,benchmark[-1]['date'])
+        self.assertTrue(result['complete'])
+        self.assertGreater(len(result['candidates']),0)
+        self.assertTrue(all(c['industry']=='行业5' for c in result['candidates']))
+
+    def test_horizon_acceptance_is_immutable(self):
+        b=bars(30)
+        f={'id':'frozen','symbol':'sh600000','eligible_from':b[1]['date'],
+           'bucket':'80+','regime':'趋势','probability':{'probability':None}}
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)
+            now=datetime(2026,3,1,tzinfo=CST)
+            outcomes=resolve([f],{'sh600000':b},b[:6],now,path)
+            self.assertEqual(len(outcomes),0)
+            outcomes=resolve([f],{'sh600000':b},b,now,path)
+            self.assertEqual({o['horizon'] for o in outcomes},{5,10,20})
+            changed=copy.deepcopy(b)
+            changed[11]['close']='100'
+            self.assertEqual(outcomes,resolve([f],{'sh600000':changed},b,now,path))
+
+    def test_rolled_window_cannot_skip_ledger_days(self):
+        b,f,state=self.setup_account()
+        r=advance(state,[f],{'sh600000':b},{'sh600000':b},b[5:],b[-1]['date'])
+        self.assertEqual(r['valuation_status'],'blocked')
+        self.assertEqual(r['last_date'],state['last_date'])
+
+    def test_fallback_volume_and_suspension(self):
+        row={'date':'2026-01-05','open':'10','close':'10','high':'11','low':'9','volume':'10000','tradestatus':'1','isST':'0'}
+        self.assertEqual(normalize([row])[0]['volume_raw'],'100')
+        with self.assertRaises(ValueError):
+            normalize([{**row,'tradestatus':'0'}])
+        with self.assertRaises(ValueError):
+            normalize([{**row,'close':'NaN'}])
 
 
 if __name__ == '__main__':

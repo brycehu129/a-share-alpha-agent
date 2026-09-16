@@ -32,7 +32,7 @@ def corporate_event(raw, adjusted, entry_day, day):
         return True
     ratio0 = float(adjusted[entry_day]['close'])/float(raw[entry_day]['close'])
     ratio1 = float(adjusted[day]['close'])/float(raw[day]['close'])
-    return abs(ratio1/ratio0-1) > 0.005
+    return abs(ratio1/ratio0-1) > 0.000001
 
 
 def advance(previous, forecasts, raw, adjusted, benchmark, cutoff):
@@ -41,6 +41,10 @@ def advance(previous, forecasts, raw, adjusted, benchmark, cutoff):
     state['valuation_status'] = 'current'
     bb = {b['date']: b for b in benchmark}
     dates = sorted(d for d in bb if d <= cutoff)
+    if not dates or state['last_date'] not in dates:
+        state['valuation_status'] = 'blocked'
+        state['issues'].append('历史窗口未覆盖账本最后估值日，先补齐数据，不跳过未处理交易日')
+        return state
     raw = {s: {b['date']: b for b in bars} for s, bars in raw.items()}
     adj = {s: {b['date']: b for b in bars} for s, bars in adjusted.items()}
     for day in [d for d in dates if d > state['last_date']]:

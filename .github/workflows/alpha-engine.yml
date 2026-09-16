@@ -1,12 +1,6 @@
 name: Alpha候选与虚拟账户
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - 'server/alpha_*.py'
-      - 'server/test_alpha_*.py'
-      - '.github/workflows/alpha-engine.yml'
 permissions:
   contents: read
 concurrency:
@@ -33,7 +27,7 @@ jobs:
       - name: 全清单日线采集
         continue-on-error: true
         run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID"
-      - name: 预测及验收
+      - name: 补充独立日线源
         # A hung external SDK is bounded independently of the overall workflow.
         run: timeout 960 python3 -u server/alpha_baostock.py --history .history --run-id "$REPORT_ID"
         continue-on-error: true
