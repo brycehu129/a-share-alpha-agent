@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-16T19:32:40.035365+08:00",
+  "exported_at": "2026-09-16T19:47:32.665367+08:00",
   "market": {
     "generated_at": "2026-09-16T13:34:54.169538+08:00",
     "status": "success",
@@ -5731,35 +5731,268 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-16T19:29:11.236293+08:00",
-    "status": "partial",
+    "generated_at": "2026-09-16T19:34:24.097350+08:00",
+    "status": "success",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
     "target_days": 60,
-    "saved_days": 18,
-    "pending_days": 42,
-    "errors": [
-      "20260820: daily: invalid_response JSONDecodeError"
-    ],
+    "saved_days": 60,
+    "pending_days": 0,
+    "errors": [],
     "stock_counts": {
       "L": 5562
     }
   },
   "analysis": {
-    "generated_at": "2026-09-16T19:31:49.255473+08:00",
-    "status": "waiting_data",
+    "generated_at": "2026-09-16T19:46:20.993399+08:00",
+    "status": "ready",
     "start_date": "20260818",
     "end_date": "20260915",
-    "missing_dates": [
-      "20260818",
-      "20260819",
-      "20260820"
+    "missing_dates": [],
+    "issues": [],
+    "rankings": [
+      {
+        "code": "601086.SH",
+        "name": "国芳集团",
+        "return20_pct": "103.39",
+        "ma20_deviation_pct": "43.37",
+        "excess20_pp": "109.23",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "600127.SH",
+        "name": "金健米业",
+        "return20_pct": "79.32",
+        "ma20_deviation_pct": "8.74",
+        "excess20_pp": "85.16",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "000993.SZ",
+        "name": "闽东电力",
+        "return20_pct": "69.01",
+        "ma20_deviation_pct": "52.20",
+        "excess20_pp": "74.85",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "301132.SZ",
+        "name": "满坤科技",
+        "return20_pct": "61.28",
+        "ma20_deviation_pct": "48.44",
+        "excess20_pp": "67.12",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "000978.SZ",
+        "name": "桂林旅游",
+        "return20_pct": "59.64",
+        "ma20_deviation_pct": "34.15",
+        "excess20_pp": "65.48",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "600371.SH",
+        "name": "万向德农",
+        "return20_pct": "58.85",
+        "ma20_deviation_pct": "6.14",
+        "excess20_pp": "64.68",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "688209.SH",
+        "name": "英集芯",
+        "return20_pct": "54.16",
+        "ma20_deviation_pct": "22.63",
+        "excess20_pp": "59.99",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "300741.SZ",
+        "name": "华宝股份",
+        "return20_pct": "53.55",
+        "ma20_deviation_pct": "29.19",
+        "excess20_pp": "59.38",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "000823.SZ",
+        "name": "超声电子",
+        "return20_pct": "51.55",
+        "ma20_deviation_pct": "44.60",
+        "excess20_pp": "57.39",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "002815.SZ",
+        "name": "崇达技术",
+        "return20_pct": "50.10",
+        "ma20_deviation_pct": "37.70",
+        "excess20_pp": "55.94",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "301046.SZ",
+        "name": "能辉科技",
+        "return20_pct": "49.06",
+        "ma20_deviation_pct": "19.11",
+        "excess20_pp": "54.89",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "002912.SZ",
+        "name": "中新赛克",
+        "return20_pct": "44.93",
+        "ma20_deviation_pct": "38.70",
+        "excess20_pp": "50.77",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "600792.SH",
+        "name": "云煤能源",
+        "return20_pct": "44.93",
+        "ma20_deviation_pct": "24.05",
+        "excess20_pp": "50.77",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "605058.SH",
+        "name": "澳弘电子",
+        "return20_pct": "44.29",
+        "ma20_deviation_pct": "38.59",
+        "excess20_pp": "50.12",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "688135.SH",
+        "name": "利扬芯片",
+        "return20_pct": "42.50",
+        "ma20_deviation_pct": "31.04",
+        "excess20_pp": "48.33",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "301251.SZ",
+        "name": "威尔高",
+        "return20_pct": "40.23",
+        "ma20_deviation_pct": "26.04",
+        "excess20_pp": "46.06",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "603618.SH",
+        "name": "杭电股份",
+        "return20_pct": "39.12",
+        "ma20_deviation_pct": "16.34",
+        "excess20_pp": "44.95",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "002708.SZ",
+        "name": "光洋股份",
+        "return20_pct": "37.83",
+        "ma20_deviation_pct": "17.43",
+        "excess20_pp": "43.66",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "601579.SH",
+        "name": "会稽山",
+        "return20_pct": "37.26",
+        "ma20_deviation_pct": "19.36",
+        "excess20_pp": "43.10",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "003040.SZ",
+        "name": "楚天龙",
+        "return20_pct": "37.21",
+        "ma20_deviation_pct": "-10.35",
+        "excess20_pp": "43.04",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "601595.SH",
+        "name": "上海电影",
+        "return20_pct": "36.74",
+        "ma20_deviation_pct": "20.34",
+        "excess20_pp": "42.58",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "603186.SH",
+        "name": "华正新材",
+        "return20_pct": "36.57",
+        "ma20_deviation_pct": "32.58",
+        "excess20_pp": "42.41",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "300647.SZ",
+        "name": "超频三",
+        "return20_pct": "36.47",
+        "ma20_deviation_pct": "7.88",
+        "excess20_pp": "42.31",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "000980.SZ",
+        "name": "众泰汽车",
+        "return20_pct": "34.52",
+        "ma20_deviation_pct": "26.12",
+        "excess20_pp": "40.36",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "003006.SZ",
+        "name": "百亚股份",
+        "return20_pct": "34.37",
+        "ma20_deviation_pct": "20.78",
+        "excess20_pp": "40.20",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "688655.SH",
+        "name": "迅捷兴",
+        "return20_pct": "34.08",
+        "ma20_deviation_pct": "25.28",
+        "excess20_pp": "39.92",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "301122.SZ",
+        "name": "采纳股份",
+        "return20_pct": "32.87",
+        "ma20_deviation_pct": "11.35",
+        "excess20_pp": "38.70",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "300852.SZ",
+        "name": "四会富仕",
+        "return20_pct": "31.41",
+        "ma20_deviation_pct": "26.21",
+        "excess20_pp": "37.25",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "002886.SZ",
+        "name": "沃特股份",
+        "return20_pct": "31.36",
+        "ma20_deviation_pct": "8.35",
+        "excess20_pp": "37.20",
+        "benchmark20_pct": "-5.84"
+      },
+      {
+        "code": "605177.SH",
+        "name": "东亚药业",
+        "return20_pct": "31.05",
+        "ma20_deviation_pct": "13.38",
+        "excess20_pp": "36.89",
+        "benchmark20_pct": "-5.84"
+      }
     ],
-    "issues": [
-      "目标窗口缺少3个完整日线/因子检查点，暂不排名。"
-    ],
-    "rankings": [],
-    "factor_count": 0
+    "factor_count": 4978
   },
   "sources": [
     {
@@ -5776,15 +6009,15 @@
     },
     {
       "kind": "sync",
-      "id": "35090534947-1",
-      "generated_at": "2026-09-16T19:29:11.236293+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35090534947-1.md"
+      "id": "35091009948-1",
+      "generated_at": "2026-09-16T19:34:24.097350+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35091009948-1.md"
     },
     {
       "kind": "analysis",
-      "id": "35090534947-1",
-      "generated_at": "2026-09-16T19:31:49.255473+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35090534947-1.md"
+      "id": "35091009948-1",
+      "generated_at": "2026-09-16T19:46:20.993399+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35091009948-1.md"
     },
     {
       "kind": "盘前/收盘日报",
