@@ -1,13 +1,14 @@
-"""Independent BaoStock daily fallback. One sequential session; bounded runtime."""
+"""Bounded independent BaoStock sessions, disjoint resumable stock partitions."""
 import argparse
 import socket
 import time
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from pathlib import Path
 from collect_quotes import CST
 from tushare_sync import read, save, sha
-from alpha_data import symbol
+from alpha_data import symbol, completed_day
 
 
 def normalize(rows):
@@ -18,14 +19,12 @@ def normalize(rows):
             raise ValueError('Duplicate or unordered date')
         previous = d
         if row.get('tradestatus') == '0':
-            continue  # Missing session will block candidate, not become fake liquidity.
+            continue
         nums = {k:Decimal(row[k]) for k in ('open','high','low','close','volume')}
         if any(not n.is_finite() or n < 0 for n in nums.values()):
             raise ValueError('Invalid OHLCV')
         if not 0 < nums['low'] <= min(nums['open'],nums['close']) <= max(nums['open'],nums['close']) <= nums['high']:
             raise ValueError('Invalid OHLC ordering')
-        # BaoStock volume is shares; normalize to the Tencent lot scale used
-        # by the relative liquidity proxy. Keep original unit and provider explicit.
         result.append({'date':d, **{k:str(nums[k]) for k in ('open','high','low','close')},
                        'volume_raw':str(nums['volume']/100), 'is_st':row.get('isST')})
     if not result:
@@ -33,13 +32,11 @@ def normalize(rows):
     return result[-320:]
 
 
-def collect(history, run_id, budget=900):
+def partition(args):
+    history, codes, run_id, part_id, budget = args
+    root = Path(history)/'alpha_data'
     now = datetime.now(CST)
-    report = {'generated_at':now.isoformat(),'provider':'BaoStock','status':'partial','requests':[], 'errors':[]}
-    root = history/'alpha_data'
-    path = root/'fallback_runs'/(run_id+'.json')
-    if path.exists():
-        raise ValueError('Fallback run exists')
+    report = {'generated_at':now.isoformat(),'provider':'BaoStock','requests':[],'errors':[], 'status':'partial'}
     started = time.monotonic()
     socket.setdefaulttimeout(15)
     try:
@@ -48,17 +45,10 @@ def collect(history, run_id, budget=900):
         if logged.error_code != '0':
             raise ValueError('Login failed: '+logged.error_msg)
         try:
-            master = read(history/'tushare_data/stock_basic.json')
-            stocks = [s for s in master['rows'] if s['exchange'] in ('SSE','SZSE') and s['list_status']=='L']
-            session = now.strftime('%Y-%m-%d')+('-close' if now.hour>=15 else '-pre')
             failures = 0
-            for stock in stocks:
-                code = symbol(stock['ts_code'])
-                target = root/'series'/(code+'.json')
-                if target.exists() and read(target).get('session') == session:
-                    continue
+            for code in codes:
                 if time.monotonic()-started > budget or failures >= 3:
-                    report['errors'].append('请求预算用尽或连续3次失败；剩余清单保留缺失状态')
+                    report['errors'].append('分批请求预算用尽或连续3次失败；未完成股票下次续跑')
                     break
                 try:
                     response = bs.query_history_k_data_plus(code[:2]+'.'+code[2:],
@@ -74,25 +64,63 @@ def collect(history, run_id, budget=900):
                         raise ValueError(response.error_msg)
                     bars = normalize(rows)
                     data = {'symbol':code,'adjustment':'qfq','provider':'BaoStock','fetched_at':datetime.now(CST).isoformat(),
-                            'session':session,'url':'https://www.baostock.com/','response_sha256':sha(rows),
+                            'url':'https://www.baostock.com/','response_sha256':sha(rows),
                             'original_volume_unit':'shares','normalized_volume_unit':'100 shares','bars':bars}
-                    save(target,data)
+                    save(root/'series'/(code+'.json'),data)
                     report['requests'].append({'symbol':code,'status':'success','bars':len(bars)})
                     failures = 0
                 except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
                     failures += 1
                     report['requests'].append({'symbol':code,'status':'failed','error':str(exc)[:200]})
-                if len(report['requests'])%500 == 0:
-                    print('BaoStock processed',len(report['requests']),flush=True)
-                time.sleep(0.1)
-            report['status'] = 'success' if not report['errors'] and all(x['status']=='success' for x in report['requests']) else 'partial'
+                if len(report['requests'])%100 == 0:
+                    print('BaoStock part',part_id,'processed',len(report['requests']),flush=True)
+                    save(root/'fallback_parts'/(run_id+'-'+str(part_id)+'.json'),report)
+                time.sleep(0.2)
         finally:
             bs.logout()
     except (ImportError, OSError, ValueError, KeyError) as exc:
         report['errors'].append(str(exc)[:300])
     report['finished_at'] = datetime.now(CST).isoformat()
+    report['status'] = 'success' if not report['errors'] and all(r['status']=='success' for r in report['requests']) else 'partial'
+    save(root/'fallback_parts'/(run_id+'-'+str(part_id)+'.json'),report)
+    return report
+
+
+def collect(history, run_id, budget=2100, workers=6):
+    now = datetime.now(CST)
+    root = history/'alpha_data'
+    path = root/'fallback_runs'/(run_id+'.json')
+    if path.exists():
+        raise ValueError('Fallback run exists')
+    report = {'generated_at':now.isoformat(),'provider':'BaoStock','status':'partial','requests':[], 'errors':[]}
+    master = read(history/'tushare_data/stock_basic.json')
+    stocks = [s for s in master['rows'] if s['exchange'] in ('SSE','SZSE') and s['list_status']=='L']
+    bench = root/'series/sh000300.json'
+    cutoff = completed_day(read(bench)) if bench.exists() else now.date().isoformat()
+    pending = []
+    for stock in stocks:
+        code = symbol(stock['ts_code'])
+        cached = root/'series'/(code+'.json')
+        if cached.exists():
+            data = read(cached)
+            if completed_day(data) >= cutoff:
+                continue
+            pending.append((1,data['fetched_at'],code))
+        else:
+            pending.append((0,'',code))
+    codes = [r[2] for r in sorted(pending)]
+    report.update(target_cutoff=cutoff,pending_before=len(codes),workers=workers)
+    if codes:
+        # Each process owns one public SDK session; never share its socket.
+        batches = [(str(history), codes[i::workers], run_id, i, budget) for i in range(workers) if codes[i::workers]]
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            for part in pool.map(partition,batches):
+                report['requests'].extend(part['requests'])
+                report['errors'].extend(part['errors'])
+    report['finished_at'] = datetime.now(CST).isoformat()
+    report['status'] = 'success' if not report['errors'] and all(r['status']=='success' for r in report['requests']) else 'partial'
     save(path,report)
-    print('BaoStock fallback:',report['status'],report['errors'],flush=True)
+    print('BaoStock fallback:',report['status'],'processed',len(report['requests']),report['errors'],flush=True)
 
 
 if __name__ == '__main__':

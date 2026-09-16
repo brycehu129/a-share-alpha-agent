@@ -8,6 +8,7 @@ from alpha_model import features, estimate, label, screen, POLICY, percentiles
 from alpha_portfolio import initial, advance, fee
 from collect_quotes import CST
 from alpha_baostock import normalize
+from alpha_data import completed_day
 
 
 def bars(n=70, start='2026-01-05', growth=0.001):
@@ -172,6 +173,13 @@ class AlphaTests(unittest.TestCase):
             normalize([{**row,'tradestatus':'0'}])
         with self.assertRaises(ValueError):
             normalize([{**row,'close':'NaN'}])
+
+    def test_cache_never_treats_intraday_bar_as_closed(self):
+        rows=[{'date':'2026-09-15'},{'date':'2026-09-16'}]
+        morning={'fetched_at':'2026-09-16T09:10:00+08:00','bars':rows}
+        closed={'fetched_at':'2026-09-16T15:30:00+08:00','bars':rows}
+        self.assertEqual(completed_day(morning),'2026-09-15')
+        self.assertEqual(completed_day(closed),'2026-09-16')
 
 
 if __name__ == '__main__':

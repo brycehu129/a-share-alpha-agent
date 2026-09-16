@@ -6,7 +6,7 @@ import re
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, time as clock_time
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.error import HTTPError
@@ -21,6 +21,13 @@ def symbol(code):
     return code[-2:].lower() + code[:6]
 
 
+def completed_day(data):
+    fetched = datetime.fromisoformat(data['fetched_at']).astimezone(CST)
+    today = fetched.date().isoformat()
+    return max((b['date'] for b in data['bars'] if b['date'] < today or
+                (b['date'] == today and fetched.time() >= clock_time(15,10))), default='')
+
+
 def collect(history, run_id, budget=1200):
     now = datetime.now(CST)
     root = history / 'alpha_data'
@@ -31,7 +38,8 @@ def collect(history, run_id, budget=1200):
         raise ValueError('Stock list incomplete or duplicated')
     started = time.monotonic()
     stopped = threading.Event()
-    jobs = [('sh000300', 'none')] + [(symbol(s['ts_code']), 'qfq') for s in stocks]
+    jobs = [(symbol(s['ts_code']), 'qfq') for s in stocks]
+    cutoff = None
 
     def fetch(job):
         code, adj = job
@@ -41,7 +49,7 @@ def collect(history, run_id, budget=1200):
         session = now.strftime('%Y-%m-%d') + ('-close' if now.hour >= 15 else '-pre')
         if cache.exists():
             old = read(cache)
-            if old.get('session') == session:
+            if code != 'sh000300' and cutoff and completed_day(old) >= cutoff:
                 return {'symbol': code, 'status': 'cached', 'fetched_at': old['fetched_at']}
         if time.monotonic() - started > budget:
             return {'symbol': code, 'status': 'failed', 'error': '本轮请求预算已用尽'}
@@ -65,7 +73,12 @@ def collect(history, run_id, budget=1200):
         finally:
             time.sleep(0.15)
 
-    results = []
+    results = [fetch(('sh000300', 'none'))]
+    bench_path = root/'series/sh000300.json'
+    cutoff = completed_day(read(bench_path)) if bench_path.exists() else None
+    # Bootstrap missing symbols first, then refresh oldest checkpoints. Never
+    # restart the same prefix of a 5,000-stock list after the daily date changes.
+    jobs.sort(key=lambda job: ((root/'series'/(job[0]+'.json')).exists(), job[0]))
     with ThreadPoolExecutor(max_workers=3) as pool:
         for r in pool.map(fetch, jobs):
             results.append(r)
