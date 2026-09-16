@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-16T19:17:52.827187+08:00",
+  "exported_at": "2026-09-16T19:19:35.605421+08:00",
   "market": {
     "generated_at": "2026-09-16T13:34:54.169538+08:00",
     "status": "success",
@@ -5731,28 +5731,50 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-16T19:16:57.993845+08:00",
+    "generated_at": "2026-09-16T19:18:16.330663+08:00",
     "status": "partial",
-    "calendar_range": null,
-    "calendar_agree": null,
-    "target_days": null,
-    "saved_days": null,
-    "pending_days": null,
+    "calendar_range": "20250101—20261231",
+    "calendar_agree": true,
+    "target_days": 60,
+    "saved_days": 0,
+    "pending_days": 60,
     "errors": [
-      "trade_cal: cooling down until 2026-09-17T00:49:18.686179+00:00"
+      "20260915: Invalid daily OHLCV"
     ],
     "stock_counts": {
       "L": 5562
     }
   },
   "analysis": {
-    "generated_at": "2026-09-16T19:16:58.071541+08:00",
+    "generated_at": "2026-09-16T19:18:43.748001+08:00",
     "status": "waiting_data",
-    "start_date": null,
-    "end_date": null,
-    "missing_dates": null,
+    "start_date": "20260818",
+    "end_date": "20260915",
+    "missing_dates": [
+      "20260818",
+      "20260819",
+      "20260820",
+      "20260821",
+      "20260824",
+      "20260825",
+      "20260826",
+      "20260827",
+      "20260828",
+      "20260831",
+      "20260901",
+      "20260902",
+      "20260903",
+      "20260904",
+      "20260907",
+      "20260908",
+      "20260909",
+      "20260910",
+      "20260911",
+      "20260914",
+      "20260915"
+    ],
     "issues": [
-      "等待完整沪深交易日历；不以工作日替代交易日。"
+      "目标窗口缺少21个完整日线/因子检查点，暂不排名。"
     ],
     "rankings": [],
     "factor_count": 0
@@ -5772,15 +5794,15 @@
     },
     {
       "kind": "sync",
-      "id": "35089374503-1",
-      "generated_at": "2026-09-16T19:16:57.993845+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35089374503-1.md"
+      "id": "35089528405-1",
+      "generated_at": "2026-09-16T19:18:16.330663+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35089528405-1.md"
     },
     {
       "kind": "analysis",
-      "id": "35089374503-1",
-      "generated_at": "2026-09-16T19:16:58.071541+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35089374503-1.md"
+      "id": "35089528405-1",
+      "generated_at": "2026-09-16T19:18:43.748001+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35089528405-1.md"
     },
     {
       "kind": "盘前/收盘日报",
