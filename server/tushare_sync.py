@@ -48,6 +48,27 @@ def fetch_pages(api, params, fields, key, call):
     raise ValueError(api + ': pagination limit exceeded')
 
 
+def partition_daily(day, rows):
+    """Quarantine exact zero-activity placeholders; never infer suspension."""
+    valid, excluded, seen = [], [], set()
+    for r in rows:
+        code = r['ts_code']
+        if code in seen or r['trade_date'] != day:
+            raise ValueError(f'Duplicate symbol or unexpected date: {code} {day}')
+        seen.add(code)
+        try:
+            o, h, l, c, prev, vol, amount = [Decimal(str(r[k])) for k in ('open','high','low','close','pre_close','vol','amount')]
+        except (ArithmeticError, ValueError, KeyError) as exc:
+            raise ValueError(f'Invalid daily numeric field: {code} {day}') from exc
+        if not all(n.is_finite() for n in (o,h,l,c,prev,vol,amount)):
+            raise ValueError(f'Non-finite daily OHLCV: {code} {day}')
+        if o == h == l == vol == amount == 0 and c == prev and c > 0:
+            excluded.append({'ts_code':code,'trade_date':day,'reason':'zero_activity_placeholder_unverified'})
+        else:
+            valid.append(r)
+    return valid, excluded
+
+
 def check_day(day, prices, factors):
     if not prices or not factors:
         raise ValueError('Empty daily or adjustment result')
@@ -64,7 +85,7 @@ def check_day(day, prices, factors):
             raise ValueError('Missing adjustment factor for quoted stock')
         o, h, l, c, prev, vol, amount = [Decimal(str(r[k])) for k in ('open', 'high', 'low', 'close', 'pre_close', 'vol', 'amount')]
         if any(not n.is_finite() for n in (o, h, l, c, prev, vol, amount)) or not 0 < l <= min(o, c) <= max(o, c) <= h or prev <= 0 or min(vol, amount) < 0:
-            raise ValueError('Invalid daily OHLCV')
+            raise ValueError(f'Invalid daily OHLCV: {r["ts_code"]} {day}')
 
 
 def select_days(sessions, existing, batch):
@@ -111,9 +132,10 @@ def render(r):
     lines += ['', '每日请求全体股票，单次上限6000条，触及上限不认定完整；没有日线的股票不能直接认定停牌。北交所可能随接口返回，但本版调度日历仅核验沪深。基础信息暂取在市L状态，退市和暂停上市档案暂缓。', '',
               '每轮最多处理10个日期，优先最近日期；已完成日期作为检查点，最近2日重取以接受源修订。当前文件可更新，旧版本由Git提交历史保留。', '',
               '日线与复权因子分开原样保存，所有有日线的股票必须有同日因子；未直接生成前复权价格或策略收益。日线量额单位沿用接口（成交量：手，成交额：千元）。', '',
-              '尚未开启定时运行、交易或Dashboard数据接入。日期计数表示已通过分页及字段检查，不是与交易所逐股核验后的完整率。', '',
+              '日期计数表示已通过字段检查，不是与交易所逐股核验后的完整率。无成交占位记录单独保存且不参与有效日线，不据此确认停牌。', '',
               '## 错误', '']
     lines += ['- ' + safe(e) for e in r['errors']] or ['无。']
+    lines += ['', '本轮隔离无成交占位记录：' + str(sum(x.get('excluded', 0) for x in r['days'])) + ' 条；原始响应保留在 raw/daily。']
     return '\n'.join(lines) + '\n'
 
 
@@ -240,10 +262,11 @@ def main():
                 persist('raw/daily/' + day + '.json', {'trade_date': day, 'rows': prices})
                 factors = single_batch('adj_factor', {'trade_date': day}, 'ts_code,trade_date,adj_factor', call)
                 persist('raw/adj_factor/' + day + '.json', {'trade_date': day, 'rows': factors})
+                prices, excluded = partition_daily(day, prices)
                 check_day(day, prices, factors)
-                persist('days/' + day + '.json', {'trade_date': day, 'daily': prices, 'adj_factor': factors})
+                persist('days/' + day + '.json', {'trade_date': day, 'daily': prices, 'adj_factor': factors, 'excluded': excluded})
                 existing.add(day)
-                report['days'].append({'date': day, 'status': 'success', 'daily': len(prices), 'adj_factor': len(factors)})
+                report['days'].append({'date': day, 'status': 'success', 'daily': len(prices), 'adj_factor': len(factors), 'excluded': len(excluded)})
                 print(day, len(prices), 'daily rows saved', flush=True)
             except ValueError as exc:
                 report['days'].append({'date': day, 'status': 'failed'})

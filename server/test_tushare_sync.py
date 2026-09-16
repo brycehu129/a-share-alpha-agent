@@ -3,9 +3,26 @@ import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
 from tushare_sync import fetch_pages, check_day, select_days, cooldowns, save, single_batch
+from tushare_sync import partition_daily
 
 
 class SyncTests(unittest.TestCase):
+    def test_exact_zero_activity_placeholder_is_quarantined(self):
+        row = dict(ts_code='000016.SZ',trade_date='20260915',open=0,high=0,low=0,close=2.46,pre_close=2.46,vol=0,amount=0)
+        valid, excluded = partition_daily('20260915',[row])
+        self.assertEqual(valid, [])
+        self.assertEqual(excluded[0]['reason'], 'zero_activity_placeholder_unverified')
+        factor = dict(ts_code='000016.SZ',trade_date='20260915',adj_factor=1)
+        for change in ({'vol':1},{'close':2.5},{'open':1},{'amount':-1}):
+            valid, excluded = partition_daily('20260915',[{**row,**change}])
+            self.assertEqual(excluded, [])
+            with self.assertRaises(ValueError):
+                check_day('20260915',valid,[factor])
+        with self.assertRaises(ValueError):
+            partition_daily('20260915',[{**row,'close':'NaN'}])
+        with self.assertRaises(ValueError):
+            partition_daily('20260915',[row,row])
+
     def test_source_cooldowns_are_isolated(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
