@@ -33,6 +33,7 @@ jobs:
       - name: 获取基础数据与缺失交易日
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          XIAODEFA_TOKEN: ${{ secrets.XIAODEFA_TOKEN }}
           REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID"
       - name: 根据本次数据更新研究报告

@@ -12,6 +12,15 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import HTTPError, URLError
 
 ENDPOINT = 'https://api.tushare.pro'
+XIAODEFA_ENDPOINT = 'https://t.xiaodefa.top/'
+
+
+def selected_source():
+    # Each credential is sent only to its explicitly associated service.
+    token = os.environ.get('XIAODEFA_TOKEN', '').strip()
+    if token:
+        return XIAODEFA_ENDPOINT, token
+    return ENDPOINT, os.environ.get('TUSHARE_TOKEN', '').strip()
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -39,12 +48,14 @@ def classify(body, token):
     return {'status': 'success' if items else 'empty', 'code': 0, 'message': '', **cleaned}
 
 
-def probe(api, params, fields, token):
-    item = {'api': api, 'params': params, 'requested_fields': fields, 'endpoint': ENDPOINT,
+def probe(api, params, fields, token, endpoint=ENDPOINT):
+    if endpoint not in (ENDPOINT, XIAODEFA_ENDPOINT):
+        raise ValueError('Unapproved data endpoint')
+    item = {'api': api, 'params': params, 'requested_fields': fields, 'endpoint': endpoint,
             'fetched_at': datetime.now(timezone.utc).isoformat()}
     try:
         body = json.dumps({'api_name': api, 'params': params, 'fields': fields, 'token': token}).encode()
-        req = Request(ENDPOINT, data=body, headers={'Content-Type': 'application/json'}, method='POST')
+        req = Request(endpoint, data=body, headers={'Content-Type': 'application/json'}, method='POST')
         with build_opener(NoRedirect).open(req, timeout=20) as response:
             raw = response.read(2_000_001)
         if len(raw) > 2_000_000:
@@ -68,7 +79,7 @@ def render(report):
         lines.append(f'| {r["api"]} | {r["status"]} | {len(r["items"])} | {safe(r["message"])} |')
     lines += ['', 'success=有数据；empty=请求成功但无数据；permission_denied=权限不足；authentication_error=凭证异常；rate_limited=频率限制；http_error/connection_error=连接未通，不能推断积分权限。', '',
               '这里只对限定股票或日期做接口探测，不是完整行业、日历或日线采集。返回样本保存在同编号 JSON；未写入正式评分。', '',
-              '仅向官方HTTPS地址提交凭证，禁止跳转和降级HTTP；Token及请求正文不写入日志或仓库。', '']
+              '凭证仅提交到对应的已配置HTTPS数据源，禁止跳转和降级HTTP；Token及请求正文不写入日志或仓库。实际来源见JSON endpoint。', '']
     return '\n'.join(lines)
 
 
@@ -79,9 +90,9 @@ def main():
     args = p.parse_args()
     if not re.fullmatch(r'\d+-\d+', args.run_id):
         raise ValueError('invalid run ID')
-    token = os.environ.get('TUSHARE_TOKEN', '').strip()
+    endpoint, token = selected_source()
     if not token:
-        print('TUSHARE_TOKEN is missing or empty; no requests sent')
+        print('No data-source token configured; no requests sent')
         return 1
     now = datetime.now(timezone(timedelta(hours=8)))
     end = (now.date() - timedelta(days=1)).strftime('%Y%m%d')
@@ -103,7 +114,7 @@ def main():
         raise ValueError('cannot overwrite prior probe')
     report = {'id': args.run_id, 'generated_at': now.isoformat(), 'results': []}
     for api, params, fields in probes:
-        item = probe(api, params, fields, token)
+        item = probe(api, params, fields, token, endpoint)
         report['results'].append(item)
         print(api + ': ' + item['status'] + ', rows=' + str(len(item['items'])), flush=True)
         time.sleep(2)

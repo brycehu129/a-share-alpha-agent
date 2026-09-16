@@ -6,6 +6,12 @@ from tushare_sync import fetch_pages, check_day, select_days, cooldowns, save, s
 
 
 class SyncTests(unittest.TestCase):
+    def test_source_cooldowns_are_isolated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            save(root / 'runs/1-1.json', {'requests':[{'api':'daily','status':'rate_limited','message':'1次/天','fetched_at':'2026-09-15T13:23:00+00:00','endpoint':'https://api.tushare.pro'}]})
+            self.assertNotIn('daily', cooldowns(root, datetime(2026,9,15,14,tzinfo=timezone.utc), 'https://t.xiaodefa.top/'))
+
     def test_hourly_cooldown_survives_runs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

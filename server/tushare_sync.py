@@ -10,7 +10,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
-from tushare_probe import probe
+from tushare_probe import probe, selected_source, ENDPOINT
 
 
 def sha(data):
@@ -73,10 +73,12 @@ def select_days(sessions, existing, batch):
     return list(dict.fromkeys(list(reversed(sessions[-2:])) + missing))[:batch]
 
 
-def cooldowns(root, now):
+def cooldowns(root, now, endpoint=ENDPOINT):
     deadlines = {}
     for path in (root / 'runs').glob('*.json'):
         for request in read(path).get('requests', []):
+            if request.get('endpoint', ENDPOINT) != endpoint:
+                continue
             if request.get('status') != 'rate_limited':
                 continue
             message = request.get('message', '')
@@ -138,13 +140,13 @@ def main():
         return 0 if report['status'] == 'success' else 1
     if logpath.exists():
         raise ValueError('Run already archived')
-    token = os.environ.get('TUSHARE_TOKEN', '').strip()
+    endpoint, token = selected_source()
     if not token:
-        raise ValueError('Missing TUSHARE_TOKEN')
+        raise ValueError('Missing data-source token')
     now = datetime.now(timezone(timedelta(hours=8)))
     report = {'id': args.run_id, 'generated_at': now.isoformat(), 'days': [], 'errors': [], 'files': {}, 'requests': []}
     started = time.monotonic()
-    deadlines = cooldowns(root, now)
+    deadlines = cooldowns(root, now, endpoint)
     blocked = set()
     last_calendar_call = None
 
@@ -166,7 +168,7 @@ def main():
                     remaining = 65 - (time.monotonic() - last_calendar_call)
         if api == 'trade_cal':
             last_calendar_call = time.monotonic()
-        response = probe(api, params, fields, token)
+        response = probe(api, params, fields, token, endpoint)
         report['requests'].append({k: v for k, v in response.items() if k not in ('items', 'fields')})
         time.sleep(2)
         if response['status'] not in ('success', 'empty'):
@@ -177,7 +179,7 @@ def main():
         return [dict(zip(response['fields'], row)) for row in response['items']]
 
     def persist(relative, payload):
-        payload = {'fetched_at': now.isoformat(), 'source': 'https://api.tushare.pro', **payload}
+        payload = {'fetched_at': now.isoformat(), 'source': endpoint, **payload}
         save(root / relative, payload)
         report['files'][relative] = sha(payload)
 

@@ -33,6 +33,7 @@ jobs:
         continue-on-error: true
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          XIAODEFA_TOKEN: ${{ secrets.XIAODEFA_TOKEN }}
         run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID"
       - name: 核验是否休市
         id: gate
