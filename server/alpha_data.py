@@ -108,6 +108,45 @@ def raw_bars(history, codes, now):
         except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as exc:
             result[code] = {'bars': [], 'error': str(exc)[:200]}
         time.sleep(0.15)
+    missing = [code for code, item in result.items() if not item['bars']]
+    if missing:
+        try:
+            import socket
+            import baostock as bs
+            from alpha_baostock import normalize
+            from datetime import timedelta
+            socket.setdefaulttimeout(15)
+            login = bs.login()
+            if login.error_code != '0':
+                raise ValueError('BaoStock raw login failed: '+login.error_msg)
+            try:
+                for code in missing:
+                    response = bs.query_history_k_data_plus(code[:2]+'.'+code[2:],
+                        'date,code,open,high,low,close,volume,tradestatus,isST',
+                        start_date=(now.date()-timedelta(days=550)).isoformat(),
+                        end_date=now.date().isoformat(),frequency='d',adjustflag='3')
+                    if response.error_code != '0':
+                        result[code]['fallback_error'] = response.error_msg
+                        continue
+                    rows = []
+                    while response.error_code == '0' and response.next():
+                        rows.append(dict(zip(response.fields,response.get_row_data())))
+                    if response.error_code != '0':
+                        result[code]['fallback_error'] = response.error_msg
+                        continue
+                    try:
+                        result[code] = {'bars':normalize(rows),'provider':'BaoStock','adjustment':'none',
+                            'fetched_at':datetime.now(CST).isoformat(),'url':'https://www.baostock.com/',
+                            'response_sha256':hashlib.sha256(json.dumps(rows,sort_keys=True).encode()).hexdigest()}
+                    except (ValueError, KeyError, ArithmeticError) as exc:
+                        result[code]['fallback_error'] = str(exc)[:200]
+                    time.sleep(0.2)
+            finally:
+                bs.logout()
+        except (ImportError, OSError, ValueError, KeyError) as exc:
+            for code in missing:
+                if not result[code]['bars']:
+                    result[code]['fallback_error'] = str(exc)[:200]
     return result
 
 

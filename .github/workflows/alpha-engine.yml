@@ -1,9 +1,6 @@
 name: Alpha候选与虚拟账户
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths: ['server/alpha_baostock.py']
 permissions:
   contents: read
 concurrency:

@@ -174,13 +174,15 @@ def render(r):
                   '| 股票 | 行业 | 综合分 | 10日研究胜率 | 有效样本/日期组 | 区间 |', '|---|---|---:|---:|---:|---|']
         for c in r['candidates']:
             p = c['probability']
-            lines += [f'| {safe(c["name"])} {c["symbol"]} | {safe(c["industry"])} | {c["score"]} | {p["probability"] if p["probability"] is not None else "尚不可估计"} | {p["n"]}/{p["cohorts"]} | {p["low"]}–{p["high"]} |']
+            interval = f'{p["low"]}–{p["high"]}%' if p['low'] is not None else '—'
+            lines += [f'| {safe(c["name"])} {c["symbol"]} | {safe(c["industry"])} | {c["score"]} | {p["probability"] if p["probability"] is not None else "尚不可估计"} | {p["n"]}/{p["cohorts"]} | {interval} |']
         lines += ['', '排除统计：'+safe(s['exclusion_counts']), '', '每只股票的排除理由及完整候选见同编号JSON。候选按固定综合分排序，前3只留档；概率仅作旁证，不能声称它们是全市场真实胜率最高。', '']
     p = r['portfolio']
     if p:
+        trade_rate = str(p['trade_win_rate'])+'%' if p.get('trade_win_rate') is not None else '暂无已平仓样本'
         lines += ['## 虚拟账户', '', f'估值日期 {p["last_date"]} · 状态 {p["valuation_status"]} · 总资产 {p["equity"]} · 现金 {p["cash"]} · 持仓 {len(p["positions"])}只',
                   f'净值 {p["nav"]}；同期基准收益 {p["benchmark_return_pct"]}%；超额 {p["excess_pp"]}个百分点；最大回撤 {p["max_drawdown_pct"]}%。',
-                  f'已平仓 {p.get("closed_trades",0)}笔；实测虚拟交易胜率 {p.get("trade_win_rate")}%。', '',
+                  f'已平仓 {p.get("closed_trades",0)}笔；实测虚拟交易胜率：{trade_rate}。', '',
                   '成本假设：每边滑点0.1%，佣金0.03%且至少5元，过户费0.001%，卖出税费0.05%；仅为模拟参数，非券商报价。',
                   '只在预测留档后的下一合格日期模拟开盘成交。9:20之后生成的计划最早下一自然日开始等待实际基准交易日。',
                   '开盘偏离参考价超过±3%、接近涨跌停、一字行情或缺价不成交；T+1，收盘触发止盈/止损后下一交易日开盘退出，可能跳空超损。',
