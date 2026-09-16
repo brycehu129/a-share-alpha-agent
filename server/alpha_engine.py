@@ -73,17 +73,30 @@ def run(history, run_id):
     report['source_hashes']['stock_basic'] = sha(master)
     report['source_hashes']['sh000300'] = sha(bench_source)
     today = now.date().isoformat()
+    bridge_path = root / 'bridge_latest.json'
+    bridge = read(bridge_path) if bridge_path.exists() else None
+    if bridge:
+        report['source_hashes']['bridge'] = sha(bridge)
     benchmark = [b for b in bench_source['bars'] if b['date'] < today or (b['date'] == today and now.time() >= time(15, 10))]
     if len(benchmark) < 21:
         report['issues'].append('基准不足21个已结束交易日。')
         report['portfolio'] = previous.get('portfolio') if previous else None
         return report
+    if bridge:
+        benchmark = [b for b in benchmark if b['date'] <= bridge['cutoff']]
+        if len(benchmark) < 21:
+            report['issues'].append('新源与基准共同窗口不足21日。')
+            report['portfolio'] = previous.get('portfolio') if previous else None
+            return report
     cutoff = benchmark[-1]['date']
     stocks = [s for s in master['rows'] if s['exchange'] in ('SSE', 'SZSE') and s['list_status'] == 'L']
     series = {}
     for stock in stocks:
         code = symbol(stock['ts_code'])
         path = root / 'series' / (code+'.json')
+        imported = root / 'tushare_series' / (code+'.json')
+        if bridge and imported.exists():
+            path = imported
         if path.exists():
             data = read(path)
             report['source_hashes'][code] = sha(data)
@@ -131,7 +144,7 @@ def run(history, run_id):
         path = root / 'series' / (code+'.json')
         if path.exists():
             series[code] = [b for b in read(path)['bars'] if b['date'] <= cutoff]
-    raw = raw_bars(history, codes, now)
+    raw = raw_bars(history, codes, now, cutoff=cutoff)
     immutable(history / 'execution_inputs' / (run_id+'.json'), {'generated_at': now.isoformat(), 'series': raw})
     raw_series = {s: [b for b in d['bars'] if b['date'] <= cutoff] for s, d in raw.items()}
     old_state = old_state or initial(cutoff, float(benchmark[-1]['close']))

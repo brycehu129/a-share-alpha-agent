@@ -28,7 +28,7 @@ def completed_day(data):
                 (b['date'] == today and fetched.time() >= clock_time(15,10))), default='')
 
 
-def collect(history, run_id, budget=1200):
+def collect(history, run_id, budget=1200, benchmark_only=False):
     now = datetime.now(CST)
     root = history / 'alpha_data'
     root.mkdir(exist_ok=True)
@@ -39,6 +39,8 @@ def collect(history, run_id, budget=1200):
     started = time.monotonic()
     stopped = threading.Event()
     jobs = [(symbol(s['ts_code']), 'qfq') for s in stocks]
+    if benchmark_only:
+        jobs = []
     cutoff = None
 
     def fetch(job):
@@ -94,10 +96,18 @@ def collect(history, run_id, budget=1200):
     print('Full-list scan archived:', report['status'], flush=True)
 
 
-def raw_bars(history, codes, now):
+def raw_bars(history, codes, now, cutoff=None):
     """Unadjusted execution prices for candidates/positions; never infer from QFQ."""
     result = {}
     for code in sorted(set(codes)):
+        imported = history / 'alpha_data/tushare_series' / (code+'.json')
+        if cutoff and imported.exists():
+            cached = read(imported)
+            if cached.get('cutoff', '') >= cutoff:
+                result[code] = {'bars':cached['raw_bars'], 'fetched_at':cached['fetched_at'],
+                                'provider':cached['provider'], 'adjustment':'none',
+                                'source_manifest':cached['source_manifest']}
+                continue
         url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?' + urlencode({
             'param': f'{code},day,,{now.date().isoformat()},320,'})
         try:
@@ -159,7 +169,8 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--history', type=Path, required=True)
     p.add_argument('--run-id', required=True)
+    p.add_argument('--benchmark-only', action='store_true')
     a = p.parse_args()
     if not re.fullmatch(r'\d+-\d+', a.run_id):
         raise ValueError('Invalid ID')
-    collect(a.history, a.run_id)
+    collect(a.history, a.run_id, benchmark_only=a.benchmark_only)

@@ -49,10 +49,12 @@ jobs:
       - name: 生成历史窗口分析
         continue-on-error: true
         run: python3 server/tushare_analysis.py --history .history --run-id "$REPORT_ID"
-      - name: 按完整股票清单更新日线
+      - name: 转换全清单日线与复权因子
+        run: python3 -u server/tushare_bridge.py --history .history --run-id "$REPORT_ID"
+      - name: 更新基准日线
         if: steps.gate.outputs.collect == 'true'
         continue-on-error: true
-        run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID"
+        run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID" --benchmark-only
       - name: 补充独立日线源
         if: steps.gate.outputs.collect == 'true'
         continue-on-error: true

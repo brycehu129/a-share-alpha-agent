@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [master]
-    paths: ['server/data_source_policy.py']
+    paths: ['server/data_source_policy.py', 'server/tushare_bridge.py']
 permissions:
   contents: read
 concurrency:
@@ -27,9 +27,11 @@ jobs:
         with:
           ref: market-data
           path: .history
-      - name: 全清单日线采集
+      - name: 转换已校验日线与复权因子
+        run: python3 -u server/tushare_bridge.py --history .history --run-id "$REPORT_ID"
+      - name: 更新基准日线
         continue-on-error: true
-        run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID"
+        run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID" --benchmark-only
       - name: 补充独立日线源
         # A hung external SDK is bounded independently of the overall workflow.
         run: timeout --kill-after=10s 2160 python3 -u server/alpha_baostock.py --history .history --run-id "$REPORT_ID"
