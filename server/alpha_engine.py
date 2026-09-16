@@ -161,7 +161,14 @@ def run(history, run_id):
             report['issues'].append(c['symbol']+' 未获得未复权参考价，不生成预测记录。')
             continue
         can_trade = screened['complete'] and not stale and screened['market_score'] >= 40 and report['portfolio']['valuation_status'] == 'current' and not report['portfolio']['paused']
+        plan_reasons = []
+        if not screened['complete']: plan_reasons.append('有效日线覆盖不足95%')
+        if stale: plan_reasons.append('数据超过允许时效')
+        if screened['market_score'] < 40: plan_reasons.append('市场评分低于40')
+        if report['portfolio']['valuation_status'] != 'current': plan_reasons.append('虚拟账户估值暂停')
+        if report['portfolio']['paused']: plan_reasons.append('账户回撤风控暂停')
         forecast = {'id': identity, 'version': VERSION, 'created_at': created.isoformat(), 'as_of': cutoff,
+            'plan_reasons': plan_reasons,
             'eligible_from': eligible_from(created), 'symbol': c['symbol'], 'name': c['name'], 'industry': c['industry'],
             'score': c['score'], 'bucket': c['bucket'], 'regime': c['regime'], 'probability': c['probability'],
             'reference_price': float(ref['close']), 'target': TARGET, 'paper_eligible': can_trade,

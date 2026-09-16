@@ -70,6 +70,8 @@ def build(history):
         result['agent']['portfolio'] = ({**portfolio, 'trades': portfolio['trades'][-30:], 'curve': portfolio['curve'][-250:], 'attempted': []} if portfolio else None)
         result['agent']['forecasts'] = [{k: f[k] for k in ('id', 'created_at', 'as_of', 'eligible_from', 'symbol', 'name', 'score', 'probability', 'reference_price', 'paper_eligible')} for f in agent['forecasts'][:30]]
         result['agent']['outcomes'] = agent['outcomes'][:30]
+        from decision_view import decisions
+        result['agent']['decisions'] = decisions(agent)
         result['agent']['forecast_count'] = len(agent['forecasts'])
         result['agent']['outcome_count'] = len(agent['outcomes'])
         result['sources'].append({'kind': '候选预测与虚拟组合', 'id': agent_path.stem, 'generated_at': agent['generated_at'],
