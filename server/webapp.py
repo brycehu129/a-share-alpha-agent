@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
+from dashboard_page import render_dashboard_page
 from wecom_push import (
     ConfigError,
     PushError,
@@ -79,6 +80,7 @@ button{{padding:8px 16px;margin-top:8px;margin-right:8px;cursor:pointer}}
 </style></head>
 <body>
 <h1>Alpha Shadow 盘中推送配置</h1>
+<p><a href="/dashboard">→ 看板</a></p>
 <p>企业微信群机器人 webhook 状态：<span class="status">{status}</span></p>
 {message_html}
 <form method="post" action="/config">
@@ -127,6 +129,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self._send_html(200, "ok")
+            return
+        if self.path in ("/dashboard", "/dashboard/"):
+            if not self._require_auth():
+                return
+            self._send_html(200, render_dashboard_page())
             return
         if self.path != "/":
             self._send_html(404, "not found")
