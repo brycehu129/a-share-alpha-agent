@@ -41,6 +41,9 @@ def main():
         raise ValueError('Invalid run ID')
     schedule = os.environ.get('REPORT_SCHEDULE', '')
     mode = '盘前数据整理' if schedule == '40 0 * * 1-5' else '收盘数据整理' if schedule in ('35 7 * * 1-5','20 10 * * 1-5') else '提前补数' if schedule == '10 23 * * 0-4' else '手动数据整理'
+    mode = {'prepare':'提前补数','premarket':'盘前数据整理','close':'收盘数据整理'}.get(os.environ.get('REPORT_SLOT'), mode)
+    if os.environ.get('REPORT_SLOT')=='premarket' and now.hour>=9:
+        mode += '（延迟生成，非开盘前可用）'
     report = {'id': args.run_id, 'generated_at': now.isoformat(), 'mode': mode, 'calendar': state, 'sources': [], 'status': 'data_only'}
     lines = [f'# A股 {mode}', '', f'生成时间：{now.isoformat()}（北京时间）', '', f'交易日状态：{state}。', '',
              '候选筛选、研究胜率和虚拟账户见下方独立报告；数据不足时不补造概率或成交。', '']

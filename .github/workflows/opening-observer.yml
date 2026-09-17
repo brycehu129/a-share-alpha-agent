@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '31 1 * * 1-5'
+    - cron: '33 1 * * 1-5'
+    # Audit missed windows even when both opening attempts were delayed.
+    - cron: '47 1 * * 1-5'
   push:
     branches: [master]
     paths: ['server/opening_observer.py']

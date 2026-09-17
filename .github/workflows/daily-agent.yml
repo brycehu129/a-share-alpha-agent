@@ -3,12 +3,14 @@ on:
   workflow_dispatch:
   push:
     branches: [master]
-    paths: ['server/report_status.py']
+    paths: ['server/report_status.py', 'server/report_dispatch.py']
   schedule:
     - cron: '10 23 * * 0-4'
     - cron: '40 0 * * 1-5'
     - cron: '35 7 * * 1-5'
     - cron: '20 10 * * 1-5'
+    # Recovery checks; GitHub scheduling remains best effort.
+    - cron: '17 0-12 * * 1-5'
 permissions:
   contents: read
 concurrency:
@@ -28,52 +30,59 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
-      - run: python3 -m unittest discover -s server -p 'test_*.py'
-      - run: python3 -m pip install baostock==0.9.3
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: market-data
           path: .history
+      - name: 按实际时间检查待补报告
+        id: dispatch
+        run: python3 server/report_dispatch.py --history .history
+      - name: 验证程序
+        if: steps.dispatch.outputs.run == 'true'
+        run: python3 -m unittest discover -s server -p 'test_*.py'
       - name: 发布运行中状态
+        if: steps.dispatch.outputs.run == 'true'
         run: bash server/publish_report_status.sh start
       - name: 补齐历史与交易日历
+        if: steps.dispatch.outputs.run == 'true'
         continue-on-error: true
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           XIAODEFA_TOKEN: ${{ secrets.XIAODEFA_TOKEN }}
         run: python3 -u server/tushare_sync.py --history .history --run-id "$REPORT_ID"
       - name: 核验是否休市
+        if: steps.dispatch.outputs.run == 'true'
         id: gate
         run: python3 server/session_brief.py --history .history --gate-only
       - name: 更新市场行情
-        if: steps.gate.outputs.collect == 'true' && github.event.schedule != '10 23 * * 0-4'
+        if: steps.gate.outputs.collect == 'true' && env.REPORT_SLOT != 'prepare' && steps.dispatch.outputs.run == 'true'
         continue-on-error: true
         run: python3 -u server/report_pipeline.py --history .history --run-id "$REPORT_ID"
       - name: 更新行业与样本强度
-        if: steps.gate.outputs.collect == 'true' && github.event.schedule != '10 23 * * 0-4'
+        if: steps.gate.outputs.collect == 'true' && env.REPORT_SLOT != 'prepare' && steps.dispatch.outputs.run == 'true'
         continue-on-error: true
         run: python3 -u server/research_pipeline.py --history .history --run-id "$REPORT_ID"
       - name: 生成历史窗口分析
+        if: steps.dispatch.outputs.run == 'true'
         continue-on-error: true
         run: python3 server/tushare_analysis.py --history .history --run-id "$REPORT_ID"
       - name: 转换全清单日线与复权因子
+        if: steps.dispatch.outputs.run == 'true'
         run: python3 -u server/tushare_bridge.py --history .history --run-id "$REPORT_ID"
       - name: 更新基准日线
-        if: steps.gate.outputs.collect == 'true' && github.event.schedule != '10 23 * * 0-4'
+        if: steps.gate.outputs.collect == 'true' && env.REPORT_SLOT != 'prepare' && steps.dispatch.outputs.run == 'true'
         continue-on-error: true
         run: python3 -u server/alpha_data.py --history .history --run-id "$REPORT_ID" --benchmark-only
-      - name: 补充独立日线源
-        if: steps.gate.outputs.collect == 'true' && github.event.schedule != '10 23 * * 0-4'
-        continue-on-error: true
-        run: timeout --kill-after=10s 2160 python3 -u server/alpha_baostock.py --history .history --run-id "$REPORT_ID"
       - name: 生成候选及账户报告
-        if: steps.gate.outputs.collect == 'true' && github.event.schedule != '10 23 * * 0-4'
+        if: steps.gate.outputs.collect == 'true' && env.REPORT_SLOT != 'prepare' && steps.dispatch.outputs.run == 'true'
         run: python3 -u server/alpha_engine.py --history .history --run-id "$REPORT_ID"
       - name: 整理日报并导出网页数据
+        if: steps.dispatch.outputs.run == 'true'
         run: |
           python3 server/session_brief.py --history .history --run-id "$REPORT_ID"
           python3 server/dashboard_export.py --history .history
       - name: 保存数据与报告
+        if: steps.dispatch.outputs.run == 'true'
         working-directory: .history
         run: |
           set -euo pipefail
@@ -83,12 +92,12 @@ jobs:
           git commit -m "Archive scheduled data brief $REPORT_ID"
           git push origin HEAD:market-data
       - name: 发布最终运行状态
-        if: always()
+        if: always() && steps.dispatch.outputs.run == 'true'
         env:
           FINAL_JOB_STATUS: ${{ job.status }}
         run: bash server/publish_report_status.sh finish "$FINAL_JOB_STATUS"
       - name: 展示本次整理报告
-        if: always()
+        if: always() && steps.dispatch.outputs.run == 'true'
         run: |
           if [ -f ".history/briefs/$REPORT_ID.md" ]; then
             cat ".history/briefs/$REPORT_ID.md" >> "$GITHUB_STEP_SUMMARY"

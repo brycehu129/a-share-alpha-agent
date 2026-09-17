@@ -26,7 +26,7 @@ def update(history, run_id, phase, job_status='success'):
     now=datetime.now(CST)
     path=history/'operations.json'
     state=json.loads(path.read_text()) if path.exists() else {'reports':{}}
-    slot=SLOTS.get(os.environ.get('REPORT_SCHEDULE',''),'manual')
+    slot=os.environ.get('REPORT_SLOT') or SLOTS.get(os.environ.get('REPORT_SCHEDULE',''),'manual')
     today=now.date().isoformat()
     calendar=[{'date':(now.date()+timedelta(days=i)).isoformat(),
                'state':calendar_state(history,(now.date()+timedelta(days=i)).strftime('%Y%m%d'))} for i in range(-30,32)]
@@ -52,7 +52,10 @@ def update(history, run_id, phase, job_status='success'):
             run['issues'].append('行情日期尚未达到本报告要求，保留旧数据等待补齐。')
         if job_status!='success':
             run['issues'].append('整理任务未成功结束，请查看运行记录中的失败步骤。')
+        if slot=='premarket' and now.hour>=9:
+            run['issues'].append('盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。')
         run['finished_at']=now.isoformat()
+        state.setdefault('checkpoints',{})[os.environ.get('REPORT_PHASE') or slot]=run
     if slot in ('premarket','close'):
         state['reports'][slot]=run
     state.update(updated_at=now.isoformat(),latest_run=run,calendar=calendar,

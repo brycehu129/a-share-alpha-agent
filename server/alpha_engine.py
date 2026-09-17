@@ -227,6 +227,8 @@ if __name__ == '__main__':
     if path.exists():
         raise ValueError('Report already archived')
     report = run(a.history, a.run_id)
+    from expire_plans import reconcile
+    reconcile(a.history, report, datetime.now(CST))
     immutable(path, report)
     path.with_suffix('.md').write_text(render(report))
     (path.parent/'README.md').write_text(render(report))
