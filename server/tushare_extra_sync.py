@@ -48,7 +48,7 @@ def validate_hm_detail(day, rows):
         try:
             buy, sell, net = (Decimal(str(r[k])) for k in ('buy_amount', 'sell_amount', 'net_amount'))
         except (ArithmeticError, ValueError, KeyError) as exc:
-            raise ValueError('hm_detail: invalid numeric field') from exc
+            raise ValueError('hm_detail: invalid numeric field; row=' + repr(r)) from exc
         if not all(n.is_finite() for n in (buy, sell, net)) or buy < 0 or sell < 0:
             raise ValueError('hm_detail: invalid amount')
         if abs((buy - sell) - net) > Decimal('0.02'):
@@ -70,9 +70,9 @@ def validate_limit_list(day, rows):
             close, pct, limit_amount, fd_amount = (
                 Decimal(str(r[k])) for k in ('close', 'pct_chg', 'limit_amount', 'fd_amount'))
         except (ArithmeticError, ValueError, KeyError) as exc:
-            raise ValueError('limit_list_d: invalid numeric field') from exc
+            raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r)) from exc
         if not all(n.is_finite() for n in (close, pct, limit_amount, fd_amount)) or close <= 0:
-            raise ValueError('limit_list_d: invalid numeric field')
+            raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r))
         try:
             open_times, limit_times = int(r['open_times']), int(r['limit_times'])
         except (TypeError, ValueError) as exc:
@@ -90,7 +90,7 @@ def validate_cyq_chips(day, code, rows):
         try:
             price, percent = Decimal(str(r['price'])), Decimal(str(r['percent']))
         except (ArithmeticError, ValueError, KeyError) as exc:
-            raise ValueError('cyq_chips: invalid numeric field') from exc
+            raise ValueError('cyq_chips: invalid numeric field; row=' + repr(r)) from exc
         if not price.is_finite() or price <= 0 or not percent.is_finite() or percent < 0:
             raise ValueError('cyq_chips: invalid price or percent')
         total += percent
