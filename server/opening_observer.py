@@ -4,7 +4,7 @@ import copy
 from datetime import datetime, time
 from pathlib import Path
 from decimal import Decimal
-from alpha_model import POLICY
+from shortterm_model import SHORT_POLICY as DEFAULT_POLICY
 from alpha_portfolio import fee
 from alpha_engine import immutable, render
 from collect_quotes import CST
@@ -77,9 +77,10 @@ def run(history, run_id):
     for pos in list(state['positions']):
         if not pos.get('exit_signal') or pos['entry_day']>=today:continue
         if not enabled:continue
+        policy=pos.get('policy',DEFAULT_POLICY)
         try:
             value,evidence=observe(pos['symbol'])
-            price=round(value*(1-POLICY['slippage']),2);gross=round(price*pos['shares'],2);cost=fee(gross,'sell');pnl=round(gross-cost-pos['cost'],2)
+            price=round(value*(1-policy['slippage']),2);gross=round(price*pos['shares'],2);cost=fee(gross,'sell');pnl=round(gross-cost-pos['cost'],2)
             state['cash']=round(state['cash']+gross-cost,2)
             state['trades'].append({'id':pos['id']+'-exit','prediction_id':pos['id'],'symbol':pos['symbol'],'side':'sell','date':today,'price':price,'shares':pos['shares'],'fee':cost,'pnl':pnl,'return_pct':round(pnl/pos['cost']*100,4),'reason':pos['exit_signal'],**evidence})
             state['positions'].remove(pos)
@@ -89,25 +90,25 @@ def run(history, run_id):
         if not f['paper_eligible'] or f['id'] in state['attempted']:continue
         due=first_session(f,dates)
         if due is None or due>today or (due==today and now.time()<time(9,30)):continue
-        reason=None;evidence={}
+        reason=None;evidence={};policy=f.get('policy',DEFAULT_POLICY)
         try:
             if due!=today or not enabled:raise ValueError('错过首个允许交易日的观察窗口，不回填日线成交')
             if f.get('execution_mode')!='observed-quote-v1':raise ValueError('旧日线撮合计划不迁移为新执行方式，等待新版本计划')
             created=datetime.fromisoformat(f['created_at']).astimezone(CST)
             if created.date()>now.date() or (created.date()==now.date() and created.time()>=time(9,20)):raise ValueError('计划未在09:20之前冻结')
             if f['as_of']!=previous:raise ValueError('计划依据不是上一交易日，不执行过期计划')
-            if state['paused'] or len(state['positions'])>=POLICY['max_positions']:raise ValueError('风险暂停或持仓已满')
+            if state['paused'] or len(state['positions'])>=policy['max_positions']:raise ValueError('风险暂停或持仓已满')
             if any(p['symbol']==f['symbol'] for p in state['positions']):raise ValueError('已经持有该股票')
             value,evidence=observe(f['symbol'])
-            if not POLICY['entry_gap_min']<=value/f['reference_price']-1<=POLICY['entry_gap_max']:raise ValueError('观察时报价偏离参考价超过3%')
-            price=round(value*(1+POLICY['slippage']),2)
-            budget=min(state['equity']*POLICY['max_weight'],state['equity']*POLICY['risk_per_trade']/POLICY['stop_pct'],state['cash']-10)
+            if not policy['entry_gap_min']<=value/f['reference_price']-1<=policy['entry_gap_max']:raise ValueError('观察时报价偏离参考价超过3%')
+            price=round(value*(1+policy['slippage']),2)
+            budget=min(state['equity']*policy['max_weight'],state['equity']*policy['risk_per_trade']/policy['stop_pct'],state['cash']-10)
             shares=max(0,int(budget/price/100)*100)
             if shares<=0 or (f['symbol'].startswith('sh688') and shares<200):raise ValueError('资金不足最低模拟申报数量')
             cost=fee(round(price*shares,2),'buy');total=round(price*shares+cost,2)
             if total>state['cash']:raise ValueError('现金不足以支付数量与费用')
             state['cash']=round(state['cash']-total,2)
-            state['positions'].append({'id':f['id'],'symbol':f['symbol'],'name':f['name'],'shares':shares,'entry_day':today,'entry_price':price,'cost':total,'exit_signal':None,'mark':value,'value':round(value*shares,2)})
+            state['positions'].append({'id':f['id'],'symbol':f['symbol'],'name':f['name'],'shares':shares,'entry_day':today,'entry_price':price,'cost':total,'exit_signal':None,'mark':value,'value':round(value*shares,2),'policy':policy})
             state['trades'].append({'id':f['id']+'-entry','prediction_id':f['id'],'symbol':f['symbol'],'side':'buy','date':today,'price':price,'shares':shares,'fee':cost,'reason':'观察窗口有效报价满足冻结计划',**evidence})
         except (ValueError,OSError,KeyError,ArithmeticError) as exc:reason=str(exc)[:200]
         state['attempted'].append(f['id'])
@@ -116,7 +117,7 @@ def run(history, run_id):
     report['issues']=['开盘观察执行记录；当日净值仍需收盘估值。未用当天完整日线决定成交。']+[r['reason'] for r in audit if r.get('status')=='deferred']
     if any(t.get('evidence_run')==run_id for t in state['trades']):
         state['equity']=round(state['cash']+sum(p['value'] for p in state['positions']),2)
-        state['nav']=round(state['equity']/POLICY['capital'],6)
+        state['nav']=round(state['equity']/DEFAULT_POLICY['capital'],6)
         state['valuation_status']='intraday'
     immutable(history/'opening_runs'/(run_id+'.json'),{'generated_at':report['generated_at'],'window_enabled':enabled,'audit':audit})
     dest=history/'agent'/(run_id+'.json');immutable(dest,report);dest.with_suffix('.md').write_text(render(report))
