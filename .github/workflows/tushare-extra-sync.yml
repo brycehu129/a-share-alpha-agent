@@ -1,0 +1,78 @@
+name: Tushare扩展数据同步（游资/涨跌停/筹码）
+on:
+  workflow_dispatch:
+    inputs:
+      cyq_symbols:
+        description: '筹码分布抓取的股票代码，逗号分隔（例如 000001.SZ,600000.SH），留空则跳过筹码分布'
+        required: false
+        default: ''
+  push:
+    branches: [master]
+    paths:
+      - 'server/tushare_extra_sync.py'
+      - 'server/test_tushare_extra_sync.py'
+      - '.github/workflows/tushare-extra-sync.yml'
+permissions:
+  contents: read
+concurrency:
+  group: market-report-history
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    outputs:
+      data_commit: ${{ steps.save.outputs.data_commit }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s server -p 'test_tushare_extra_sync.py' -v
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: market-data
+          path: .history
+      - name: 补充游资/涨跌停，按需补充筹码分布
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          XIAODEFA_TOKEN: ${{ secrets.XIAODEFA_TOKEN }}
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          CYQ_SYMBOLS: ${{ github.event.inputs.cyq_symbols }}
+        run: |
+          python3 -u server/tushare_extra_sync.py --history .history --run-id "$REPORT_ID" \
+            --batch-days 10 --budget-seconds 1200 --cyq-symbols "$CYQ_SYMBOLS" --cyq-days 5
+      - name: 保存数据和更新检查点
+        id: save
+        working-directory: .history
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tushare_data/hm_detail/ tushare_data/limit_list_d/ tushare_data/cyq_chips/ \
+                     tushare_data/runs_extra/ tushare_data/README_extra.md
+          git commit -m "Sync Tushare extra data $REPORT_ID"
+          git push origin HEAD:market-data
+          echo "data_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  verify:
+    needs: sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.sync.outputs.data_commit }}
+          path: .history
+          persist-credentials: false
+      - name: 从仓库恢复并校验本次数据
+        env:
+          REPORT_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: python3 server/tushare_extra_sync.py --history .history --run-id "$REPORT_ID" --verify-only
