@@ -1,0 +1,2 @@
+# 本项目服务器代码只依赖 Python 标准库，这里留空只是为了让 Railway/Nixpacks
+# 能识别出这是一个 Python 项目（触发 Python builder）。
