@@ -171,6 +171,10 @@ def main():
         if response['status'] not in ('success', 'empty'):
             blocked.add(api)
             raise ValueError(api + ': ' + response['status'] + ' ' + response['message'])
+        if response['status'] == 'empty':
+            # Zero rows for this query (e.g. no hot-money activity logged yet for
+            # a same-day request) -- not a schema problem, nothing to validate.
+            return []
         missing = set(fields.split(',')) - set(response['fields'])
         if missing:
             raise ValueError(api + ': missing requested fields: ' + ','.join(sorted(missing))
