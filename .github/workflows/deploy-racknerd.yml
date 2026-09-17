@@ -16,14 +16,19 @@ jobs:
     steps:
       - name: 通过SSH触发远端部署
         env:
-          DEPLOY_KEY: ${{ secrets.RACKNERD_DEPLOY_KEY }}
+          # RACKNERD_DEPLOY_KEY 存的是私钥文件的 base64（单行），不是原始PEM——
+          # 多行PEM在网页终端里复制粘贴很容易丢换行/截断，导致
+          # "Load key: error in libcrypto"；base64单行从根本上避开这个问题。
+          # 服务器上生成：base64 -w0 /root/.ssh/github_actions_deploy
+          DEPLOY_KEY_B64: ${{ secrets.RACKNERD_DEPLOY_KEY }}
           DEPLOY_HOST: ${{ secrets.RACKNERD_HOST }}
         run: |
           set -euo pipefail
           umask 077
           mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          echo "$DEPLOY_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null  # 提前校验私钥格式，坏了就在这一步直接报错
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           # authorized_keys 上这个 key 绑定了一个固定的 command=，实际执行的
           # 是服务器端预先设好的部署脚本，这里传的命令会被服务器忽略。

@@ -110,10 +110,12 @@ fi
 
 echo ""
 echo "=================================================================="
-echo "把下面这把私钥完整复制，粘到 GitHub 仓库 Settings -> Secrets and"
-echo "variables -> Actions -> New repository secret，名字填 RACKNERD_DEPLOY_KEY："
+echo "把下面这一整行 base64 复制（不是上面PEM格式的私钥本身——多行PEM在网页"
+echo "终端里复制粘贴很容易丢换行/截断，导致GitHub Actions报 error in libcrypto，"
+echo "单行base64能从根本上避开这个问题），粘到 GitHub 仓库 Settings -> Secrets"
+echo "and variables -> Actions -> New repository secret，名字填 RACKNERD_DEPLOY_KEY："
 echo "=================================================================="
-cat /root/.ssh/github_actions_deploy
+base64 -w0 /root/.ssh/github_actions_deploy; echo
 echo "=================================================================="
 echo "再新建一个 secret，名字 RACKNERD_HOST，值填：64.188.22.227"
 echo "=================================================================="
