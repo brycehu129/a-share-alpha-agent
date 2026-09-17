@@ -1,19 +1,19 @@
 """Append-only daily shadow account. No broker API; no retrospective entries."""
 import copy
 from datetime import datetime, time
-from alpha_model import POLICY
+from alpha_model import POLICY as DEFAULT_POLICY
 
 
-def fee(gross, side):
-    return round(max(POLICY['minimum_commission'], gross*POLICY['commission']) +
-                 gross*POLICY['transfer_fee'] + (gross*POLICY['sell_tax'] if side == 'sell' else 0), 2)
+def fee(gross, side, policy=DEFAULT_POLICY):
+    return round(max(policy['minimum_commission'], gross*policy['commission']) +
+                 gross*policy['transfer_fee'] + (gross*policy['sell_tax'] if side == 'sell' else 0), 2)
 
 
-def initial(day, benchmark):
-    return {'cash': POLICY['capital'], 'equity': POLICY['capital'], 'nav': 1.0,
+def initial(day, benchmark, policy=DEFAULT_POLICY):
+    return {'cash': policy['capital'], 'equity': policy['capital'], 'nav': 1.0,
             'positions': [], 'trades': [], 'attempted': [], 'last_date': day,
             'inception_date': day, 'benchmark_start': benchmark, 'benchmark_return_pct': 0,
-            'excess_pp': 0, 'peak': POLICY['capital'], 'max_drawdown_pct': 0,
+            'excess_pp': 0, 'peak': policy['capital'], 'max_drawdown_pct': 0,
             'drawdown_pct': 0, 'paused': False, 'curve': [{'date': day, 'nav': 1.0, 'benchmark_nav': 1.0}],
             'valuation_status': 'current', 'issues': []}
 
@@ -35,7 +35,7 @@ def corporate_event(raw, adjusted, entry_day, day):
     return abs(ratio1/ratio0-1) > 0.000001
 
 
-def advance(previous, forecasts, raw, adjusted, benchmark, cutoff, execute=True):
+def advance(previous, forecasts, raw, adjusted, benchmark, cutoff, execute=True, policy=DEFAULT_POLICY):
     state = copy.deepcopy(previous)
     state['issues'] = []
     state['valuation_status'] = 'current'
@@ -62,9 +62,9 @@ def advance(previous, forecasts, raw, adjusted, benchmark, cutoff, execute=True)
             code = pos['symbol']
             bar = raw[code][day]
             if execute and pos.get('exit_signal') and pos['entry_day'] < day and tradable(bar, raw[code].get(prev_day), code):
-                price = round(float(bar['open'])*(1-POLICY['slippage']), 2)
+                price = round(float(bar['open'])*(1-policy['slippage']), 2)
                 gross = round(price*pos['shares'], 2)
-                costs = fee(gross, 'sell')
+                costs = fee(gross, 'sell', policy)
                 pnl = round(gross-costs-pos['cost'], 2)
                 state['cash'] = round(state['cash']+gross-costs, 2)
                 state['trades'].append({'id': pos['id']+'-exit', 'prediction_id': pos['id'], 'symbol': code,
@@ -89,7 +89,7 @@ def advance(previous, forecasts, raw, adjusted, benchmark, cutoff, execute=True)
             prev_bar = raw.get(code, {}).get(prev_day)
             if created.date().isoformat() > day or (created.date().isoformat() == day and created.time() >= time(9, 20)):
                 reason = '盘前截止后生成，不回填成交'
-            elif state['paused'] or len(state['positions']) >= POLICY['max_positions']:
+            elif state['paused'] or len(state['positions']) >= policy['max_positions']:
                 reason = '风险暂停或持仓已满'
             elif any(p['symbol'] == code for p in state['positions']):
                 reason = '已持有该股票'
@@ -97,25 +97,25 @@ def advance(previous, forecasts, raw, adjusted, benchmark, cutoff, execute=True)
                 reason = '缺价、无量、一字行情或开盘接近涨跌停'
             elif corporate_event(raw.get(code, {}), adj.get(code, {}), f['as_of'], day):
                 reason = '参考日至入场日复权关系变化或无法核验'
-            elif not POLICY['entry_gap_min'] <= float(bar['open'])/f['reference_price']-1 <= POLICY['entry_gap_max']:
+            elif not policy['entry_gap_min'] <= float(bar['open'])/f['reference_price']-1 <= policy['entry_gap_max']:
                 reason = '开盘偏离参考价超过3%'
             if reason:
                 state['trades'].append({'id': f['id']+'-skip', 'prediction_id': f['id'], 'symbol': code,
                                         'side': 'skipped', 'date': day, 'reason': reason})
                 continue
-            price = round(float(bar['open'])*(1+POLICY['slippage']), 2)
-            budget = min(state['equity']*POLICY['max_weight'],
-                         state['equity']*POLICY['risk_per_trade']/POLICY['stop_pct'], state['cash']-10)
+            price = round(float(bar['open'])*(1+policy['slippage']), 2)
+            budget = min(state['equity']*policy['max_weight'],
+                         state['equity']*policy['risk_per_trade']/policy['stop_pct'], state['cash']-10)
             shares = max(0, int(budget/price/100)*100)
             if code.startswith('sh688') and shares < 200:
                 shares = 0
-            while shares and shares*price+fee(shares*price, 'buy') > state['cash']:
+            while shares and shares*price+fee(shares*price, 'buy', policy) > state['cash']:
                 shares -= 100
             if shares <= 0 or (code.startswith('sh688') and shares < 200):
                 state['trades'].append({'id': f['id']+'-skip', 'prediction_id': f['id'], 'symbol': code,
                                         'side': 'skipped', 'date': day, 'reason': '资金不足最低模拟申报数量'})
                 continue
-            gross, costs = round(shares*price, 2), fee(shares*price, 'buy')
+            gross, costs = round(shares*price, 2), fee(shares*price, 'buy', policy)
             state['cash'] = round(state['cash']-gross-costs, 2)
             state['positions'].append({'id': f['id'], 'symbol': code, 'name': f['name'], 'shares': shares,
                 'entry_day': day, 'entry_price': price, 'cost': round(gross+costs, 2), 'exit_signal': None})
@@ -130,19 +130,19 @@ def advance(previous, forecasts, raw, adjusted, benchmark, cutoff, execute=True)
             # Close-only signal, next session open fill; never pretend an intraday
             # stop was available from daily OHLC, especially on the T+1 entry day.
             if not pos['exit_signal']:
-                pos['exit_signal'] = ('收盘触发止损' if ret <= -POLICY['stop_pct'] else
-                    '收盘触发止盈' if ret >= POLICY['target_pct'] else '持有期到期' if held >= POLICY['hold_sessions'] else None)
+                pos['exit_signal'] = ('收盘触发止损' if ret <= -policy['stop_pct'] else
+                    '收盘触发止盈' if ret >= policy['target_pct'] else '持有期到期' if held >= policy['hold_sessions'] else None)
         state['equity'] = round(state['cash']+sum(p['value'] for p in state['positions']), 2)
-        state['nav'] = round(state['equity']/POLICY['capital'], 6)
+        state['nav'] = round(state['equity']/policy['capital'], 6)
         state['peak'] = max(state['peak'], state['equity'])
         dd = (1-state['equity']/state['peak'])*100
         state['drawdown_pct'] = round(dd, 4)
         state['max_drawdown_pct'] = round(max(state['max_drawdown_pct'], dd), 4)
-        if dd >= POLICY['drawdown_pause']*100:
+        if dd >= policy['drawdown_pause']*100:
             state['paused'] = True
             for pos in state['positions']:
                 pos['exit_signal'] = '账户回撤风控退出'
-        if dd >= POLICY['drawdown_hard_stop']*100:
+        if dd >= policy['drawdown_hard_stop']*100:
             state['issues'].append('账户触及50%硬上限；实际可成交价格仍可能导致进一步亏损')
         bn = float(bb[day]['close'])/state['benchmark_start']
         state['benchmark_return_pct'] = round((bn-1)*100, 4)
