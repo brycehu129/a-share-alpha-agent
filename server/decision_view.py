@@ -50,6 +50,7 @@ def decisions(agent):
         ref=(f or {}).get('reference_price')
         entry=pos.get('entry_price') if pos else None
         result.append({'symbol':code,'name':(pos or f or candidate or {}).get('name',code),
+            'strategy_type':(f or candidate or {}).get('strategy_type'),
             'state':state,'reasons':reasons,'prediction_id':(f or {}).get('id'),
             'created_at':(f or {}).get('created_at'),'as_of':(f or {}).get('as_of'),
             'eligible_from':(f or {}).get('eligible_from'),'reference_price':ref,
