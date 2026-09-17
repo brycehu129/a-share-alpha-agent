@@ -53,8 +53,21 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- tushare_data/hm_detail/ tushare_data/limit_list_d/ tushare_data/cyq_chips/ \
-                     tushare_data/runs_extra/ tushare_data/README_extra.md
+          targets=()
+          for p in tushare_data/hm_detail tushare_data/limit_list_d tushare_data/cyq_chips tushare_data/runs_extra tushare_data/README_extra.md; do
+            if [ -e "$p" ]; then targets+=("$p"); fi
+          done
+          if [ ${#targets[@]} -eq 0 ]; then
+            echo "No extra-sync output was produced this run; nothing to commit."
+            echo "data_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add -- "${targets[@]}"
+          if git diff --cached --quiet; then
+            echo "No staged changes after add; nothing to commit."
+            echo "data_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git commit -m "Sync Tushare extra data $REPORT_ID"
           git push origin HEAD:market-data
           echo "data_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
