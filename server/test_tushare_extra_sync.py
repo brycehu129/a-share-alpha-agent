@@ -57,6 +57,19 @@ class ExtraSyncTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_limit_list('20260915', [row, dict(row)])
 
+    def test_limit_list_accepts_zhaban_row_with_all_nulls(self):
+        rows = [dict(trade_date='20260917', ts_code='000572.SZ', name='海马汽车', close=4.36,
+                     pct_chg=7.92, limit_amount=None, fd_amount=None,
+                     open_times=2, limit_times=None, limit='Z')]
+        self.assertEqual(validate_limit_list('20260917', rows), rows)
+
+    def test_limit_list_rejects_zero_limit_times_when_present(self):
+        rows = [dict(trade_date='20260917', ts_code='000001.SZ', name='x', close=1,
+                     pct_chg=1, limit_amount=None, fd_amount=None,
+                     open_times=0, limit_times=0, limit='U')]
+        with self.assertRaises(ValueError):
+            validate_limit_list('20260917', rows)
+
     def test_limit_list_accepts_null_limit_and_fd_amount(self):
         rows = [dict(trade_date='20260917', ts_code='000504.SZ', name='南华生物', close=9.1,
                      pct_chg=10.04, limit_amount=None, fd_amount=34195070.0,

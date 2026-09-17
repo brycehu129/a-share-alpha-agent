@@ -85,12 +85,23 @@ def validate_limit_list(day, rows):
                 raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r)) from exc
             if not value.is_finite() or value < 0:
                 raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r))
+        # limit_times (连板数) is meaningless for a 'Z' (zhaban -- opened and
+        # never resealed) row that never closed at the limit price that day;
+        # observed null on a real 'Z' row alongside null limit_amount/fd_amount.
+        # open_times is always reported, so it stays required.
         try:
-            open_times, limit_times = int(r['open_times']), int(r['limit_times'])
+            open_times = int(r['open_times'])
         except (TypeError, ValueError) as exc:
-            raise ValueError('limit_list_d: invalid open/limit times; row=' + repr(r)) from exc
-        if open_times < 0 or limit_times < 1:
-            raise ValueError('limit_list_d: invalid open/limit times; row=' + repr(r))
+            raise ValueError('limit_list_d: invalid open_times; row=' + repr(r)) from exc
+        if open_times < 0:
+            raise ValueError('limit_list_d: invalid open_times; row=' + repr(r))
+        if r.get('limit_times') is not None:
+            try:
+                limit_times = int(r['limit_times'])
+            except (TypeError, ValueError) as exc:
+                raise ValueError('limit_list_d: invalid limit_times; row=' + repr(r)) from exc
+            if limit_times < 1:
+                raise ValueError('limit_list_d: invalid limit_times; row=' + repr(r))
     return rows
 
 
