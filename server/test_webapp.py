@@ -65,5 +65,18 @@ class RenderPageTests(unittest.TestCase):
             self.assertIn("&lt;script&gt;", page)
 
 
+class BuildTlsContextTests(unittest.TestCase):
+    def test_missing_cert_file_raises_clear_error(self):
+        with self.assertRaises(wp.ConfigError):
+            webapp.build_tls_context("/no/such/cert.pem", "/no/such/key.pem")
+
+    def test_missing_key_file_raises_even_if_cert_exists(self):
+        with tempfile.TemporaryDirectory() as d:
+            cert = os.path.join(d, "cert.pem")
+            open(cert, "w").close()
+            with self.assertRaises(wp.ConfigError):
+                webapp.build_tls_context(cert, "/no/such/key.pem")
+
+
 if __name__ == "__main__":
     unittest.main()

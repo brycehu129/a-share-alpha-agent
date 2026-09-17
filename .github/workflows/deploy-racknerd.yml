@@ -1,0 +1,30 @@
+name: 部署到RackNerd
+on:
+  push:
+    branches: [master]
+    paths: ['server/webapp.py', 'server/wecom_push.py', 'Procfile', 'requirements.txt']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-racknerd
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 通过SSH触发远端部署
+        env:
+          DEPLOY_KEY: ${{ secrets.RACKNERD_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.RACKNERD_HOST }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # authorized_keys 上这个 key 绑定了一个固定的 command=，实际执行的
+          # 是服务器端预先设好的部署脚本，这里传的命令会被服务器忽略。
+          ssh -i ~/.ssh/deploy_key "root@$DEPLOY_HOST" "deploy"

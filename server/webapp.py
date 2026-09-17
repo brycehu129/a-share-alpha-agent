@@ -10,14 +10,22 @@
 
 启动：python3 server/webapp.py
 环境变量：
-  PORT           监听端口（Railway 会自动注入），本地默认 8080。
+  PORT           监听端口，默认 8080。
   ADMIN_PASSWORD 访问后台页面所需的密码（必须设置，否则拒绝启动）。
   CONFIG_PATH    配置文件路径，默认 server/data/webapp_config.json。
+  TLS_CERT_PATH  TLS证书文件路径；和 TLS_KEY_PATH 一起设置时，用 HTTPS 监听。
+  TLS_KEY_PATH   TLS私钥文件路径。
+
+  没设置 TLS_CERT_PATH/TLS_KEY_PATH 时用纯 HTTP 监听——这时 Basic Auth 密码是
+  明文在网络上传输的，只应该在只有本机/SSH隧道能访问的情况下这么用；一旦要
+  用公网IP直接访问，必须配好这两个环境变量（自签名证书就够，见
+  server/RACKNERD_DEPLOY.md），否则密码可能被同网络的人截获。
 """
 import base64
 import hmac
 import html
 import os
+import ssl
 import sys
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -157,6 +165,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send_html(404, "not found")
 
 
+def build_tls_context(cert_path, key_path):
+    """校验证书/私钥文件存在并可加载，返回一个 server-side SSLContext。"""
+    for label, p in (("TLS_CERT_PATH", cert_path), ("TLS_KEY_PATH", key_path)):
+        if not p or not os.path.exists(p):
+            raise ConfigError(f"{label} 指向的文件不存在: {p!r}")
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile=cert_path, keyfile=key_path)
+    return context
+
+
 def main():
     if not os.environ.get("ADMIN_PASSWORD"):
         raise SystemExit(
@@ -164,7 +182,19 @@ def main():
         )
     port = int(os.environ.get("PORT", "8080"))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
-    print(f"Alpha Shadow webapp listening on 0.0.0.0:{port}", file=sys.stderr)
+
+    cert_path = os.environ.get("TLS_CERT_PATH")
+    key_path = os.environ.get("TLS_KEY_PATH")
+    if cert_path or key_path:
+        context = build_tls_context(cert_path, key_path)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        print(f"Alpha Shadow webapp listening on https://0.0.0.0:{port}", file=sys.stderr)
+    else:
+        print(
+            f"Alpha Shadow webapp listening on http://0.0.0.0:{port} "
+            "(WARNING: no TLS configured, Basic Auth password travels in cleartext)",
+            file=sys.stderr,
+        )
     server.serve_forever()
 
 
