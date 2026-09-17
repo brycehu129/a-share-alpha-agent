@@ -57,6 +57,10 @@ def validate_hm_detail(day, rows):
 
 
 def validate_limit_list(day, rows):
+    # limit_amount/fd_amount (板上成交金额/封单金额) can legitimately be null on
+    # Tushare's side -- observed on a real 'U' row that had open_times=1 --
+    # so only close/pct_chg are required; the two amount fields are validated
+    # when present but never required.
     seen = set()
     for r in rows:
         if r['trade_date'] != day:
@@ -67,18 +71,26 @@ def validate_limit_list(day, rows):
         if r['limit'] not in ('U', 'D', 'Z'):
             raise ValueError('limit_list_d: unexpected limit type ' + str(r['limit']))
         try:
-            close, pct, limit_amount, fd_amount = (
-                Decimal(str(r[k])) for k in ('close', 'pct_chg', 'limit_amount', 'fd_amount'))
+            close, pct = Decimal(str(r['close'])), Decimal(str(r['pct_chg']))
         except (ArithmeticError, ValueError, KeyError) as exc:
             raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r)) from exc
-        if not all(n.is_finite() for n in (close, pct, limit_amount, fd_amount)) or close <= 0:
+        if not close.is_finite() or close <= 0 or not pct.is_finite():
             raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r))
+        for key in ('limit_amount', 'fd_amount'):
+            if r.get(key) is None:
+                continue
+            try:
+                value = Decimal(str(r[key]))
+            except (ArithmeticError, ValueError) as exc:
+                raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r)) from exc
+            if not value.is_finite() or value < 0:
+                raise ValueError('limit_list_d: invalid numeric field; row=' + repr(r))
         try:
             open_times, limit_times = int(r['open_times']), int(r['limit_times'])
         except (TypeError, ValueError) as exc:
-            raise ValueError('limit_list_d: invalid open/limit times') from exc
+            raise ValueError('limit_list_d: invalid open/limit times; row=' + repr(r)) from exc
         if open_times < 0 or limit_times < 1:
-            raise ValueError('limit_list_d: invalid open/limit times')
+            raise ValueError('limit_list_d: invalid open/limit times; row=' + repr(r))
     return rows
 
 
