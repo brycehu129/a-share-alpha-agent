@@ -41,6 +41,34 @@ SHORT_POLICY = {**POLICY, 'hold_sessions': 3, 'stop_pct': 0.03, 'target_pct': 0.
 BREAKOUT = {'return3_min': 3.0, 'volume_ratio_5d_min': 1.8, 'excess20_max': 15.0, 'ma5_deviation_max': 6.0}
 PULLBACK = {'return2_max': 0.0, 'volume_ratio_20d_max': 1.0, 'deviation_max': 8.0}
 
+# Bounded additive nudge from same-day hot-money/limit-board activity
+# (tushare_data/hm_detail, tushare_data/limit_list_d via hotmoney_features.py).
+# Confirmation only, never a gate: absence of data (signal is None/empty, the
+# normal case while these two interfaces are only rolling-synced a handful of
+# days back via manual workflow_dispatch) must score exactly like "no
+# hot-money activity" -- zero adjustment, not an exclusion or a penalty.
+# Not yet validated against real outcomes; revisit once walk_forward_short()
+# has enough real hm_detail/limit_list_d coverage to check whether it helps.
+HOTMONEY = {'net_amount_scale': 1e7, 'net_amount_cap': 6.0, 'limit_up_bonus': 4.0}
+
+
+def hotmoney_adjustment(signal, include_limit_bonus):
+    if not signal:
+        return 0.0, []
+    adjustment, reasons = 0.0, []
+    net = signal.get('hm_net_amount')
+    if net:
+        bump = clip(net / HOTMONEY['net_amount_scale'], -HOTMONEY['net_amount_cap'], HOTMONEY['net_amount_cap'])
+        adjustment += bump
+        if bump > 0:
+            reasons.append(f'游资席位净买入约{net/1e4:.0f}万元')
+        elif bump < 0:
+            reasons.append(f'游资席位净卖出约{-net/1e4:.0f}万元')
+    if include_limit_bonus and signal.get('limit_status') == 'U':
+        adjustment += HOTMONEY['limit_up_bonus']
+        reasons.append('当日涨停收盘')
+    return adjustment, reasons
+
 
 def strong_industries(industry_rows):
     """Same top-10%/positive-median/>=50%-breadth rule alpha_model.screen()
@@ -102,7 +130,7 @@ def stock_features(stocks, series, benchmark, cutoff):
     return out
 
 
-def screen_breakout(stocks, series, benchmark, cutoff, industry_rows):
+def screen_breakout(stocks, series, benchmark, cutoff, industry_rows, hotmoney=None):
     strong = strong_industries(industry_rows)
     candidates, excluded = [], {}
     for code, r in stock_features(stocks, series, benchmark, cutoff).items():
@@ -124,15 +152,17 @@ def screen_breakout(stocks, series, benchmark, cutoff, industry_rows):
         if reason:
             excluded[code] = reason
             continue
-        score = round(clip(50 + r['return3_pct'] * 5 + (r['volume_ratio_5d'] - 1) * 10), 2)
-        candidates.append({**r, 'strategy_type': 'breakout', 'score': score,
+        signal = (hotmoney or {}).get(code)
+        bonus, hm_reasons = hotmoney_adjustment(signal, include_limit_bonus=True)
+        score = round(clip(50 + r['return3_pct'] * 5 + (r['volume_ratio_5d'] - 1) * 10 + bonus), 2)
+        candidates.append({**r, 'strategy_type': 'breakout', 'score': score, 'hotmoney': signal,
                             'reasons': ['行业强度前10%', f"近3日涨幅≥{BREAKOUT['return3_min']}%",
-                                        '今日首次放量', '接近20日新高', 'MA5偏离受控']})
+                                        '今日首次放量', '接近20日新高', 'MA5偏离受控', *hm_reasons]})
     candidates.sort(key=lambda r: (-r['score'], r['symbol']))
     return {'candidates': candidates, 'excluded': excluded, 'exclusion_counts': dict(Counter(excluded.values()))}
 
 
-def screen_pullback(stocks, series, benchmark, cutoff, industry_rows):
+def screen_pullback(stocks, series, benchmark, cutoff, industry_rows, hotmoney=None):
     strong = strong_industries(industry_rows)
     candidates, excluded = [], {}
     for code, r in stock_features(stocks, series, benchmark, cutoff).items():
@@ -152,21 +182,30 @@ def screen_pullback(stocks, series, benchmark, cutoff, industry_rows):
         if reason:
             excluded[code] = reason
             continue
-        score = round(clip(50 + r['excess20_pp'] * 1.5 - abs(r['return2_pct']) * 3), 2)
-        candidates.append({**r, 'strategy_type': 'pullback', 'score': score,
+        signal = (hotmoney or {}).get(code)
+        # No limit_up_bonus here: a pullback candidate closing at the daily
+        # limit would already fail return2_pct/volume_ratio above in
+        # practice, and 'confirmed by closing at the limit' isn't what this
+        # track is screening for -- only the net-buying signal applies.
+        bonus, hm_reasons = hotmoney_adjustment(signal, include_limit_bonus=False)
+        score = round(clip(50 + r['excess20_pp'] * 1.5 - abs(r['return2_pct']) * 3 + bonus), 2)
+        candidates.append({**r, 'strategy_type': 'pullback', 'score': score, 'hotmoney': signal,
                             'reasons': ['行业强度前10%', '20日超额为正', '近2日缩量回调',
-                                        '未跌破MA20区间', '当日收阳反转确认']})
+                                        '未跌破MA20区间', '当日收阳反转确认', *hm_reasons]})
     candidates.sort(key=lambda r: (-r['score'], r['symbol']))
     return {'candidates': candidates, 'excluded': excluded, 'exclusion_counts': dict(Counter(excluded.values()))}
 
 
-def screen_short(stocks, series, benchmark, cutoff, tuning=None):
+def screen_short(stocks, series, benchmark, cutoff, tuning=None, hotmoney=None):
     """Orchestrator: reuses alpha_model.screen() once for industry strength
     and market_score/coverage gating (both tracks share the same market-wide
-    gate the mid-term strategy uses), then runs the two independent tracks."""
+    gate the mid-term strategy uses), then runs the two independent tracks.
+    `hotmoney` is the same-day signal dict from hotmoney_features.load()
+    (keyed by symbol); None/missing entries score as no signal, never as a
+    penalty -- see hotmoney_adjustment()'s docstring."""
     mid = screen_mid(stocks, series, benchmark, cutoff, tuning)
-    breakout = screen_breakout(stocks, series, benchmark, cutoff, mid['industries'])
-    pullback = screen_pullback(stocks, series, benchmark, cutoff, mid['industries'])
+    breakout = screen_breakout(stocks, series, benchmark, cutoff, mid['industries'], hotmoney)
+    pullback = screen_pullback(stocks, series, benchmark, cutoff, mid['industries'], hotmoney)
     # Flat, merged exclusion_counts for callers (e.g. dashboard_export.py) that
     # still expect the single-track shape alpha_model.screen() used to return.
     # Per-track breakdowns remain available under breakout/pullback above --
@@ -198,19 +237,29 @@ def select_candidates(screened, max_n=None):
     return pooled[:max_n]
 
 
-def walk_forward_short(stocks, series, benchmark, cutoff, tuning=None):
+def walk_forward_short(stocks, series, benchmark, cutoff, tuning=None, hotmoney_loader=None):
     """Non-overlapping windows sized to the short hold (3 sessions + 1-session
     purge gap = stride 4), one screen_short() per historical date. Reuses
     alpha_model.label()/estimate() unchanged -- samples are tagged with
     bucket=strategy_type so estimate(samples, cutoff, bucket='breakout')
-    calibrates each track independently without any new math."""
+    calibrates each track independently without any new math.
+
+    `hotmoney_loader(day) -> signals_dict` is optional and called once per
+    historical date so calibration samples are scored with the SAME formula
+    live picks use -- without it, live scores would include the hot-money
+    bonus while the calibration backing their probabilities didn't, which
+    would silently invalidate the calibration. Omit it (None) only when no
+    hot-money history is available at all; every date it can't cover simply
+    screens with no signal for that day, same as a missing checkpoint does
+    in live scoring."""
     dates = [b['date'] for b in benchmark if b['date'] <= cutoff]
     hold = SHORT_POLICY['hold_sessions']
     step = hold + 1
     samples, predictions = [], []
     for i in range(22, len(dates) - step, step):
         day = dates[i]
-        screened = screen_short(stocks, series, benchmark, day, tuning)
+        signal = hotmoney_loader(day) if hotmoney_loader else None
+        screened = screen_short(stocks, series, benchmark, day, tuning, signal)
         if not screened['complete'] or screened['market_score'] < screened['market_score_pause']:
             continue
         for track in ('breakout', 'pullback'):

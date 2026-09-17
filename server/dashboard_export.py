@@ -68,7 +68,10 @@ def build(history):
         result['agent'] = {k: agent.get(k) for k in ('generated_at', 'version', 'status', 'target', 'issues', 'calibration', 'calibration_short', 'candidates', 'policy')}
         result['agent']['screen'] = ({k: screening[k] for k in ('cutoff', 'listed', 'eligible', 'valid', 'coverage_pct', 'complete', 'market_score', 'regime', 'market_score_pause', 'exclusion_counts')} if screening else None)
         result['agent']['portfolio'] = ({**portfolio, 'trades': portfolio['trades'][-30:], 'curve': portfolio['curve'][-250:], 'attempted': []} if portfolio else None)
-        result['agent']['forecasts'] = [{k: f[k] for k in ('id', 'created_at', 'as_of', 'eligible_from', 'symbol', 'name', 'score', 'strategy_type', 'probability', 'reference_price', 'paper_eligible')} for f in agent['forecasts'][:30]]
+        # .get(), not f[k]: older frozen forecast records predate 'hotmoney'
+        # and are immutable -- they can never gain the key, so the export must
+        # tolerate its absence rather than KeyError on every historical record.
+        result['agent']['forecasts'] = [{k: f.get(k) for k in ('id', 'created_at', 'as_of', 'eligible_from', 'symbol', 'name', 'score', 'strategy_type', 'probability', 'reference_price', 'paper_eligible', 'hotmoney')} for f in agent['forecasts'][:30]]
         result['agent']['outcomes'] = agent['outcomes'][:30]
         from decision_view import decisions
         result['agent']['decisions'] = decisions(agent)

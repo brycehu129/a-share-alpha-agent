@@ -11,6 +11,7 @@ from alpha_model import VERSION as MID_VERSION, POLICY as MID_POLICY, TARGET as 
 from alpha_portfolio import initial, advance
 from collect_quotes import CST
 from dashboard_export import latest
+from hotmoney_features import load as load_hotmoney
 from review_pipeline import current_tuning
 from shortterm_model import (VERSION, TARGET, SHORT_POLICY as POLICY, screen_short,
                               select_candidates, walk_forward_short)
@@ -116,7 +117,12 @@ def run(history, run_id):
             data = read(path)
             report['source_hashes'][code] = sha(data)
             series[code] = [b for b in data['bars'] if b['date'] <= cutoff]
-    screened = screen_short(stocks, series, benchmark, cutoff, tuning)
+    hotmoney, hotmoney_availability = load_hotmoney(history, cutoff)
+    if not hotmoney_availability['hm_detail']:
+        report['issues'].append('本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。')
+    if not hotmoney_availability['limit_list_d']:
+        report['issues'].append('本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。')
+    screened = screen_short(stocks, series, benchmark, cutoff, tuning, hotmoney)
     report['screen'] = screened
     stale = (now - datetime.fromisoformat(master['fetched_at'])).days > 7 or (now - datetime.fromisoformat(bench_source['fetched_at'])).total_seconds() > 86400 or (now.date()-datetime.fromisoformat(cutoff).date()).days > 5
     if stale:
@@ -134,7 +140,8 @@ def run(history, run_id):
         report['issues'].append(f'市场趋势评分低于{screened["market_score_pause"]}，暂停新虚拟计划。')
     # T+10版本(alpha-shadow-0.2-observed)校准继续跑，留作历史对照，不再驱动新预测。
     calibration = walk_forward(stocks, series, benchmark, cutoff, tuning)
-    calibration_short = walk_forward_short(stocks, series, benchmark, cutoff, tuning)
+    calibration_short = walk_forward_short(stocks, series, benchmark, cutoff, tuning,
+                                            hotmoney_loader=lambda d: load_hotmoney(history, d)[0])
     forecasts = [read(p) for p in sorted((history / 'predictions').glob('*.json'))]
     outcomes = resolve(forecasts, series, benchmark, now, history)
     live_mid = [o for o in outcomes if o['horizon'] == 10]
@@ -201,7 +208,7 @@ def run(history, run_id):
             'execution_mode': 'observed-quote-v1',
             'eligible_from': eligible_from(created), 'symbol': c['symbol'], 'name': c['name'], 'industry': c['industry'],
             'score': c['score'], 'strategy_type': c['strategy_type'], 'bucket': c['strategy_type'],
-            'regime': screened['regime'], 'probability': c['probability'],
+            'regime': screened['regime'], 'probability': c['probability'], 'hotmoney': c.get('hotmoney'),
             'reference_price': float(ref['close']), 'target': TARGET, 'paper_eligible': can_trade,
             'features': c, 'policy': POLICY, 'source_run': run_id,
             'limitations': calibration_short['limitations'], 'forecast_type': '研究假设，非已验证买入建议'}
