@@ -6,7 +6,7 @@ on:
     types: [completed]
   push:
     branches: [master]
-    paths: ['server/dashboard_export.py', '.github/workflows/dashboard-export.yml']
+    paths: ['server/decision_view.py', 'server/dashboard_export.py', '.github/workflows/dashboard-export.yml']
 permissions:
   contents: read
 concurrency:
