@@ -11,7 +11,10 @@
   自签名 HTTPS 支持（`TLS_CERT_PATH`/`TLS_KEY_PATH` 环境变量）——不加密的话
   HTTP Basic Auth 密码是明文过网络的，公网IP直接访问必须加密。浏览器会提示
   证书不受信任（因为是自签名，不是CA签发的），点"继续访问"就行，这是预期的，
-  不是配置错了。
+  不是配置错了。**证书要用 ECDSA（prime256v1）或 RSA，不要用 Ed25519**——
+  实测 Python `ssl` 模块配 Ed25519 证书时和 Chrome 协商 TLS 会报
+  `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`（curl 因为协商逻辑更宽松能连上，
+  掩盖了这个问题，浏览器才会暴露出来），下面脚本已经改成 ECDSA。
 - "push自动重新部署"是一个新增的 GitHub Actions workflow
   (`.github/workflows/deploy-racknerd.yml`)：代码改动push后，Actions通过SSH
   连到服务器触发部署，SSH私钥存在GitHub Secrets里，且这个key在服务器上被限制
@@ -34,7 +37,7 @@ cd /opt/alpha-shadow
 # 2. 自签名 TLS 证书（10年有效期，纯粹是为了加密传输，不是为了证明身份）
 mkdir -p /opt/alpha-shadow/tls
 if [ ! -f /opt/alpha-shadow/tls/cert.pem ]; then
-  openssl req -x509 -newkey ed25519 \
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
     -keyout /opt/alpha-shadow/tls/key.pem \
     -out /opt/alpha-shadow/tls/cert.pem \
     -days 3650 -nodes -subj "/CN=64.188.22.227"
