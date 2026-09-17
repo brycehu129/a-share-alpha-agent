@@ -171,8 +171,10 @@ def main():
         if response['status'] not in ('success', 'empty'):
             blocked.add(api)
             raise ValueError(api + ': ' + response['status'] + ' ' + response['message'])
-        if set(fields.split(',')) - set(response['fields']):
-            raise ValueError(api + ': missing requested fields')
+        missing = set(fields.split(',')) - set(response['fields'])
+        if missing:
+            raise ValueError(api + ': missing requested fields: ' + ','.join(sorted(missing))
+                              + '; response had: ' + ','.join(response['fields']))
         return [dict(zip(response['fields'], row)) for row in response['items']]
 
     def persist(relative, payload):
