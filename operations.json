@@ -1,24 +1,19 @@
 {
   "reports": {},
-  "updated_at": "2026-09-16T20:15:31.893605+08:00",
+  "updated_at": "2026-09-17T09:19:57.541498+08:00",
   "latest_run": {
-    "id": "35093969999-1",
-    "slot": "manual",
-    "report_date": "2026-09-16",
+    "id": "35170100412-1",
+    "slot": "prepare",
+    "report_date": "2026-09-17",
     "expected_date": "2026-09-16",
-    "started_at": "2026-09-16T20:07:16.455835+08:00",
-    "updated_at": "2026-09-16T20:15:31.893605+08:00",
-    "status": "ready",
-    "data_date": "2026-09-16",
+    "started_at": "2026-09-17T09:19:57.541498+08:00",
+    "updated_at": "2026-09-17T09:19:57.541498+08:00",
+    "status": "running",
+    "data_date": null,
     "issues": [],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35093969999",
-    "finished_at": "2026-09-16T20:15:31.893605+08:00"
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35170100412"
   },
   "calendar": [
-    {
-      "date": "2026-08-17",
-      "state": "open"
-    },
     {
       "date": "2026-08-18",
       "state": "open"
@@ -261,6 +256,10 @@
     },
     {
       "date": "2026-10-17",
+      "state": "closed"
+    },
+    {
+      "date": "2026-10-18",
       "state": "closed"
     }
   ],
