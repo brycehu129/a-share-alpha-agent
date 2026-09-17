@@ -37,14 +37,14 @@ def capped_batch(api, params, fields, call, cap):
 
 
 def validate_hm_detail(day, rows):
-    seen = set()
+    # A single hot-money desk can log more than one trade in the same stock on
+    # the same day (buy and sell logged separately, or two branches under the
+    # same hm_name/hm_orgs) -- observed as a genuine repeat of (ts_code,
+    # hm_name) with different amounts on 20260916, not a pagination bug. So
+    # this only checks each row's own fields, no cross-row identity check.
     for r in rows:
         if r['trade_date'] != day:
             raise ValueError('hm_detail: unexpected trade date')
-        identity = (r['ts_code'], r['hm_name'])
-        if identity in seen:
-            raise ValueError('hm_detail: duplicate stock/hot-money pair')
-        seen.add(identity)
         try:
             buy, sell, net = (Decimal(str(r[k])) for k in ('buy_amount', 'sell_amount', 'net_amount'))
         except (ArithmeticError, ValueError, KeyError) as exc:
@@ -221,7 +221,8 @@ def main():
                 if day not in have_hm:
                     rows = fetch_pages('hm_detail', {'trade_date': day},
                                         'trade_date,ts_code,ts_name,buy_amount,sell_amount,net_amount,hm_name,hm_orgs',
-                                        ('ts_code', 'hm_name'), call)
+                                        ('ts_code', 'ts_name', 'buy_amount', 'sell_amount', 'net_amount',
+                                         'hm_name', 'hm_orgs'), call)
                     validate_hm_detail(day, rows)
                     persist('hm_detail/' + day + '.json', {'trade_date': day, 'rows': rows})
                     entry['hm_detail'] = len(rows)

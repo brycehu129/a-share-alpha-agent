@@ -22,11 +22,14 @@ class ExtraSyncTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_hm_detail('20260915', rows)
 
-    def test_hm_detail_rejects_duplicate_stock_hotmoney_pair(self):
-        row = dict(trade_date='20260915', ts_code='000001.SZ', ts_name='x',
-                   buy_amount=1, sell_amount=0, net_amount=1, hm_name='y', hm_orgs='')
-        with self.assertRaises(ValueError):
-            validate_hm_detail('20260915', [row, dict(row)])
+    def test_hm_detail_accepts_two_distinct_trades_same_stock_same_hotmoney(self):
+        # 游资 desks can log more than one trade in the same stock on the same
+        # day; this is real data (20260916), not a duplicate to reject.
+        rows = [dict(trade_date='20260916', ts_code='000001.SZ', ts_name='x',
+                     buy_amount=10, sell_amount=0, net_amount=10, hm_name='y', hm_orgs='a'),
+                dict(trade_date='20260916', ts_code='000001.SZ', ts_name='x',
+                     buy_amount=0, sell_amount=5, net_amount=-5, hm_name='y', hm_orgs='a')]
+        self.assertEqual(validate_hm_detail('20260916', rows), rows)
 
     def test_hm_detail_rejects_negative_amount(self):
         rows = [dict(trade_date='20260915', ts_code='000001.SZ', ts_name='x',
