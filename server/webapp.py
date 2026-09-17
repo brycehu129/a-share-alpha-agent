@@ -89,6 +89,7 @@ button{{padding:8px 16px;margin-top:8px;margin-right:8px;cursor:pointer}}
 <form method="post" action="/test-push">
   <button type="submit">发送测试消息</button>
 </form>
+<p style="color:#999;font-size:12px;margin-top:32px">由 GitHub Actions 自动部署（push 到 master 后自动生效）</p>
 </body></html>"""
 
 
