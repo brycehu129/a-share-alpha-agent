@@ -165,12 +165,19 @@ def screen_short(stocks, series, benchmark, cutoff, tuning=None):
     and market_score/coverage gating (both tracks share the same market-wide
     gate the mid-term strategy uses), then runs the two independent tracks."""
     mid = screen_mid(stocks, series, benchmark, cutoff, tuning)
+    breakout = screen_breakout(stocks, series, benchmark, cutoff, mid['industries'])
+    pullback = screen_pullback(stocks, series, benchmark, cutoff, mid['industries'])
+    # Flat, merged exclusion_counts for callers (e.g. dashboard_export.py) that
+    # still expect the single-track shape alpha_model.screen() used to return.
+    # Per-track breakdowns remain available under breakout/pullback above --
+    # this merge is purely for backward-compatible display, not new logic.
+    merged_exclusions = dict(Counter(breakout['exclusion_counts']) + Counter(pullback['exclusion_counts']))
     return {'cutoff': cutoff, 'listed': mid['listed'], 'eligible': mid['eligible'], 'valid': mid['valid'],
             'complete': mid['complete'], 'coverage_pct': mid['coverage_pct'],
             'market_score': mid['market_score'], 'regime': mid['regime'],
             'market_score_pause': mid['tuning']['market_score_pause'],
-            'breakout': screen_breakout(stocks, series, benchmark, cutoff, mid['industries']),
-            'pullback': screen_pullback(stocks, series, benchmark, cutoff, mid['industries'])}
+            'exclusion_counts': merged_exclusions,
+            'breakout': breakout, 'pullback': pullback}
 
 
 def select_candidates(screened, max_n=None):
