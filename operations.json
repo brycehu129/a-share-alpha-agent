@@ -6,25 +6,31 @@
       "report_date": "2026-09-17",
       "expected_date": "2026-09-16",
       "started_at": "2026-09-17T11:00:47.806327+08:00",
-      "updated_at": "2026-09-17T11:00:47.806327+08:00",
-      "status": "running",
-      "data_date": null,
-      "issues": [],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35176531592"
+      "updated_at": "2026-09-17T11:05:49.574109+08:00",
+      "status": "ready",
+      "data_date": "2026-09-16",
+      "issues": [
+        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
+      ],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35176531592",
+      "finished_at": "2026-09-17T11:05:49.574109+08:00"
     }
   },
-  "updated_at": "2026-09-17T11:00:47.806327+08:00",
+  "updated_at": "2026-09-17T11:05:49.574109+08:00",
   "latest_run": {
     "id": "35176531592-1",
     "slot": "premarket",
     "report_date": "2026-09-17",
     "expected_date": "2026-09-16",
     "started_at": "2026-09-17T11:00:47.806327+08:00",
-    "updated_at": "2026-09-17T11:00:47.806327+08:00",
-    "status": "running",
-    "data_date": null,
-    "issues": [],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35176531592"
+    "updated_at": "2026-09-17T11:05:49.574109+08:00",
+    "status": "ready",
+    "data_date": "2026-09-16",
+    "issues": [
+      "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
+    ],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35176531592",
+    "finished_at": "2026-09-17T11:05:49.574109+08:00"
   },
   "calendar": [
     {
@@ -283,5 +289,22 @@
     "close_start": "15:35",
     "close_final": "18:20",
     "timezone": "Asia/Shanghai"
+  },
+  "checkpoints": {
+    "premarket_after_open": {
+      "id": "35176531592-1",
+      "slot": "premarket",
+      "report_date": "2026-09-17",
+      "expected_date": "2026-09-16",
+      "started_at": "2026-09-17T11:00:47.806327+08:00",
+      "updated_at": "2026-09-17T11:05:49.574109+08:00",
+      "status": "ready",
+      "data_date": "2026-09-16",
+      "issues": [
+        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
+      ],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35176531592",
+      "finished_at": "2026-09-17T11:05:49.574109+08:00"
+    }
   }
 }
