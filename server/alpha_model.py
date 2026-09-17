@@ -75,7 +75,11 @@ def features(bars, benchmark, cutoff):
             'reference_adjusted': closes[-1]}
 
 
-def screen(stocks, series, benchmark, cutoff):
+def screen(stocks, series, benchmark, cutoff, tuning=None):
+    tuning = tuning or {}
+    industry_weight = tuning.get('industry_weight', 0.40)
+    overheat_coef = tuning.get('overheat_coef', 2.0)
+    market_score_pause = tuning.get('market_score_pause', 40)
     excluded, rows, counts = {}, [], Counter()
     for s in stocks:
         code = s['ts_code'][-2:].lower() + s['ts_code'][:6]
@@ -128,10 +132,10 @@ def screen(stocks, series, benchmark, cutoff):
         if reason:
             excluded[r['symbol']] = reason
             continue
-        penalty = max(0, r['deviation_pct']-5)*2
+        penalty = max(0, r['deviation_pct']-5)*overheat_coef
         r['theme_score'] = strong[r['industry']]['score']
         r['leader_score'] = rp[r['symbol']]
-        r['score'] = round(clip(r['theme_score']*0.4+r['leader_score']*0.6-penalty), 2)
+        r['score'] = round(clip(r['theme_score']*industry_weight+r['leader_score']*(1-industry_weight)-penalty), 2)
         r['bucket'] = '80+' if r['score'] >= 80 else '<80'
         r['regime'] = regime
         r['reasons'] = ['行业强度前10%', '20日跑赢沪深300', '近5日上涨', 'MA20偏离不超过12%']
@@ -140,7 +144,8 @@ def screen(stocks, series, benchmark, cutoff):
     return {'cutoff': cutoff, 'listed': len(stocks), 'eligible': eligible, 'valid': len(rows),
             'coverage_pct': round(coverage*100, 2), 'complete': coverage >= POLICY['coverage_required'],
             'market_score': round(market_score, 2), 'regime': regime, 'industries': industry_rows,
-            'candidates': candidates, 'excluded': excluded, 'exclusion_counts': dict(Counter(excluded.values()))}
+            'candidates': candidates, 'excluded': excluded, 'exclusion_counts': dict(Counter(excluded.values())),
+            'tuning': {'industry_weight': industry_weight, 'overheat_coef': overheat_coef, 'market_score_pause': market_score_pause}}
 
 
 def label(bars, benchmark, entry_day, horizon):
@@ -185,14 +190,14 @@ def estimate(samples, cutoff, bucket=None, regime=None):
             'status': 'historical_exploratory'}
 
 
-def walk_forward(stocks, series, benchmark, cutoff):
+def walk_forward(stocks, series, benchmark, cutoff, tuning=None):
     dates = [b['date'] for b in benchmark if b['date'] <= cutoff]
     samples, predictions = [], []
     # Non-overlapping 10-session outcomes with a one-session purge gap.
     for i in range(20, len(dates)-11, 11):
         day = dates[i]
-        screened = screen(stocks, series, benchmark, day)
-        if not screened['complete'] or screened['market_score'] < 40:
+        screened = screen(stocks, series, benchmark, day, tuning)
+        if not screened['complete'] or screened['market_score'] < screened['tuning']['market_score_pause']:
             continue
         for c in screened['candidates'][:3]:
             outcome = label(series[c['symbol']], benchmark, dates[i+1], 10)
