@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-17T16:00:18.126153+08:00",
+  "exported_at": "2026-09-17T20:52:25.656761+08:00",
   "market": {
     "generated_at": "2026-09-17T11:01:19.544183+08:00",
     "status": "success",
@@ -5725,7 +5725,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-17T11:00:49.639101+08:00",
+    "generated_at": "2026-09-17T20:09:29.784757+08:00",
     "status": "success",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5738,7 +5738,7 @@
     }
   },
   "analysis": {
-    "generated_at": "2026-09-17T11:05:09.674631+08:00",
+    "generated_at": "2026-09-17T20:10:09.937037+08:00",
     "status": "ready",
     "start_date": "20260819",
     "end_date": "20260916",
@@ -6003,15 +6003,15 @@
     },
     {
       "kind": "sync",
-      "id": "35176531592-1",
-      "generated_at": "2026-09-17T11:00:49.639101+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35176531592-1.md"
+      "id": "35219478052-1",
+      "generated_at": "2026-09-17T20:09:29.784757+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35219478052-1.md"
     },
     {
       "kind": "analysis",
-      "id": "35176531592-1",
-      "generated_at": "2026-09-17T11:05:09.674631+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35176531592-1.md"
+      "id": "35219478052-1",
+      "generated_at": "2026-09-17T20:10:09.937037+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35219478052-1.md"
     },
     {
       "kind": "盘前/收盘日报",
@@ -6044,6 +6044,20 @@
       "historical_n": 6,
       "live_n": 0,
       "live_win_rate": null
+    },
+    "calibration_short": {
+      "walk_forward_n": 0,
+      "brier": null,
+      "limitations": [
+        "短线(1-3日)回看同样存在当前名单与行业分类的幸存者/回看偏差",
+        "突破/回调两条track各自独立统计校准，不与对方或原T+10版本样本混用",
+        "1-3日窗口下单边成本假设占比更高，历史频率不代表已覆盖成本后的可交易胜率",
+        "MA5/近3日涨幅/放量阈值是初始设定值，尚未用本函数的回看结果验证过合理性"
+      ],
+      "historical_n": 36,
+      "live_n": 0,
+      "live_win_rate_breakout": null,
+      "live_win_rate_pullback": null
     },
     "candidates": [
       {
@@ -6487,6 +6501,26 @@
         }
       }
     ],
+    "policy": {
+      "capital": 100000,
+      "max_positions": 3,
+      "max_weight": 0.3,
+      "risk_per_trade": 0.02,
+      "stop_pct": 0.03,
+      "target_pct": 0.05,
+      "hold_sessions": 3,
+      "entry_gap_min": -0.03,
+      "entry_gap_max": 0.03,
+      "slippage": 0.001,
+      "commission": 0.0003,
+      "minimum_commission": 5,
+      "transfer_fee": 1e-05,
+      "sell_tax": 0.0005,
+      "drawdown_pause": 0.2,
+      "drawdown_hard_stop": 0.5,
+      "label_cost_pct": 0.5,
+      "coverage_required": 0.95
+    },
     "screen": {
       "cutoff": "2026-09-16",
       "listed": 5222,
@@ -6496,6 +6530,7 @@
       "complete": true,
       "market_score": 45.27,
       "regime": "偏弱",
+      "market_score_pause": 40,
       "exclusion_counts": {
         "行业未进入强势前10%": 9236,
         "近3日涨幅不足": 142,
@@ -6578,6 +6613,7 @@
         "symbol": "sz002623",
         "name": "亚玛顿",
         "score": 94.57,
+        "strategy_type": "breakout",
         "probability": {
           "n": 18,
           "cohorts": 7,
@@ -6590,7 +6626,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 16.76,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.3-shortterm-2026-09-16-sh605277",
@@ -6600,6 +6637,7 @@
         "symbol": "sh605277",
         "name": "新亚电子",
         "score": 86.26,
+        "strategy_type": "pullback",
         "probability": {
           "n": 12,
           "cohorts": 5,
@@ -6612,7 +6650,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 17.78,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.3-shortterm-2026-09-16-sz003019",
@@ -6622,6 +6661,7 @@
         "symbol": "sz003019",
         "name": "宸展光电",
         "score": 80.09,
+        "strategy_type": "pullback",
         "probability": {
           "n": 12,
           "cohorts": 5,
@@ -6634,7 +6674,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 27.5,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.2-observed-2026-09-16-sh600293",
@@ -6644,6 +6685,7 @@
         "symbol": "sh600293",
         "name": "三峡新材",
         "score": 88.02,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6656,7 +6698,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 3.09,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.2-observed-2026-09-16-sh605277",
@@ -6666,6 +6709,7 @@
         "symbol": "sh605277",
         "name": "新亚电子",
         "score": 88.61,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6678,7 +6722,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 17.78,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.2-observed-2026-09-16-sz002724",
@@ -6688,6 +6733,7 @@
         "symbol": "sz002724",
         "name": "海洋王",
         "score": 87.02,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6700,7 +6746,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 7.27,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.1-2026-09-16-sh600293",
@@ -6710,6 +6757,7 @@
         "symbol": "sh600293",
         "name": "三峡新材",
         "score": 88.02,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6722,7 +6770,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 3.09,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.1-2026-09-16-sh605277",
@@ -6732,6 +6781,7 @@
         "symbol": "sh605277",
         "name": "新亚电子",
         "score": 88.61,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6744,7 +6794,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 17.78,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.1-2026-09-16-sz002724",
@@ -6754,6 +6805,7 @@
         "symbol": "sz002724",
         "name": "海洋王",
         "score": 87.02,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6766,7 +6818,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 7.27,
-        "paper_eligible": true
+        "paper_eligible": true,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.1-2026-09-15-sh601169",
@@ -6776,6 +6829,7 @@
         "symbol": "sh601169",
         "name": "北京银行",
         "score": 90.99,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6788,7 +6842,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 5.66,
-        "paper_eligible": false
+        "paper_eligible": false,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.1-2026-09-15-sh601838",
@@ -6798,6 +6853,7 @@
         "symbol": "sh601838",
         "name": "成都银行",
         "score": 90.72,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6810,7 +6866,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 20.04,
-        "paper_eligible": false
+        "paper_eligible": false,
+        "hotmoney": null
       },
       {
         "id": "alpha-shadow-0.1-2026-09-15-sh601998",
@@ -6820,6 +6877,7 @@
         "symbol": "sh601998",
         "name": "中信银行",
         "score": 91.88,
+        "strategy_type": null,
         "probability": {
           "n": 3,
           "cohorts": 1,
@@ -6832,7 +6890,8 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 8.98,
-        "paper_eligible": false
+        "paper_eligible": false,
+        "hotmoney": null
       }
     ],
     "outcomes": [],
@@ -6840,6 +6899,7 @@
       {
         "symbol": "sz002623",
         "name": "亚玛顿",
+        "strategy_type": "breakout",
         "state": "waiting_buy",
         "reasons": [
           "冻结记录允许条件式模拟入场；尚无成交记录。",
@@ -6863,6 +6923,7 @@
       {
         "symbol": "sh605277",
         "name": "新亚电子",
+        "strategy_type": "pullback",
         "state": "waiting_buy",
         "reasons": [
           "冻结记录允许条件式模拟入场；尚无成交记录。",
@@ -6887,6 +6948,7 @@
       {
         "symbol": "sz003019",
         "name": "宸展光电",
+        "strategy_type": "pullback",
         "state": "waiting_buy",
         "reasons": [
           "冻结记录允许条件式模拟入场；尚无成交记录。",
@@ -6910,6 +6972,7 @@
       {
         "symbol": "sh605118",
         "name": "力鼎光电",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -6932,6 +6995,7 @@
       {
         "symbol": "sz300629",
         "name": "新劲刚",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -6954,6 +7018,7 @@
       {
         "symbol": "sz000509",
         "name": "华塑控股",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -6976,6 +7041,7 @@
       {
         "symbol": "sh688511",
         "name": "天微电子",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -6998,6 +7064,7 @@
       {
         "symbol": "sz000601",
         "name": "韶能股份",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -7020,6 +7087,7 @@
       {
         "symbol": "sz000791",
         "name": "甘肃能源",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -7042,6 +7110,7 @@
       {
         "symbol": "sz301571",
         "name": "国科天成",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -7064,6 +7133,7 @@
       {
         "symbol": "sh600025",
         "name": "华能水电",
+        "strategy_type": "pullback",
         "state": "observing",
         "reasons": [
           "目前仅候选前3名进入冻结计划检查，其余保留观察。"
@@ -7086,6 +7156,7 @@
       {
         "symbol": "sh600293",
         "name": "三峡新材",
+        "strategy_type": null,
         "state": "waiting_buy",
         "reasons": [
           "冻结记录允许条件式模拟入场；尚无成交记录。",
@@ -7110,6 +7181,7 @@
       {
         "symbol": "sz002724",
         "name": "海洋王",
+        "strategy_type": null,
         "state": "waiting_buy",
         "reasons": [
           "冻结记录允许条件式模拟入场；尚无成交记录。",
@@ -7134,6 +7206,7 @@
       {
         "symbol": "sh601169",
         "name": "北京银行",
+        "strategy_type": null,
         "state": "observing",
         "reasons": [
           "该冻结记录只允许观察；旧记录未保存具体拦截原因，不能用当前条件倒推。"
@@ -7156,6 +7229,7 @@
       {
         "symbol": "sh601838",
         "name": "成都银行",
+        "strategy_type": null,
         "state": "observing",
         "reasons": [
           "该冻结记录只允许观察；旧记录未保存具体拦截原因，不能用当前条件倒推。"
@@ -7178,6 +7252,7 @@
       {
         "symbol": "sh601998",
         "name": "中信银行",
+        "strategy_type": null,
         "state": "observing",
         "reasons": [
           "该冻结记录只允许观察；旧记录未保存具体拦截原因，不能用当前条件倒推。"
