@@ -105,9 +105,21 @@ a{color:var(--accent);}
 .pill.status-ready{background:var(--status-ready-bg); color:var(--status-ready-fg);}
 .pill.status-wait{background:var(--status-wait-bg); color:var(--status-wait-fg);}
 .meta-item b, .meta-item span{color:var(--ink);}
-.refresh-btn{margin-left:auto; display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); color:var(--ink-2); font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:999px; cursor:pointer; box-shadow:var(--shadow);}
+.refresh-btn{margin-left:auto; display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); color:var(--ink-2); font-size:12.5px; font-weight:600; padding:6px 14px; min-height:30px; border-radius:999px; cursor:pointer; box-shadow:var(--shadow);}
 .refresh-btn:hover{color:var(--accent); border-color:var(--accent);}
 .refresh-btn:disabled{opacity:.6; cursor:default;}
+
+/* ---------- nav pills (page switcher, top of hero) ---------- */
+.nav-pills{display:inline-flex; gap:2px; padding:3px; background:var(--surface-2); border-radius:999px; border:1px solid var(--border);}
+.nav-pills a{display:inline-flex; align-items:center; padding:5px 14px; border-radius:999px; font-size:12.5px; font-weight:600; color:var(--ink-2); text-decoration:none; white-space:nowrap;}
+.nav-pills a:hover{color:var(--ink);}
+.nav-pills a.active{background:var(--accent); color:var(--accent-ink); box-shadow:var(--shadow);}
+
+/* ---------- rank badge (candidates table, #1-3 stand out) ---------- */
+.rank-badge{display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:999px; font-size:11.5px; font-weight:700; background:var(--surface-2); color:var(--ink-3);}
+.rank-badge.rank-1{background:var(--gold-hi); color:#fff;}
+.rank-badge.rank-2{background:#9aa5b1; color:#fff;}
+.rank-badge.rank-3{background:#b08050; color:#fff;}
 
 /* ---------- market strip ---------- */
 .market-strip{display:grid; grid-template-columns:1fr 260px; gap:14px;}
@@ -225,7 +237,7 @@ td.rank{color:var(--ink-3); font-weight:600;}
       <span class="pill status-wait" id="sourceBadge">○ 加载中…</span>
       <span class="meta-item">数据时间 <span id="generatedAt" class="num"></span>（北京时间）</span>
       <span class="meta-item">版本 <span id="versionText" class="num"></span></span>
-      <a href="/" style="font-size:12.5px;color:var(--ink-2)">推送配置 →</a>
+      <nav class="nav-pills"><a href="/dashboard" class="active">看板</a><a href="/">推送配置</a></nav>
       <button class="refresh-btn" id="refreshBtn">↻ 刷新</button>
     </div>
   </header>
@@ -507,7 +519,7 @@ function renderDashboard(DATA){
       ? `${prob.probability}% (${prob.low}–${prob.high})`
       : `样本不足 (n=${prob.n}/组${prob.cohorts})`;
     tr.innerHTML = `
-      <td class="rank num">${i+1}</td>
+      <td class="rank"><span class="rank-badge${i<3?' rank-'+(i+1):''}">${i+1}</span></td>
       <td><span class="chip" style="background:${c.strategy_type==='breakout'?'var(--chip-2-bg)':'var(--chip-1-bg)'};color:${c.strategy_type==='breakout'?'var(--chip-2-fg)':'var(--chip-1-fg)'}">${TRACK_LABEL[c.strategy_type]||c.strategy_type||'—'}</span></td>
       <td><span class="stock-name">${c.name}</span><span class="stock-code num">${c.symbol}</span></td>
       <td>${industryChip(c.industry, industryIndex(c.industry))}</td>

@@ -65,33 +65,62 @@ def check_auth(headers, password):
 def render_page(message=""):
     config = load_config(config_path())
     masked = mask_webhook_url(config.get("webhook_url"))
+    configured = bool(masked)
     status = f"已配置（{html.escape(masked)}）" if masked else "尚未配置"
+    status_cls = "status-ready" if configured else "status-wait"
     message_html = (
-        f'<p style="color:#0a7d32">{html.escape(message)}</p>' if message else ""
+        f'<p class="notice">{html.escape(message)}</p>' if message else ""
     )
     return f"""<!doctype html>
 <html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Alpha Shadow 盘中推送配置</title>
 <style>
-body{{font-family:-apple-system,sans-serif;max-width:640px;margin:40px auto;padding:0 16px;color:#1a1a1a}}
-input[type=text]{{width:100%;padding:8px;box-sizing:border-box;font-family:monospace}}
-button{{padding:8px 16px;margin-top:8px;margin-right:8px;cursor:pointer}}
-.status{{padding:8px 12px;background:#f2f2f2;border-radius:6px;display:inline-block}}
+:root{{
+  --bg:#f2f5f4; --surface:#ffffff; --surface-2:#e8edec; --border:#d6dedb;
+  --ink:#16221d; --ink-2:#48584f; --ink-3:#7c8b83; --accent:#2f5fae; --accent-ink:#fff;
+  --status-ready-bg:#dcebf6; --status-ready-fg:#1f4c78;
+  --status-wait-bg:#eceef0; --status-wait-fg:#57626b;
+  --shadow: 0 1px 2px rgba(22,34,29,.06), 0 8px 24px -12px rgba(22,34,29,.18);
+}}
+*{{box-sizing:border-box;}}
+body{{font-family:"IBM Plex Sans","PingFang SC","Microsoft YaHei",-apple-system,sans-serif;
+  max-width:640px;margin:0 auto;padding:28px 20px 48px;background:var(--bg);color:var(--ink);}}
+h1{{font-size:24px;font-weight:600;margin:0 0 14px;}}
+.nav-pills{{display:inline-flex;gap:2px;padding:3px;background:var(--surface-2);border-radius:999px;border:1px solid var(--border);margin-bottom:18px;}}
+.nav-pills a{{display:inline-flex;align-items:center;padding:5px 14px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--ink-2);text-decoration:none;}}
+.nav-pills a:hover{{color:var(--ink);}}
+.nav-pills a.active{{background:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow);}}
+.panel{{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 18px 20px;box-shadow:var(--shadow);margin-bottom:16px;}}
+.pill{{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12.5px;font-weight:600;}}
+.pill.status-ready{{background:var(--status-ready-bg);color:var(--status-ready-fg);}}
+.pill.status-wait{{background:var(--status-wait-bg);color:var(--status-wait-fg);}}
+.notice{{font-size:13.5px;color:#0a7d32;background:#e8f5ec;border-radius:8px;padding:8px 12px;margin:0 0 14px;}}
+label{{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px;}}
+input[type=text]{{width:100%;padding:9px 10px;box-sizing:border-box;font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);}}
+input[type=text]:focus{{outline:2px solid var(--accent);outline-offset:1px;}}
+button{{padding:8px 16px;margin-top:10px;margin-right:8px;cursor:pointer;border:1px solid var(--border);
+  border-radius:999px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;min-height:36px;}}
+button:hover{{color:var(--accent);border-color:var(--accent);}}
+.footer-note{{color:var(--ink-3);font-size:11.5px;margin-top:24px;}}
 </style></head>
 <body>
+<nav class="nav-pills"><a href="/dashboard">看板</a><a href="/" class="active">推送配置</a></nav>
 <h1>Alpha Shadow 盘中推送配置</h1>
-<p><a href="/dashboard">→ 看板</a></p>
-<p>企业微信群机器人 webhook 状态：<span class="status">{status}</span></p>
-{message_html}
-<form method="post" action="/config">
-  <label>企业微信群机器人 Webhook 地址</label>
-  <input type="text" name="webhook_url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." autocomplete="off">
-  <button type="submit">保存</button>
-</form>
-<form method="post" action="/test-push">
-  <button type="submit">发送测试消息</button>
-</form>
-<p style="color:#999;font-size:12px;margin-top:32px">由 GitHub Actions 自动部署（push 到 master 后自动生效）</p>
+<div class="panel">
+  <p>企业微信群机器人 webhook 状态：<span class="pill {status_cls}">{status}</span></p>
+  {message_html}
+  <form method="post" action="/config">
+    <label>企业微信群机器人 Webhook 地址</label>
+    <input type="text" name="webhook_url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." autocomplete="off">
+    <button type="submit">保存</button>
+  </form>
+  <form method="post" action="/test-push">
+    <button type="submit">发送测试消息</button>
+  </form>
+</div>
+<p class="footer-note">由 GitHub Actions 自动部署（push 到 master 后自动生效）</p>
 </body></html>"""
 
 
