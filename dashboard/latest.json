@@ -1,52 +1,52 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-17T22:28:21.817935+08:00",
+  "exported_at": "2026-09-18T09:21:20.637883+08:00",
   "market": {
-    "generated_at": "2026-09-17T22:19:28.249660+08:00",
+    "generated_at": "2026-09-18T09:15:35.572786+08:00",
     "status": "success",
-    "summary": "源数据日期 2026-09-17：所监测6个指数中，0个上涨、6个下跌、0个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
+    "summary": "源数据日期 2026-09-18：所监测6个指数中，0个上涨、3个下跌、3个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
     "quotes": [
       {
         "name": "上证指数",
         "symbol": "sh000001",
-        "last": "3875.60",
-        "change_pct": "-0.41%",
-        "quote_at": "2026-09-17T16:14:02+08:00"
+        "last": "3875.33",
+        "change_pct": "-0.01%",
+        "quote_at": "2026-09-18T09:15:00+08:00"
       },
       {
         "name": "沪深300",
         "symbol": "sh000300",
-        "last": "4460.16",
-        "change_pct": "-0.45%",
-        "quote_at": "2026-09-17T16:14:14+08:00"
+        "last": "4459.86",
+        "change_pct": "-0.01%",
+        "quote_at": "2026-09-18T09:15:00+08:00"
       },
       {
         "name": "科创50",
         "symbol": "sh000688",
-        "last": "1606.29",
-        "change_pct": "-0.61%",
-        "quote_at": "2026-09-17T16:14:14+08:00"
+        "last": "1606.09",
+        "change_pct": "-0.01%",
+        "quote_at": "2026-09-18T09:15:00+08:00"
       },
       {
         "name": "中证1000",
         "symbol": "sh000852",
-        "last": "7548.82",
-        "change_pct": "-0.51%",
-        "quote_at": "2026-09-17T16:14:02+08:00"
+        "last": "7548.69",
+        "change_pct": "-0.00%",
+        "quote_at": "2026-09-18T09:15:00+08:00"
       },
       {
         "name": "深证成指",
         "symbol": "sz399001",
         "last": "13409.91",
-        "change_pct": "-0.33%",
-        "quote_at": "2026-09-17T16:14:39+08:00"
+        "change_pct": "0.00%",
+        "quote_at": "2026-09-18T09:15:27+08:00"
       },
       {
         "name": "创业板指",
         "symbol": "sz399006",
         "last": "3298.31",
-        "change_pct": "-0.40%",
-        "quote_at": "2026-09-17T16:14:54+08:00"
+        "change_pct": "0.00%",
+        "quote_at": "2026-09-18T09:14:42+08:00"
       }
     ],
     "universe": {
@@ -55,19 +55,19 @@
       "quoted": 5220,
       "coverage_pct": 100.0,
       "dates": {
-        "2026-09-17": 5220
+        "2026-09-18": 5220
       },
       "breadth": {
-        "up": 2503,
-        "down": 2558,
-        "flat": 159
+        "up": 2455,
+        "down": 1651,
+        "flat": 1114
       }
     }
   },
   "research": {
-    "generated_at": "2026-09-17T22:24:16.830881+08:00",
+    "generated_at": "2026-09-18T09:18:59.355769+08:00",
     "status": "partial",
-    "factor_cutoff": "2026-09-16",
+    "factor_cutoff": "2026-09-17",
     "industry_provider": "新浪行业",
     "mapping": {
       "universe_count": 5220,
@@ -5302,437 +5302,15 @@
         "sz002565": "new_zzhy"
       }
     },
-    "source_id": "35232690137-1",
-    "source_generated_at": "2026-09-17T22:19:28.249660+08:00",
-    "sample_count": 300,
-    "factor_count": 231,
-    "rankings": [
-      {
-        "symbol": "sz301046",
-        "name": "能辉科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "52.68",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "55.04",
-        "ma20_deviation_pct": "15.63"
-      },
-      {
-        "symbol": "sz002988",
-        "name": "豪美新材",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "43.26",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "45.62",
-        "ma20_deviation_pct": "18.97"
-      },
-      {
-        "symbol": "sz301081",
-        "name": "严牌股份",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "40.25",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "42.61",
-        "ma20_deviation_pct": "9.16"
-      },
-      {
-        "symbol": "sh600103",
-        "name": "青山纸业",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "30.85",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "33.21",
-        "ma20_deviation_pct": "2.43"
-      },
-      {
-        "symbol": "sh688216",
-        "name": "气派科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "29.36",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "31.72",
-        "ma20_deviation_pct": "24.42"
-      },
-      {
-        "symbol": "sz002976",
-        "name": "瑞玛精密",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "19.93",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "22.29",
-        "ma20_deviation_pct": "7.47"
-      },
-      {
-        "symbol": "sz002848",
-        "name": "高斯贝尔",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "18.91",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "21.28",
-        "ma20_deviation_pct": "8.24"
-      },
-      {
-        "symbol": "sh600255",
-        "name": "鑫科材料",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "17.72",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "20.08",
-        "ma20_deviation_pct": "6.48"
-      },
-      {
-        "symbol": "sz300399",
-        "name": "天利科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "17.70",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "20.07",
-        "ma20_deviation_pct": "-0.30"
-      },
-      {
-        "symbol": "sh603499",
-        "name": "翔港科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "17.27",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "19.63",
-        "ma20_deviation_pct": "4.00"
-      },
-      {
-        "symbol": "sh603088",
-        "name": "宁波精达",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "17.09",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "19.45",
-        "ma20_deviation_pct": "1.35"
-      },
-      {
-        "symbol": "sz002961",
-        "name": "瑞达期货",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "16.95",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "19.32",
-        "ma20_deviation_pct": "6.32"
-      },
-      {
-        "symbol": "sz301119",
-        "name": "正强股份",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "16.88",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "19.24",
-        "ma20_deviation_pct": "-2.35"
-      },
-      {
-        "symbol": "sz000906",
-        "name": "浙商中拓",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "16.63",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "19.00",
-        "ma20_deviation_pct": "3.51"
-      },
-      {
-        "symbol": "sz301500",
-        "name": "飞南资源",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "16.54",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "18.91",
-        "ma20_deviation_pct": "9.02"
-      },
-      {
-        "symbol": "sh600785",
-        "name": "新华百货",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "16.10",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "18.46",
-        "ma20_deviation_pct": "-9.64"
-      },
-      {
-        "symbol": "sz300410",
-        "name": "正业科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "15.47",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "17.84",
-        "ma20_deviation_pct": "8.88"
-      },
-      {
-        "symbol": "sz300426",
-        "name": "华智数媒",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "15.10",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "17.46",
-        "ma20_deviation_pct": "2.46"
-      },
-      {
-        "symbol": "sh603978",
-        "name": "深圳新星",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "15.01",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "17.37",
-        "ma20_deviation_pct": "5.19"
-      },
-      {
-        "symbol": "sz003001",
-        "name": "中岩大地",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "14.79",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "17.15",
-        "ma20_deviation_pct": "14.29"
-      },
-      {
-        "symbol": "sh688010",
-        "name": "福光股份",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "13.63",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "16.00",
-        "ma20_deviation_pct": "9.89"
-      },
-      {
-        "symbol": "sh688603",
-        "name": "天承科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "13.27",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "15.63",
-        "ma20_deviation_pct": "4.63"
-      },
-      {
-        "symbol": "sz300562",
-        "name": "乐心股份",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "12.07",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "14.43",
-        "ma20_deviation_pct": "-1.13"
-      },
-      {
-        "symbol": "sh603757",
-        "name": "大元泵业",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "11.57",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "13.93",
-        "ma20_deviation_pct": "-4.27"
-      },
-      {
-        "symbol": "sz301205",
-        "name": "联特科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "11.44",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "13.80",
-        "ma20_deviation_pct": "-1.82"
-      },
-      {
-        "symbol": "sz300969",
-        "name": "恒帅股份",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "11.38",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "13.75",
-        "ma20_deviation_pct": "-0.08"
-      },
-      {
-        "symbol": "sz002831",
-        "name": "裕同科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "11.09",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "13.45",
-        "ma20_deviation_pct": "4.52"
-      },
-      {
-        "symbol": "sh688293",
-        "name": "奥浦迈",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "11.05",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "13.41",
-        "ma20_deviation_pct": "10.62"
-      },
-      {
-        "symbol": "sh688711",
-        "name": "宏微科技",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "10.36",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "12.72",
-        "ma20_deviation_pct": "11.01"
-      },
-      {
-        "symbol": "sh605296",
-        "name": "神农集团",
-        "end_date": "2026-09-16",
-        "start_date": "2026-08-19",
-        "return20_pct": "10.31",
-        "benchmark20_pct": "-2.36",
-        "excess20_pp": "12.68",
-        "ma20_deviation_pct": "-0.81"
-      }
-    ],
-    "industries": [
-      {
-        "name": "医疗器械",
-        "node": "new_ylqx",
-        "count": 25,
-        "eligible": 25,
-        "source_members": 31,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.91,
-        "up_pct": 72.0
-      },
-      {
-        "name": "农林牧渔",
-        "node": "new_nlmy",
-        "count": 56,
-        "eligible": 56,
-        "source_members": 64,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.79,
-        "up_pct": 69.64
-      },
-      {
-        "name": "纺织行业",
-        "node": "new_fzhy",
-        "count": 31,
-        "eligible": 31,
-        "source_members": 42,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.78,
-        "up_pct": 64.52
-      },
-      {
-        "name": "汽车制造",
-        "node": "new_qczz",
-        "count": 95,
-        "eligible": 95,
-        "source_members": 103,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.77,
-        "up_pct": 70.53
-      },
-      {
-        "name": "传媒娱乐",
-        "node": "new_cmyl",
-        "count": 33,
-        "eligible": 33,
-        "source_members": 40,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.74,
-        "up_pct": 84.85
-      },
-      {
-        "name": "家具行业",
-        "node": "new_jjhy",
-        "count": 12,
-        "eligible": 12,
-        "source_members": 16,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.62,
-        "up_pct": 75.0
-      },
-      {
-        "name": "酒店旅游",
-        "node": "new_jdly",
-        "count": 29,
-        "eligible": 29,
-        "source_members": 35,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.6,
-        "up_pct": 72.41
-      },
-      {
-        "name": "开发区",
-        "node": "new_kfq",
-        "count": 10,
-        "eligible": 10,
-        "source_members": 10,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.59,
-        "up_pct": 60.0
-      },
-      {
-        "name": "生物制药",
-        "node": "new_swzz",
-        "count": 138,
-        "eligible": 138,
-        "source_members": 155,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.59,
-        "up_pct": 72.46
-      },
-      {
-        "name": "纺织机械",
-        "node": "new_fzjx",
-        "count": 6,
-        "eligible": 6,
-        "source_members": 8,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.57,
-        "up_pct": 66.67
-      },
-      {
-        "name": "房地产",
-        "node": "new_fdc",
-        "count": 89,
-        "eligible": 89,
-        "source_members": 123,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.52,
-        "up_pct": 65.17
-      },
-      {
-        "name": "物资外贸",
-        "node": "new_wzwm",
-        "count": 20,
-        "eligible": 20,
-        "source_members": 21,
-        "coverage_pct": 100.0,
-        "median_change_pct": 0.49,
-        "up_pct": 55.0
-      }
-    ]
+    "source_id": "35294476141-1",
+    "source_generated_at": "2026-09-18T09:15:35.572786+08:00",
+    "sample_count": 0,
+    "factor_count": 0,
+    "rankings": [],
+    "industries": []
   },
   "sync": {
-    "generated_at": "2026-09-17T22:18:49.785308+08:00",
+    "generated_at": "2026-09-18T09:14:19.402595+08:00",
     "status": "success",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5741,307 +5319,306 @@
     "pending_days": 0,
     "errors": [],
     "stock_counts": {
-      "L": 5566
+      "L": 5567
     }
   },
   "analysis": {
-    "generated_at": "2026-09-17T22:26:48.035413+08:00",
+    "generated_at": "2026-09-18T09:19:47.089612+08:00",
     "status": "ready",
-    "start_date": "20260819",
-    "end_date": "20260916",
+    "start_date": "20260820",
+    "end_date": "20260917",
     "missing_dates": [],
     "issues": [],
     "rankings": [
       {
-        "code": "000993.SZ",
-        "name": "闽东电力",
-        "return20_pct": "91.90",
-        "ma20_deviation_pct": "60.97",
-        "excess20_pp": "94.26",
-        "benchmark20_pct": "-2.36"
+        "code": "300741.SZ",
+        "name": "华宝股份",
+        "return20_pct": "99.95",
+        "ma20_deviation_pct": "56.69",
+        "excess20_pp": "102.84",
+        "benchmark20_pct": "-2.89"
       },
       {
         "code": "601086.SH",
         "name": "国芳集团",
-        "return20_pct": "90.96",
-        "ma20_deviation_pct": "25.18",
-        "excess20_pp": "93.32",
-        "benchmark20_pct": "-2.36"
+        "return20_pct": "91.10",
+        "ma20_deviation_pct": "21.79",
+        "excess20_pp": "93.99",
+        "benchmark20_pct": "-2.89"
       },
       {
-        "code": "688209.SH",
-        "name": "英集芯",
-        "return20_pct": "78.66",
-        "ma20_deviation_pct": "26.25",
-        "excess20_pp": "81.03",
-        "benchmark20_pct": "-2.36"
+        "code": "000993.SZ",
+        "name": "闽东电力",
+        "return20_pct": "84.12",
+        "ma20_deviation_pct": "51.12",
+        "excess20_pp": "87.01",
+        "benchmark20_pct": "-2.89"
       },
       {
         "code": "002815.SZ",
         "name": "崇达技术",
-        "return20_pct": "77.93",
-        "ma20_deviation_pct": "43.95",
-        "excess20_pp": "80.29",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "000823.SZ",
-        "name": "超声电子",
-        "return20_pct": "74.44",
-        "ma20_deviation_pct": "47.21",
-        "excess20_pp": "76.81",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "301132.SZ",
-        "name": "满坤科技",
-        "return20_pct": "73.98",
-        "ma20_deviation_pct": "44.11",
-        "excess20_pp": "76.35",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "300741.SZ",
-        "name": "华宝股份",
-        "return20_pct": "72.30",
-        "ma20_deviation_pct": "35.89",
-        "excess20_pp": "74.66",
-        "benchmark20_pct": "-2.36"
+        "return20_pct": "83.84",
+        "ma20_deviation_pct": "41.62",
+        "excess20_pp": "86.72",
+        "benchmark20_pct": "-2.89"
       },
       {
         "code": "605058.SH",
         "name": "澳弘电子",
-        "return20_pct": "68.94",
-        "ma20_deviation_pct": "47.85",
-        "excess20_pp": "71.30",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "301251.SZ",
-        "name": "威尔高",
-        "return20_pct": "65.92",
-        "ma20_deviation_pct": "46.84",
-        "excess20_pp": "68.28",
-        "benchmark20_pct": "-2.36"
+        "return20_pct": "83.03",
+        "ma20_deviation_pct": "56.84",
+        "excess20_pp": "85.92",
+        "benchmark20_pct": "-2.89"
       },
       {
         "code": "600371.SH",
         "name": "万向德农",
-        "return20_pct": "58.88",
-        "ma20_deviation_pct": "14.26",
-        "excess20_pp": "61.25",
-        "benchmark20_pct": "-2.36"
+        "return20_pct": "81.86",
+        "ma20_deviation_pct": "22.22",
+        "excess20_pp": "84.75",
+        "benchmark20_pct": "-2.89"
       },
       {
-        "code": "688135.SH",
-        "name": "利扬芯片",
-        "return20_pct": "55.73",
-        "ma20_deviation_pct": "29.07",
-        "excess20_pp": "58.09",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "002708.SZ",
-        "name": "光洋股份",
-        "return20_pct": "55.27",
-        "ma20_deviation_pct": "17.09",
-        "excess20_pp": "57.63",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "601579.SH",
-        "name": "会稽山",
-        "return20_pct": "53.38",
-        "ma20_deviation_pct": "28.39",
-        "excess20_pp": "55.75",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "300903.SZ",
-        "name": "科翔股份",
-        "return20_pct": "53.34",
-        "ma20_deviation_pct": "24.62",
-        "excess20_pp": "55.70",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "301046.SZ",
-        "name": "能辉科技",
-        "return20_pct": "52.68",
-        "ma20_deviation_pct": "15.63",
-        "excess20_pp": "55.04",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "300464.SZ",
-        "name": "星徽股份",
-        "return20_pct": "51.82",
-        "ma20_deviation_pct": "26.68",
-        "excess20_pp": "54.18",
-        "benchmark20_pct": "-2.36"
+        "code": "688209.SH",
+        "name": "英集芯",
+        "return20_pct": "72.67",
+        "ma20_deviation_pct": "23.30",
+        "excess20_pp": "75.56",
+        "benchmark20_pct": "-2.89"
       },
       {
         "code": "688004.SH",
         "name": "博汇科技",
-        "return20_pct": "51.71",
-        "ma20_deviation_pct": "46.17",
-        "excess20_pp": "54.07",
-        "benchmark20_pct": "-2.36"
+        "return20_pct": "70.97",
+        "ma20_deviation_pct": "59.57",
+        "excess20_pp": "73.85",
+        "benchmark20_pct": "-2.89"
       },
       {
-        "code": "603618.SH",
-        "name": "杭电股份",
-        "return20_pct": "51.68",
-        "ma20_deviation_pct": "11.98",
-        "excess20_pp": "54.04",
-        "benchmark20_pct": "-2.36"
+        "code": "000823.SZ",
+        "name": "超声电子",
+        "return20_pct": "64.87",
+        "ma20_deviation_pct": "38.08",
+        "excess20_pp": "67.76",
+        "benchmark20_pct": "-2.89"
       },
       {
-        "code": "688143.SH",
-        "name": "长盈通",
-        "return20_pct": "51.51",
-        "ma20_deviation_pct": "11.21",
-        "excess20_pp": "53.88",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "600127.SH",
-        "name": "金健米业",
-        "return20_pct": "51.41",
-        "ma20_deviation_pct": "-0.73",
-        "excess20_pp": "53.77",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "688137.SH",
-        "name": "近岸蛋白",
-        "return20_pct": "49.36",
-        "ma20_deviation_pct": "14.82",
-        "excess20_pp": "51.72",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "605258.SH",
-        "name": "协和电子",
-        "return20_pct": "48.98",
-        "ma20_deviation_pct": "26.29",
-        "excess20_pp": "51.34",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "300852.SZ",
-        "name": "四会富仕",
-        "return20_pct": "48.50",
-        "ma20_deviation_pct": "27.86",
-        "excess20_pp": "50.87",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "301183.SZ",
-        "name": "东田微",
-        "return20_pct": "47.24",
-        "ma20_deviation_pct": "27.22",
-        "excess20_pp": "49.61",
-        "benchmark20_pct": "-2.36"
-      },
-      {
-        "code": "000978.SZ",
-        "name": "桂林旅游",
-        "return20_pct": "46.74",
-        "ma20_deviation_pct": "18.42",
-        "excess20_pp": "49.11",
-        "benchmark20_pct": "-2.36"
+        "code": "301132.SZ",
+        "name": "满坤科技",
+        "return20_pct": "64.22",
+        "ma20_deviation_pct": "35.64",
+        "excess20_pp": "67.11",
+        "benchmark20_pct": "-2.89"
       },
       {
         "code": "300553.SZ",
         "name": "集智股份",
-        "return20_pct": "45.40",
-        "ma20_deviation_pct": "21.94",
-        "excess20_pp": "47.76",
-        "benchmark20_pct": "-2.36"
+        "return20_pct": "62.07",
+        "ma20_deviation_pct": "31.37",
+        "excess20_pp": "64.96",
+        "benchmark20_pct": "-2.89"
       },
       {
-        "code": "301041.SZ",
-        "name": "金百泽",
-        "return20_pct": "45.30",
-        "ma20_deviation_pct": "21.92",
-        "excess20_pp": "47.66",
-        "benchmark20_pct": "-2.36"
+        "code": "601579.SH",
+        "name": "会稽山",
+        "return20_pct": "60.05",
+        "ma20_deviation_pct": "31.93",
+        "excess20_pp": "62.94",
+        "benchmark20_pct": "-2.89"
       },
       {
-        "code": "003040.SZ",
-        "name": "楚天龙",
-        "return20_pct": "45.25",
-        "ma20_deviation_pct": "-11.91",
-        "excess20_pp": "47.62",
-        "benchmark20_pct": "-2.36"
+        "code": "002708.SZ",
+        "name": "光洋股份",
+        "return20_pct": "58.79",
+        "ma20_deviation_pct": "18.64",
+        "excess20_pp": "61.67",
+        "benchmark20_pct": "-2.89"
       },
       {
-        "code": "603186.SH",
-        "name": "华正新材",
-        "return20_pct": "45.14",
-        "ma20_deviation_pct": "31.13",
-        "excess20_pp": "47.50",
-        "benchmark20_pct": "-2.36"
+        "code": "688135.SH",
+        "name": "利扬芯片",
+        "return20_pct": "57.67",
+        "ma20_deviation_pct": "30.40",
+        "excess20_pp": "60.55",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "301251.SZ",
+        "name": "威尔高",
+        "return20_pct": "55.56",
+        "ma20_deviation_pct": "32.05",
+        "excess20_pp": "58.44",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "300939.SZ",
+        "name": "秋田微",
+        "return20_pct": "52.52",
+        "ma20_deviation_pct": "38.33",
+        "excess20_pp": "55.40",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "001326.SZ",
+        "name": "联域股份",
+        "return20_pct": "51.72",
+        "ma20_deviation_pct": "27.55",
+        "excess20_pp": "54.61",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "600127.SH",
+        "name": "金健米业",
+        "return20_pct": "51.40",
+        "ma20_deviation_pct": "7.18",
+        "excess20_pp": "54.28",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "300852.SZ",
+        "name": "四会富仕",
+        "return20_pct": "48.81",
+        "ma20_deviation_pct": "26.22",
+        "excess20_pp": "51.70",
+        "benchmark20_pct": "-2.89"
       },
       {
         "code": "003006.SZ",
         "name": "百亚股份",
-        "return20_pct": "45.03",
-        "ma20_deviation_pct": "26.48",
-        "excess20_pp": "47.40",
-        "benchmark20_pct": "-2.36"
+        "return20_pct": "48.44",
+        "ma20_deviation_pct": "27.80",
+        "excess20_pp": "51.33",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "600792.SH",
+        "name": "云煤能源",
+        "return20_pct": "48.33",
+        "ma20_deviation_pct": "21.20",
+        "excess20_pp": "51.22",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "300464.SZ",
+        "name": "星徽股份",
+        "return20_pct": "48.28",
+        "ma20_deviation_pct": "22.55",
+        "excess20_pp": "51.16",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "688137.SH",
+        "name": "近岸蛋白",
+        "return20_pct": "47.80",
+        "ma20_deviation_pct": "33.41",
+        "excess20_pp": "50.69",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "603269.SH",
+        "name": "海鸥股份",
+        "return20_pct": "47.11",
+        "ma20_deviation_pct": "7.65",
+        "excess20_pp": "50.00",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "000980.SZ",
+        "name": "众泰汽车",
+        "return20_pct": "46.30",
+        "ma20_deviation_pct": "27.56",
+        "excess20_pp": "49.18",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "603353.SH",
+        "name": "和顺石油",
+        "return20_pct": "46.16",
+        "ma20_deviation_pct": "23.48",
+        "excess20_pp": "49.05",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "300903.SZ",
+        "name": "科翔股份",
+        "return20_pct": "43.17",
+        "ma20_deviation_pct": "23.28",
+        "excess20_pp": "46.06",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "301046.SZ",
+        "name": "能辉科技",
+        "return20_pct": "43.16",
+        "ma20_deviation_pct": "13.72",
+        "excess20_pp": "46.05",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "600354.SH",
+        "name": "敦煌种业",
+        "return20_pct": "42.54",
+        "ma20_deviation_pct": "10.94",
+        "excess20_pp": "45.43",
+        "benchmark20_pct": "-2.89"
+      },
+      {
+        "code": "002988.SZ",
+        "name": "豪美新材",
+        "return20_pct": "42.38",
+        "ma20_deviation_pct": "15.27",
+        "excess20_pp": "45.27",
+        "benchmark20_pct": "-2.89"
       }
     ],
-    "factor_count": 4979
+    "factor_count": 4980
   },
   "sources": [
     {
       "kind": "market",
-      "id": "35232690137-1",
-      "generated_at": "2026-09-17T22:19:28.249660+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/35232690137-1.md"
+      "id": "35294476141-1",
+      "generated_at": "2026-09-18T09:15:35.572786+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/35294476141-1.md"
     },
     {
       "kind": "research",
-      "id": "35232690137-1",
-      "generated_at": "2026-09-17T22:24:16.830881+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/35232690137-1.md"
+      "id": "35294476141-1",
+      "generated_at": "2026-09-18T09:18:59.355769+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/35294476141-1.md"
     },
     {
       "kind": "sync",
-      "id": "35232690137-1",
-      "generated_at": "2026-09-17T22:18:49.785308+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35232690137-1.md"
+      "id": "35294476141-1",
+      "generated_at": "2026-09-18T09:14:19.402595+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/35294476141-1.md"
     },
     {
       "kind": "analysis",
-      "id": "35232690137-1",
-      "generated_at": "2026-09-17T22:26:48.035413+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35232690137-1.md"
+      "id": "35294476141-1",
+      "generated_at": "2026-09-18T09:19:47.089612+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/35294476141-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "35232690137-1",
-      "generated_at": "2026-09-17T22:28:20.439370+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35232690137-1.md"
+      "id": "35294476141-1",
+      "generated_at": "2026-09-18T09:21:19.126886+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/35294476141-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "35232690137-1",
-      "generated_at": "2026-09-17T22:28:20.260644+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35232690137-1.md"
+      "id": "35294476141-1",
+      "generated_at": "2026-09-18T09:21:18.969942+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35294476141-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-17T22:28:20.260644+08:00",
+    "generated_at": "2026-09-18T09:21:18.969942+08:00",
     "version": "alpha-shadow-0.3-shortterm",
-    "status": "partial",
+    "status": "ready",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
     "issues": [
       "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
-      "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。"
+      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。"
     ],
     "calibration": {
       "walk_forward_n": 0,
@@ -6065,33 +5642,33 @@
         "1-3日窗口下单边成本假设占比更高，历史频率不代表已覆盖成本后的可交易胜率",
         "MA5/近3日涨幅/放量阈值是初始设定值，尚未用本函数的回看结果验证过合理性"
       ],
-      "historical_n": 36,
+      "historical_n": 26,
       "live_n": 0,
       "live_win_rate_breakout": null,
       "live_win_rate_pullback": null
     },
     "candidates": [
       {
-        "symbol": "sz002623",
-        "name": "亚玛顿",
-        "industry": "玻璃",
-        "return20_pct": 11.510312707917514,
-        "return5_pct": 3.9057656540607777,
-        "excess20_pp": 13.873291329313542,
-        "deviation_pct": 5.180583011704165,
-        "volume_ratio": 3.8900076270568396,
-        "liquidity_proxy": 596633.22754,
-        "reference_adjusted": 16.76,
-        "return1_pct": 3.584672435105074,
-        "return2_pct": 4.423676012461075,
-        "return3_pct": 4.09937888198757,
-        "ma5_deviation_pct": 2.7212552096102183,
-        "volume_ratio_5d": 3.407254105567348,
-        "high20_ratio": 1.0163735597331718,
+        "symbol": "sz300162",
+        "name": "雷曼光电",
+        "industry": "元器件",
+        "return20_pct": 4.405874499332452,
+        "return5_pct": 3.576158940397356,
+        "excess20_pp": 7.292815874325653,
+        "deviation_pct": 2.3158445636530134,
+        "volume_ratio": 2.537552231877895,
+        "liquidity_proxy": 1347594.400535,
+        "reference_adjusted": 7.82,
+        "return1_pct": 3.576158940397356,
+        "return2_pct": 6.105834464043425,
+        "return3_pct": 4.405874499332452,
+        "ma5_deviation_pct": 3.9893617021276473,
+        "volume_ratio_5d": 3.234825265018948,
+        "high20_ratio": 0.9961783439490447,
         "is_green": true,
-        "prior_volume_ratio_5d": 1.0546880473756428,
+        "prior_volume_ratio_5d": 1.1090136956025067,
         "strategy_type": "breakout",
-        "score": 94.57,
+        "score": 94.38,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6101,419 +5678,9 @@
           "MA5偏离受控"
         ],
         "probability": {
-          "n": 18,
-          "cohorts": 7,
-          "wins": 7,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh605277",
-        "name": "新亚电子",
-        "industry": "元器件",
-        "return20_pct": 23.816155988857957,
-        "return5_pct": 2.4193548387096975,
-        "excess20_pp": 26.179134610253985,
-        "deviation_pct": 6.079589523298146,
-        "volume_ratio": 0.8904125580158312,
-        "liquidity_proxy": 3214460.126085,
-        "reference_adjusted": 17.78,
-        "return1_pct": 3.432228039557872,
-        "return2_pct": -1.0022271714921982,
-        "return3_pct": -2.0385674931129305,
-        "ma5_deviation_pct": 0.5997510467353306,
-        "volume_ratio_5d": 0.601714971812564,
-        "high20_ratio": 0.9705240174672489,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.7226515796571138,
-        "strategy_type": "pullback",
-        "score": 86.26,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz003019",
-        "name": "宸展光电",
-        "industry": "元器件",
-        "return20_pct": 18.279569892473123,
-        "return5_pct": -2.274342572850041,
-        "excess20_pp": 20.64254851386915,
-        "deviation_pct": 3.030984226892963,
-        "volume_ratio": 0.6143270828613748,
-        "liquidity_proxy": 1171130.62885,
-        "reference_adjusted": 27.5,
-        "return1_pct": 1.1773362766740236,
-        "return2_pct": -0.29006526468454696,
-        "return3_pct": 1.4011799410029502,
-        "ma5_deviation_pct": 0.4309400335987146,
-        "volume_ratio_5d": 0.7052768040437583,
-        "high20_ratio": 0.9605309116311561,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.5684075478835663,
-        "strategy_type": "pullback",
-        "score": 80.09,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh605118",
-        "name": "力鼎光电",
-        "industry": "元器件",
-        "return20_pct": 15.58883873849155,
-        "return5_pct": -1.084595522016507,
-        "excess20_pp": 17.951817359887578,
-        "deviation_pct": 4.654690034862963,
-        "volume_ratio": 0.7314508687092769,
-        "liquidity_proxy": 2011060.5079434705,
-        "reference_adjusted": 33.48,
-        "return1_pct": 2.4793388429751984,
-        "return2_pct": -2.4191197901486605,
-        "return3_pct": 1.9178082191780632,
-        "ma5_deviation_pct": 0.7773567109023771,
-        "volume_ratio_5d": 0.8117798131276405,
-        "high20_ratio": 0.9392807315976582,
-        "is_green": true,
-        "prior_volume_ratio_5d": 1.2714989548699724,
-        "strategy_type": "pullback",
-        "score": 69.67,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz300629",
-        "name": "新劲刚",
-        "industry": "元器件",
-        "return20_pct": 9.035779260157684,
-        "return5_pct": -2.0697167755991286,
-        "excess20_pp": 11.398757881553712,
-        "deviation_pct": 0.8978675645342271,
-        "volume_ratio": 0.6962641992916129,
-        "liquidity_proxy": 982701.01586,
-        "reference_adjusted": 17.98,
-        "return1_pct": 1.9274376417233618,
-        "return2_pct": -0.5530973451327359,
-        "return3_pct": -2.176278563656142,
-        "ma5_deviation_pct": -0.4760323259160759,
-        "volume_ratio_5d": 0.7323782933169464,
-        "high20_ratio": 0.9755832881172003,
-        "is_green": true,
-        "prior_volume_ratio_5d": 1.1502831094395791,
-        "strategy_type": "pullback",
-        "score": 65.44,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz000509",
-        "name": "华塑控股",
-        "industry": "元器件",
-        "return20_pct": 8.411214953271017,
-        "return5_pct": -1.4164305949008416,
-        "excess20_pp": 10.774193574667045,
-        "deviation_pct": 0.014369880730003004,
-        "volume_ratio": 0.8656010416316409,
-        "liquidity_proxy": 688319.67495,
-        "reference_adjusted": 3.48,
-        "return1_pct": 2.35294117647058,
-        "return2_pct": -0.5714285714285672,
-        "return3_pct": -0.2865329512894088,
-        "ma5_deviation_pct": 0.0,
-        "volume_ratio_5d": 1.109422301800159,
-        "high20_ratio": 0.9747899159663866,
-        "is_green": true,
-        "prior_volume_ratio_5d": 1.0234204991514217,
-        "strategy_type": "pullback",
-        "score": 64.45,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh688511",
-        "name": "天微电子",
-        "industry": "元器件",
-        "return20_pct": 5.4545454545454675,
-        "return5_pct": -0.7894736842105288,
-        "excess20_pp": 7.8175240759414955,
-        "deviation_pct": 0.5668556185395079,
-        "volume_ratio": 0.7208916544354003,
-        "liquidity_proxy": 386882.484825,
-        "reference_adjusted": 22.62,
-        "return1_pct": 1.526032315978454,
-        "return2_pct": -1.4808362369338024,
-        "return3_pct": -0.6587615283267345,
-        "ma5_deviation_pct": -0.15889830508473146,
-        "volume_ratio_5d": 0.8299407474447982,
-        "high20_ratio": 0.9468396818752617,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.9401776043279072,
-        "strategy_type": "pullback",
-        "score": 57.28,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz000601",
-        "name": "韶能股份",
-        "industry": "水力发电",
-        "return20_pct": 4.635998321373358,
-        "return5_pct": -0.15822784810127777,
-        "excess20_pp": 6.998976942769386,
-        "deviation_pct": 1.446927607654902,
-        "volume_ratio": 0.9719588351078787,
-        "liquidity_proxy": 2220241.856039382,
-        "reference_adjusted": 6.31,
-        "return1_pct": 0.7987220447284393,
-        "return2_pct": -1.0971786833855801,
-        "return3_pct": -1.2519561815336422,
-        "ma5_deviation_pct": -0.7549543881723797,
-        "volume_ratio_5d": 0.5842523362470609,
-        "high20_ratio": 0.9782945736434108,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.7023830316763789,
-        "strategy_type": "pullback",
-        "score": 57.21,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz000791",
-        "name": "甘肃能源",
-        "industry": "水力发电",
-        "return20_pct": 2.642559109874809,
-        "return5_pct": 0.27173913043476716,
-        "excess20_pp": 5.005537731270837,
-        "deviation_pct": 1.3388259526261548,
-        "volume_ratio": 0.9459283449971971,
-        "liquidity_proxy": 1307046.5563700001,
-        "reference_adjusted": 7.38,
-        "return1_pct": -0.2702702702702786,
-        "return2_pct": -0.13531799729363803,
-        "return3_pct": -0.8064516129032362,
-        "ma5_deviation_pct": -0.21633315305570333,
-        "volume_ratio_5d": 0.610060066715445,
-        "high20_ratio": 0.9919354838709676,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.9580100857519666,
-        "strategy_type": "pullback",
-        "score": 57.1,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz301571",
-        "name": "国科天成",
-        "industry": "元器件",
-        "return20_pct": 5.0165712564025355,
-        "return5_pct": -5.64428803465079,
-        "excess20_pp": 7.3795498777985635,
-        "deviation_pct": 2.46573328923676,
-        "volume_ratio": 0.8600778690707437,
-        "liquidity_proxy": 2703915.42416,
-        "reference_adjusted": 69.71,
-        "return1_pct": 0.3743700503959557,
-        "return2_pct": -1.7753980555164195,
-        "return3_pct": -2.5307606263982096,
-        "ma5_deviation_pct": -1.8279630464173025,
-        "volume_ratio_5d": 0.9229392838640829,
-        "high20_ratio": 0.9435571196534921,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.5750202516971336,
-        "strategy_type": "pullback",
-        "score": 55.74,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh600025",
-        "name": "华能水电",
-        "industry": "水力发电",
-        "return20_pct": 0.5122950819672178,
-        "return5_pct": 0.6153846153846176,
-        "excess20_pp": 2.875273703363246,
-        "deviation_pct": 0.9415033184133392,
-        "volume_ratio": 0.6983101604094564,
-        "liquidity_proxy": 2879538.288235,
-        "reference_adjusted": 9.81,
-        "return1_pct": 0.30674846625768915,
-        "return2_pct": -0.8088978766430777,
-        "return3_pct": -0.20345879959308144,
-        "ma5_deviation_pct": 0.04079135223331587,
-        "volume_ratio_5d": 0.7107390809818405,
-        "high20_ratio": 0.990909090909091,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.793381641693794,
-        "strategy_type": "pullback",
-        "score": 51.89,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 10,
+          "n": 8,
+          "cohorts": 4,
+          "wins": 4,
           "probability": null,
           "low": null,
           "high": null,
@@ -6544,28 +5711,28 @@
       "coverage_required": 0.95
     },
     "screen": {
-      "cutoff": "2026-09-16",
-      "listed": 5222,
+      "cutoff": "2026-09-17",
+      "listed": 5223,
       "eligible": 4972,
       "valid": 4942,
       "coverage_pct": 99.4,
       "complete": true,
-      "market_score": 45.27,
+      "market_score": 44.23,
       "regime": "偏弱",
       "market_score_pause": 40,
       "exclusion_counts": {
-        "行业未进入强势前10%": 9236,
-        "近3日涨幅不足": 142,
-        "今日成交量未明显放大": 88,
-        "20日超额已超过15.0pp，不算新鲜突破": 84,
-        "昨日已放量，非今日首次放量": 3,
-        "MA5偏离超出0-6%区间": 3,
-        "未接近20日新高": 3,
-        "回调未缩量": 34,
-        "20日超额未转正，非确认中期强势": 65,
-        "偏离MA20超出0-8%区间": 43,
-        "近2日未回调": 169,
-        "当日未收阳，无反转确认": 3
+        "行业未进入强势前10%": 9280,
+        "近3日涨幅不足": 157,
+        "今日成交量未明显放大": 54,
+        "未接近20日新高": 10,
+        "20日超额已超过15.0pp，不算新鲜突破": 74,
+        "昨日已放量，非今日首次放量": 4,
+        "MA5偏离超出0-6%区间": 2,
+        "近2日未回调": 187,
+        "20日超额未转正，非确认中期强势": 71,
+        "回调未缩量": 29,
+        "偏离MA20超出0-8%区间": 10,
+        "当日未收阳，无反转确认": 5
       }
     },
     "portfolio": {
@@ -6600,11 +5767,11 @@
         }
       ],
       "attempted": [],
-      "last_date": "2026-09-16",
+      "last_date": "2026-09-17",
       "inception_date": "2026-09-15",
       "benchmark_start": 4450.04,
-      "benchmark_return_pct": 0.6793,
-      "excess_pp": -0.6793,
+      "benchmark_return_pct": 0.2274,
+      "excess_pp": -0.2274,
       "peak": 100000,
       "max_drawdown_pct": 0,
       "drawdown_pct": 0.0,
@@ -6619,6 +5786,11 @@
           "date": "2026-09-16",
           "nav": 1.0,
           "benchmark_nav": 1.006793
+        },
+        {
+          "date": "2026-09-17",
+          "nav": 1.0,
+          "benchmark_nav": 1.002274
         }
       ],
       "valuation_status": "current",
@@ -6627,6 +5799,30 @@
       "trade_win_rate": null
     },
     "forecasts": [
+      {
+        "id": "alpha-shadow-0.3-shortterm-2026-09-17-sz300162",
+        "created_at": "2026-09-18T09:21:18.969410+08:00",
+        "as_of": "2026-09-17",
+        "eligible_from": "2026-09-19",
+        "symbol": "sz300162",
+        "name": "雷曼光电",
+        "score": 94.38,
+        "strategy_type": "breakout",
+        "probability": {
+          "n": 8,
+          "cohorts": 4,
+          "wins": 4,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 7.82,
+        "paper_eligible": true,
+        "hotmoney": null
+      },
       {
         "id": "alpha-shadow-0.3-shortterm-2026-09-16-sh605277",
         "created_at": "2026-09-17T16:00:16.765171+08:00",
@@ -6919,21 +6115,21 @@
     "outcomes": [],
     "decisions": [
       {
-        "symbol": "sz002623",
-        "name": "亚玛顿",
+        "symbol": "sz300162",
+        "name": "雷曼光电",
         "strategy_type": "breakout",
         "state": "waiting_buy",
         "reasons": [
           "冻结记录允许条件式模拟入场；尚无成交记录。",
-          "本计划最早允许日期：2026-09-18；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。"
+          "本计划最早允许日期：2026-09-19；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。"
         ],
-        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-16-sz002623",
-        "created_at": "2026-09-17T16:00:16.765171+08:00",
-        "as_of": "2026-09-16",
-        "eligible_from": "2026-09-18",
-        "reference_price": 16.76,
-        "entry_low": 16.2572,
-        "entry_high": 17.2628,
+        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-17-sz300162",
+        "created_at": "2026-09-18T09:21:18.969410+08:00",
+        "as_of": "2026-09-17",
+        "eligible_from": "2026-09-19",
+        "reference_price": 7.82,
+        "entry_low": 7.5854,
+        "entry_high": 8.0546,
         "stop_price": null,
         "target_price": null,
         "shares": null,
@@ -6968,6 +6164,30 @@
         "ledger": []
       },
       {
+        "symbol": "sz002623",
+        "name": "亚玛顿",
+        "strategy_type": "breakout",
+        "state": "waiting_buy",
+        "reasons": [
+          "冻结记录允许条件式模拟入场；尚无成交记录。",
+          "本计划最早允许日期：2026-09-18；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。"
+        ],
+        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-16-sz002623",
+        "created_at": "2026-09-17T16:00:16.765171+08:00",
+        "as_of": "2026-09-16",
+        "eligible_from": "2026-09-18",
+        "reference_price": 16.76,
+        "entry_low": 16.2572,
+        "entry_high": 17.2628,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "hold_sessions": 3,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
         "symbol": "sz003019",
         "name": "宸展光电",
         "strategy_type": "pullback",
@@ -6983,190 +6203,6 @@
         "reference_price": 27.5,
         "entry_low": 26.675,
         "entry_high": 28.325,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh605118",
-        "name": "力鼎光电",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz300629",
-        "name": "新劲刚",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz000509",
-        "name": "华塑控股",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh688511",
-        "name": "天微电子",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz000601",
-        "name": "韶能股份",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz000791",
-        "name": "甘肃能源",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz301571",
-        "name": "国科天成",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh600025",
-        "name": "华能水电",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前仅候选前3名进入冻结计划检查，其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
         "stop_price": null,
         "target_price": null,
         "shares": null,
@@ -7295,7 +6331,7 @@
         "ledger": []
       }
     ],
-    "forecast_count": 12,
+    "forecast_count": 13,
     "outcome_count": 0
   }
 }
