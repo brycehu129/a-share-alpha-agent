@@ -16,7 +16,7 @@ MARKET_DATA_REMOTE="git@github.com:brycehu129/a-share-alpha-agent.git"
 git fetch origin master --quiet
 git reset --hard origin/master --quiet
 
-export GIT_SSH_COMMAND="ssh -i /root/.ssh/market_data_push -o IdentitiesOnly=yes"
+export GIT_SSH_COMMAND="ssh -i /root/.ssh/market_data_push -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 
 if [ ! -d "$HISTORY_DIR/.git" ]; then
   git clone --branch market-data --single-branch "$MARKET_DATA_REMOTE" "$HISTORY_DIR"
