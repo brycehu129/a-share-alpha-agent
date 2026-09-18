@@ -530,13 +530,19 @@ function renderDashboard(DATA){
     candBody.appendChild(tr);
   });
   const toggleBtn = document.getElementById('toggleCandidates');
-  toggleBtn.textContent = '展开全部候选 ▾';
-  toggleBtn.onclick = function(){
-    const hidden = candBody.querySelectorAll('.row-hidden');
-    const willShow = hidden.length>0 && hidden[0].classList.contains('row-hidden');
-    hidden.forEach(r=>r.classList.toggle('row-hidden'));
-    this.textContent = willShow ? '收起候选列表 ▴' : '展开全部候选 ▾';
-  };
+  const hiddenRows = Array.from(candBody.querySelectorAll('.row-hidden'));
+  if(hiddenRows.length===0){
+    toggleBtn.style.display = 'none';
+  } else {
+    toggleBtn.style.display = '';
+    toggleBtn.textContent = '展开全部候选 ▾';
+    let expanded = false;
+    toggleBtn.onclick = function(){
+      expanded = !expanded;
+      hiddenRows.forEach(r=>r.classList.toggle('row-hidden', !expanded));
+      this.textContent = expanded ? '收起候选列表 ▴' : '展开全部候选 ▾';
+    };
+  }
 
   const exc = screen.exclusion_counts;
   const excParts = Object.entries(exc).map(([k,v])=>`${k} ${v}`).join(' · ');

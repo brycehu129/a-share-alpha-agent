@@ -4,13 +4,10 @@ on:
   push:
     branches: [master]
     paths: ['server/report_status.py', 'server/report_dispatch.py']
-  schedule:
-    - cron: '10 23 * * 0-4'
-    - cron: '40 0 * * 1-5'
-    - cron: '35 7 * * 1-5'
-    - cron: '20 10 * * 1-5'
-    # Recovery checks; GitHub scheduling remains best effort.
-    - cron: '17 0-12 * * 1-5'
+  # Scheduling moved to server/cron_daily_agent.sh via systemd timers on the
+  # RackNerd deployment (see server/RACKNERD_CRON.md) — GitHub's shared
+  # `market-report-history` concurrency queue caused unpredictable delays.
+  # workflow_dispatch/push above remain for manual runs and CI verification.
 permissions:
   contents: read
 concurrency:

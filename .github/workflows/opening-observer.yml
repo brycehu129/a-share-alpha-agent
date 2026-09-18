@@ -1,11 +1,11 @@
 name: 开盘报价观察与虚拟执行
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '31 1 * * 1-5'
-    - cron: '33 1 * * 1-5'
-    # Audit missed windows even when both opening attempts were delayed.
-    - cron: '47 1 * * 1-5'
+  # Scheduling moved to server/cron_opening_observer.sh via systemd timers
+  # on the RackNerd deployment (see server/RACKNERD_CRON.md) — GitHub's
+  # shared `market-report-history` concurrency queue kept delaying this past
+  # the 09:30-09:35 observation window. workflow_dispatch/push below remain
+  # for manual runs and CI verification.
   push:
     branches: [master]
     paths: ['server/opening_observer.py']
