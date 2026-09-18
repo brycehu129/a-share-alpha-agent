@@ -18,3 +18,8 @@ systemctl enable --now alpha-shadow-daily.timer alpha-shadow-opening.timer
 systemctl restart alpha-shadow-daily.timer alpha-shadow-opening.timer
 
 echo "$(date -Is) deployed $(git rev-parse --short HEAD)" >> /var/log/alpha-shadow-deploy.log
+
+# Keep the untracked outer wrapper (the SSH forced-command target,
+# /opt/alpha-shadow/deploy.sh) mirroring this file, so it never needs a
+# manual edit on the server again regardless of how it got bootstrapped.
+cp /opt/alpha-shadow/server/deploy.sh /opt/alpha-shadow/deploy.sh
