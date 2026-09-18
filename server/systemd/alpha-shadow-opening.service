@@ -1,0 +1,7 @@
+[Unit]
+Description=Alpha Shadow 开盘报价观察（替代 opening-observer.yml 的 schedule）
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_opening_observer.sh

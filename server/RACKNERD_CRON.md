@@ -16,6 +16,9 @@ Actions 的调度队列。
   `server/cron_daily_agent.sh`、`server/cron_opening_observer.sh`：把原来
   两个工作流 YAML 里的步骤顺序、`continue-on-error`/必需步骤的区分、
   `collect`/`REPORT_SLOT` 门控逻辑搬成 bash，行为上是一一对应的移植。
+- 新增 `server/systemd/*.service` / `*.timer`：四个 systemd 单元文件本体，
+  跟着仓库一起 `git pull`，服务器上只需要 `cp` 过去，不用在终端里手打/粘贴
+  大段带大括号的配置（VNC 网页控制台粘贴长文本容易被键盘布局搞乱）。
 - `.github/workflows/daily-agent.yml`、`.github/workflows/opening-observer.yml`
   去掉了 `schedule:` 触发，保留 `workflow_dispatch`（手动跑）和 push 触发
   （改对应文件时仍会在 GitHub 上跑测试），不会再自动定时执行，避免和服务器
@@ -34,16 +37,10 @@ set -e
 cd /opt/alpha-shadow
 git pull --ff-only origin master
 
-# 1. 生成一把专门用来 push market-data 分支的部署密钥（跟已有的
-#    github_actions_deploy 是两把不同的key，那把是"只能触发部署脚本"的
-#    受限key，这把需要能 git push，不能复用）。
 if [ ! -f /root/.ssh/market_data_push ]; then
   ssh-keygen -t ed25519 -f /root/.ssh/market_data_push -N "" -C "alpha-shadow-market-data-push" -q
 fi
 
-# 2. Tushare/小得法 token 配置。已有 /etc/alpha-shadow.env（webapp在用），
-#    这里追加两个新变量；如果已经存在同名变量就不会重复追加，但也不会帮你
-#    自动填真实值——占位符需要你自己改。
 if ! grep -q '^TUSHARE_TOKEN=' /etc/alpha-shadow.env 2>/dev/null; then
   echo 'TUSHARE_TOKEN=REPLACE_ME' >> /etc/alpha-shadow.env
 fi
@@ -52,59 +49,8 @@ if ! grep -q '^XIAODEFA_TOKEN=' /etc/alpha-shadow.env 2>/dev/null; then
 fi
 chmod 600 /etc/alpha-shadow.env
 
-# 3. systemd service + timer：盘前/收盘数据整理
-cat > /etc/systemd/system/alpha-shadow-daily.service <<'UNITEOF'
-[Unit]
-Description=Alpha Shadow 盘前/收盘数据整理（替代 daily-agent.yml 的 schedule）
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash /opt/alpha-shadow/server/cron_daily_agent.sh
-UNITEOF
-
-cat > /etc/systemd/system/alpha-shadow-daily.timer <<'UNITEOF'
-[Unit]
-Description=Alpha Shadow 盘前/收盘数据整理定时器
-
-[Timer]
-OnCalendar=Asia/Shanghai Mon..Fri 07:10:00
-OnCalendar=Asia/Shanghai Mon..Fri 08:40:00
-OnCalendar=Asia/Shanghai Mon..Fri 15:35:00
-OnCalendar=Asia/Shanghai Mon..Fri 18:20:00
-OnCalendar=Asia/Shanghai Mon..Fri 08..20:17:00
-Persistent=false
-AccuracySec=30s
-
-[Install]
-WantedBy=timers.target
-UNITEOF
-
-# 4. systemd service + timer：开盘报价观察与虚拟执行
-cat > /etc/systemd/system/alpha-shadow-opening.service <<'UNITEOF'
-[Unit]
-Description=Alpha Shadow 开盘报价观察（替代 opening-observer.yml 的 schedule）
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash /opt/alpha-shadow/server/cron_opening_observer.sh
-UNITEOF
-
-cat > /etc/systemd/system/alpha-shadow-opening.timer <<'UNITEOF'
-[Unit]
-Description=Alpha Shadow 开盘报价观察定时器
-
-[Timer]
-OnCalendar=Asia/Shanghai Mon..Fri 09:31:00
-OnCalendar=Asia/Shanghai Mon..Fri 09:33:00
-OnCalendar=Asia/Shanghai Mon..Fri 09:47:00
-Persistent=false
-AccuracySec=1s
-
-[Install]
-WantedBy=timers.target
-UNITEOF
+cp server/systemd/alpha-shadow-daily.service server/systemd/alpha-shadow-daily.timer /etc/systemd/system/
+cp server/systemd/alpha-shadow-opening.service server/systemd/alpha-shadow-opening.timer /etc/systemd/system/
 
 systemctl daemon-reload
 systemctl enable --now alpha-shadow-daily.timer alpha-shadow-opening.timer
@@ -123,6 +69,11 @@ echo "REPLACE_ME 换成真实 token（跟现有 GitHub Secrets 里的值一样�
 echo "改完不用重启任何服务，下次定时器触发时会读取最新的 env 文件。"
 echo "=================================================================="
 ```
+
+那四个 `.service`/`.timer` 文件本体在仓库的 `server/systemd/` 目录下，
+跟着 `git pull` 一起拿到本地，上面这段脚本只是把它们 `cp` 到 systemd 认的
+目录，不用在 VNC 终端里粘贴大段带 `{`/`}` 的配置文本（网页 VNC 的粘贴经常
+把这类内容打乱）。
 
 ## 脚本跑完之后，你需要做的事
 

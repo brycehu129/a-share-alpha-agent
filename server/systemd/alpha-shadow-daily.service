@@ -1,0 +1,7 @@
+[Unit]
+Description=Alpha Shadow 盘前/收盘数据整理（替代 daily-agent.yml 的 schedule）
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_daily_agent.sh
