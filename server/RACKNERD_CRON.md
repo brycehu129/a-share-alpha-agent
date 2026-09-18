@@ -92,6 +92,19 @@ echo "=================================================================="
 4. 查看下次触发时间：`systemctl list-timers 'alpha-shadow-*'`。
 5. 日常查日志：`journalctl -u alpha-shadow-daily -u alpha-shadow-opening --since today`。
 
+## 以后改定时任务的时间点或脚本逻辑
+
+改 `server/cron_daily_agent.sh` / `cron_opening_observer.sh` / `cron_common.sh`
+这几个脚本：直接改完 push 就行，脚本每次被 timer 触发时会自己先 `git pull`
+最新代码，不用登服务器。
+
+改 `server/systemd/*.timer`（比如调整触发时间点）：改完 push 后，
+`deploy-racknerd.yml` 现在也会因为这个路径变化自动触发部署（见
+[server/deploy.sh](deploy.sh)，它会把最新的 `.service`/`.timer` 文件
+`cp` 到 `/etc/systemd/system/`、`daemon-reload`、重启两个 timer），同样
+不用手动登服务器。`/opt/alpha-shadow/deploy.sh` 本身是个一次性装好、以后
+不用再改的薄包装，真正的部署逻辑都在仓库的 `server/deploy.sh` 里。
+
 ## 没有做的事 / 已知限制
 
 - 并发保护用的是本机 `flock /var/lock/alpha-shadow-pipeline.lock`，逻辑上

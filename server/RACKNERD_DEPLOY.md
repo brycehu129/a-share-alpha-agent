@@ -80,15 +80,16 @@ systemctl daemon-reload
 systemctl enable --now alpha-shadow-webapp
 systemctl --no-pager status alpha-shadow-webapp | head -5
 
-# 5. 部署脚本（GitHub Actions 会通过SSH触发这个，push一次跑一次）
+# 5. 部署脚本（GitHub Actions 会通过SSH触发这个，push一次跑一次）。真正的
+#    逻辑在仓库里的 server/deploy.sh（跟着 git pull 一起更新），这里装的
+#    只是一个不用再改的薄包装，避免每次改部署逻辑都要重新登服务器。
 cat > /opt/alpha-shadow/deploy.sh <<'DEPLOYEOF'
 #!/bin/bash
 set -euo pipefail
 cd /opt/alpha-shadow
 git fetch origin master --quiet
 git reset --hard origin/master
-systemctl restart alpha-shadow-webapp
-echo "$(date -Is) deployed $(git rev-parse --short HEAD)" >> /var/log/alpha-shadow-deploy.log
+exec bash /opt/alpha-shadow/server/deploy.sh
 DEPLOYEOF
 chmod +x /opt/alpha-shadow/deploy.sh
 

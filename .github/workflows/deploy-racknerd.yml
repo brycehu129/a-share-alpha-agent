@@ -2,7 +2,7 @@ name: 部署到RackNerd
 on:
   push:
     branches: [master]
-    paths: ['server/webapp.py', 'server/wecom_push.py', 'server/dashboard_page.py', 'server/dashboard_template.html', 'Procfile', 'requirements.txt']
+    paths: ['server/webapp.py', 'server/wecom_push.py', 'server/dashboard_page.py', 'server/dashboard_template.html', 'Procfile', 'requirements.txt', 'server/deploy.sh', 'server/systemd/**']
   workflow_dispatch:
 permissions:
   contents: read
