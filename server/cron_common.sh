@@ -36,9 +36,12 @@ export REPORT_ID
 
 # Mirrors the GitHub Actions "git add --all; commit; push" step, but skips
 # quietly instead of erroring when a run produced nothing new to archive.
+# Callers pass either --all or specific paths as "$@" — no `--` separator
+# here, since one would make git treat a literal `--all` argument as a
+# (nonexistent) pathspec instead of the flag.
 commit_and_push() {
   local message="$1"; shift
-  git -C "$HISTORY_DIR" add -- "$@"
+  git -C "$HISTORY_DIR" add "$@"
   if git -C "$HISTORY_DIR" diff --cached --quiet; then
     echo "Nothing to commit for: $message"
     return 0
