@@ -18,40 +18,30 @@
       "finished_at": "2026-09-18T12:56:09.001666+08:00"
     },
     "close": {
-      "id": "20260918091711-1",
+      "id": "20260918101702-1",
       "slot": "close",
       "report_date": "2026-09-18",
       "expected_date": "2026-09-18",
-      "started_at": "2026-09-18T17:17:12.713138+08:00",
-      "updated_at": "2026-09-18T17:26:02.960277+08:00",
-      "status": "partial",
-      "data_date": "2026-09-17",
-      "issues": [
-        "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-        "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
-        "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
-      ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260918091711",
-      "finished_at": "2026-09-18T17:26:02.960277+08:00"
+      "started_at": "2026-09-18T18:17:03.408504+08:00",
+      "updated_at": "2026-09-18T18:17:03.408504+08:00",
+      "status": "running",
+      "data_date": null,
+      "issues": [],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260918101702"
     }
   },
-  "updated_at": "2026-09-18T17:26:02.960277+08:00",
+  "updated_at": "2026-09-18T18:17:03.408504+08:00",
   "latest_run": {
-    "id": "20260918091711-1",
+    "id": "20260918101702-1",
     "slot": "close",
     "report_date": "2026-09-18",
     "expected_date": "2026-09-18",
-    "started_at": "2026-09-18T17:17:12.713138+08:00",
-    "updated_at": "2026-09-18T17:26:02.960277+08:00",
-    "status": "partial",
-    "data_date": "2026-09-17",
-    "issues": [
-      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
-      "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260918091711",
-    "finished_at": "2026-09-18T17:26:02.960277+08:00"
+    "started_at": "2026-09-18T18:17:03.408504+08:00",
+    "updated_at": "2026-09-18T18:17:03.408504+08:00",
+    "status": "running",
+    "data_date": null,
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260918101702"
   },
   "calendar": [
     {
