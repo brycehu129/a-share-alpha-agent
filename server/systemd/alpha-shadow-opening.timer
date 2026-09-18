@@ -2,9 +2,9 @@
 Description=Alpha Shadow 开盘报价观察定时器
 
 [Timer]
-OnCalendar=Asia/Shanghai Mon..Fri 09:31:00
-OnCalendar=Asia/Shanghai Mon..Fri 09:33:00
-OnCalendar=Asia/Shanghai Mon..Fri 09:47:00
+OnCalendar=Mon..Fri 09:31:00 Asia/Shanghai
+OnCalendar=Mon..Fri 09:33:00 Asia/Shanghai
+OnCalendar=Mon..Fri 09:47:00 Asia/Shanghai
 Persistent=false
 AccuracySec=1s
 

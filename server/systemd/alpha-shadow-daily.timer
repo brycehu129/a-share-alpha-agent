@@ -2,11 +2,11 @@
 Description=Alpha Shadow 盘前/收盘数据整理定时器
 
 [Timer]
-OnCalendar=Asia/Shanghai Mon..Fri 07:10:00
-OnCalendar=Asia/Shanghai Mon..Fri 08:40:00
-OnCalendar=Asia/Shanghai Mon..Fri 15:35:00
-OnCalendar=Asia/Shanghai Mon..Fri 18:20:00
-OnCalendar=Asia/Shanghai Mon..Fri 08..20:17:00
+OnCalendar=Mon..Fri 07:10:00 Asia/Shanghai
+OnCalendar=Mon..Fri 08:40:00 Asia/Shanghai
+OnCalendar=Mon..Fri 15:35:00 Asia/Shanghai
+OnCalendar=Mon..Fri 18:20:00 Asia/Shanghai
+OnCalendar=Mon..Fri 08..20:17:00 Asia/Shanghai
 Persistent=false
 AccuracySec=30s
 
