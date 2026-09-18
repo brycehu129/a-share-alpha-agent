@@ -1,19 +1,16 @@
 {
   "reports": {
     "premarket": {
-      "id": "35176531592-1",
+      "id": "35294476141-1",
       "slot": "premarket",
-      "report_date": "2026-09-17",
-      "expected_date": "2026-09-16",
-      "started_at": "2026-09-17T11:00:47.806327+08:00",
-      "updated_at": "2026-09-17T11:05:49.574109+08:00",
-      "status": "ready",
-      "data_date": "2026-09-16",
-      "issues": [
-        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
-      ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35176531592",
-      "finished_at": "2026-09-17T11:05:49.574109+08:00"
+      "report_date": "2026-09-18",
+      "expected_date": "2026-09-17",
+      "started_at": "2026-09-18T09:14:17.587838+08:00",
+      "updated_at": "2026-09-18T09:14:17.587838+08:00",
+      "status": "running",
+      "data_date": null,
+      "issues": [],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35294476141"
     },
     "close": {
       "id": "35232690137-1",
@@ -34,30 +31,20 @@
       "finished_at": "2026-09-17T22:28:31.067908+08:00"
     }
   },
-  "updated_at": "2026-09-17T22:28:31.067908+08:00",
+  "updated_at": "2026-09-18T09:14:17.587838+08:00",
   "latest_run": {
-    "id": "35232690137-1",
-    "slot": "close",
-    "report_date": "2026-09-17",
+    "id": "35294476141-1",
+    "slot": "premarket",
+    "report_date": "2026-09-18",
     "expected_date": "2026-09-17",
-    "started_at": "2026-09-17T22:18:47.994330+08:00",
-    "updated_at": "2026-09-17T22:28:31.067908+08:00",
-    "status": "partial",
-    "data_date": "2026-09-16",
-    "issues": [
-      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
-      "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。",
-      "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35232690137",
-    "finished_at": "2026-09-17T22:28:31.067908+08:00"
+    "started_at": "2026-09-18T09:14:17.587838+08:00",
+    "updated_at": "2026-09-18T09:14:17.587838+08:00",
+    "status": "running",
+    "data_date": null,
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35294476141"
   },
   "calendar": [
-    {
-      "date": "2026-08-18",
-      "state": "open"
-    },
     {
       "date": "2026-08-19",
       "state": "open"
@@ -301,6 +288,10 @@
     {
       "date": "2026-10-18",
       "state": "closed"
+    },
+    {
+      "date": "2026-10-19",
+      "state": "open"
     }
   ],
   "schedule": {
