@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-19T20:19:10.045396+08:00",
+  "exported_at": "2026-09-19T20:19:35.758594+08:00",
   "market": {
     "generated_at": "2026-09-18T15:36:18.194778+08:00",
     "status": "success",
@@ -5727,19 +5727,18 @@
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20260918102524-1",
-      "generated_at": "2026-09-18T18:32:57.510660+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260918102524-1.md"
+      "id": "35442501856-1",
+      "generated_at": "2026-09-19T20:19:35.679400+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35442501856-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-18T18:32:57.510660+08:00",
+    "generated_at": "2026-09-19T20:19:35.679400+08:00",
     "version": "alpha-shadow-0.3-shortterm",
     "status": "ready",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
     "issues": [
-      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。"
+      "开盘观察执行记录；当日净值仍需收盘估值。未用当天完整日线决定成交。"
     ],
     "calibration": {
       "walk_forward_n": 0,
