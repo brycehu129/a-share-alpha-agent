@@ -1,0 +1,11 @@
+[Unit]
+Description=Alpha Shadow 哨兵情景收盘对账定时器
+
+[Timer]
+# 15:00 收盘后留 20 分钟，确保分时接口已经给出完整的当日数据（对账遇到没走完的数据会拒绝下结论）。
+OnCalendar=Mon..Fri 15:20:00 Asia/Shanghai
+Persistent=false
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

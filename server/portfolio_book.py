@@ -12,6 +12,7 @@
 的模拟账本，这个是用户自己报给系统的真实持仓，只用于分析和提醒，系统永远不下单。
 """
 import json
+import math
 import os
 import re
 import tempfile
@@ -22,6 +23,10 @@ from collect_quotes import CST
 SYMBOL_RE = re.compile(r'(sh|sz)\d{6}')
 INTENTS = ('buy', 'watch', 'sell')
 INTENT_LABEL = {'buy': '想买入', 'watch': '观察', 'sell': '想卖出'}
+# 持有类型只是你对这笔持仓的自我声明，系统据此选择措辞和关注点，不据此发明卖出规则——
+# 系统不知道你为什么买，就推导不出什么时候该卖，止损/目标位必须由你自己填。
+HOLD_TYPES = ('short', 'swing', 'long', 'trapped')
+HOLD_TYPE_LABEL = {'short': '短线', 'swing': '波段', 'long': '长期', 'trapped': '套牢待解'}
 MAX_ENTRIES = 200
 
 
@@ -79,6 +84,13 @@ def _lot_size(symbol):
     return 200 if symbol.startswith('sh688') else 100
 
 
+def _optional_positive(form, key, label):
+    raw = form.get(key)
+    if raw is None or str(raw).strip() == '':
+        return None
+    return round(_positive(raw, label), 4)
+
+
 def validate_holding(form):
     symbol = normalize_symbol(form.get('symbol'))
     shares = _positive(form.get('shares'), '持仓数量')
@@ -98,18 +110,48 @@ def validate_holding(form):
         if parsed > datetime.now(CST).date():
             raise BookError('建仓日期不能是未来')
         opened_on = parsed.isoformat()
+    hold_type = (form.get('hold_type') or '').strip() or None
+    if hold_type is not None and hold_type not in HOLD_TYPES:
+        raise BookError('持有类型只能是 ' + '/'.join(HOLD_TYPES))
+    stop_price = _optional_positive(form, 'stop_price', '止损价')
+    target_price = _optional_positive(form, 'target_price', '目标价')
+    if stop_price is not None and target_price is not None and stop_price >= target_price:
+        raise BookError('止损价必须低于目标价')
+    raw_t = form.get('t_base_shares')
+    if raw_t is None or str(raw_t).strip() == '':
+        t_base = 0
+    else:
+        try:
+            value = float(str(raw_t).strip())
+        except ValueError as exc:
+            raise BookError('做T底仓必须是数字') from exc
+        # 先判有限性再取整：int(inf) 会抛 OverflowError，不是 BookError，webapp 会变成 500。
+        if not (math.isfinite(value) and value >= 0 and value == int(value)):
+            raise BookError('做T底仓必须是非负整数股')
+        t_base = int(value)
+    if t_base and (t_base % lot or t_base > shares):
+        # 做T只能用底仓先卖后买：超过持仓的部分卖不出去，提示了也没法执行。
+        raise BookError('做T底仓必须是 %d 股的整数倍且不超过持仓数量' % lot)
     return {'symbol': symbol, 'name': (form.get('name') or '').strip()[:20],
             'shares': shares, 'cost_price': round(_positive(form.get('cost_price'), '成本价'), 4),
             'opened_on': opened_on or None, 'note': (form.get('note') or '').strip()[:200],
-            'updated_at': datetime.now(CST).isoformat()}
+            'hold_type': hold_type, 'stop_price': stop_price, 'target_price': target_price,
+            't_base_shares': t_base, 'updated_at': datetime.now(CST).isoformat()}
 
 
 def validate_watch(form):
     intent = (form.get('intent') or 'watch').strip()
     if intent not in INTENTS:
         raise BookError('关注类型只能是 ' + '/'.join(INTENTS))
+    buy_low = _optional_positive(form, 'buy_low', '买入区间下沿')
+    buy_high = _optional_positive(form, 'buy_high', '买入区间上沿')
+    if (buy_low is None) != (buy_high is None):
+        raise BookError('买入区间需要同时填写下沿和上沿，或者都不填')
+    if buy_low is not None and buy_low >= buy_high:
+        raise BookError('买入区间下沿必须低于上沿')
     return {'symbol': normalize_symbol(form.get('symbol')),
             'name': (form.get('name') or '').strip()[:20], 'intent': intent,
+            'buy_low': buy_low, 'buy_high': buy_high,
             'note': (form.get('note') or '').strip()[:200],
             'added_on': datetime.now(CST).date().isoformat(),
             'updated_at': datetime.now(CST).isoformat()}

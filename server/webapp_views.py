@@ -67,7 +67,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
 @media (max-width:600px){ body{padding:16px 12px 40px;} table{font-size:12px;} }
 """
 
-NAV_ITEMS = [('/dashboard', '看板'), ('/postclose', '盘后分析'), ('/book', '持仓与自选'), ('/', '推送配置')]
+NAV_ITEMS = [('/dashboard', '看板'), ('/sentinel', '哨兵'), ('/postclose', '盘后分析'), ('/book', '持仓与自选'), ('/', '推送配置')]
 
 
 def nav(active):
@@ -157,6 +157,23 @@ def markdown_to_html(text):
 
 # --- 持仓 / 自选股管理页 ------------------------------------------------
 
+def _declared(h):
+    """把你声明过的信息压成一行：只列出你真的填了的，没填的不显示（也就不会触发对应提醒）。"""
+    import portfolio_book
+    parts = []
+    if h.get('hold_type'):
+        parts.append(portfolio_book.HOLD_TYPE_LABEL.get(h['hold_type'], h['hold_type']))
+    if h.get('stop_price'):
+        parts.append('止损 %s' % h['stop_price'])
+    if h.get('target_price'):
+        parts.append('目标 %s' % h['target_price'])
+    if h.get('t_base_shares'):
+        parts.append('做T底仓 %d' % h['t_base_shares'])
+    if h.get('note'):
+        parts.append(h['note'])
+    return ' · '.join(parts)
+
+
 def render_book_page(holdings, watchlist, quotes=None, message='', error=False):
     import portfolio_book
     quotes = quotes or {}
@@ -185,7 +202,7 @@ def render_book_page(holdings, watchlist, quotes=None, message='', error=False):
             % (html.escape(h.get('name') or h['symbol']), h['symbol'], h['shares'],
                h['cost_price'], ('%.2f' % last) if last else '—',
                cls, ('%+.2f%%' % pct) if pct is not None else '—',
-               html.escape(h.get('note') or ''), html.escape(h['symbol'])))
+               html.escape(_declared(h)), html.escape(h['symbol'])))
     summary = ''
     if total_cost and total_value:
         pnl = total_value - total_cost
@@ -230,7 +247,14 @@ def render_book_page(holdings, watchlist, quotes=None, message='', error=False):
       <div><label>成本价</label><input type="text" name="cost_price" placeholder="1300.00" required></div>
       <div><label>建仓日期（可选）</label><input type="text" name="opened_on" placeholder="2026-09-01"></div>
       <div><label>备注（可选）</label><input type="text" name="note"></div>
+      <div><label>持有类型（可选）</label><select name="hold_type">
+        <option value="">不声明</option><option value="short">短线</option><option value="swing">波段</option>
+        <option value="long">长期</option><option value="trapped">套牢待解</option></select></div>
+      <div><label>止损价（可选）</label><input type="text" name="stop_price" placeholder="不填就不提醒止损"></div>
+      <div><label>目标价（可选）</label><input type="text" name="target_price" placeholder="不填就不提醒目标"></div>
+      <div><label>做T底仓（股，可选）</label><input type="text" name="t_base_shares" placeholder="0 = 不做T"></div>
     </div>
+    <p class="muted">系统不知道你为什么买，所以止损/目标/做T底仓必须由你自己声明；不填的那类提醒就不触发。</p>
     <button class="primary" type="submit">保存持仓</button>
     <span class="muted">同一只股票再次保存即覆盖。</span>
   </form>
@@ -247,6 +271,8 @@ def render_book_page(holdings, watchlist, quotes=None, message='', error=False):
       <div><label>名称（可选）</label><input type="text" name="name"></div>
       <div><label>关注类型</label><select name="intent">{intent_options}</select></div>
       <div><label>备注（可选）</label><input type="text" name="note"></div>
+      <div><label>买入区间下沿（可选）</label><input type="text" name="buy_low"></div>
+      <div><label>买入区间上沿（可选）</label><input type="text" name="buy_high"></div>
     </div>
     <button class="primary" type="submit">加入自选</button>
   </form>

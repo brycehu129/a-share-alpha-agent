@@ -166,6 +166,25 @@ class CompleteJsonTests(unittest.TestCase):
         self.assertEqual(sent['system'][0]['cache_control'], {'type': 'ephemeral'})
         self.assertEqual(sent['messages'], [{'role': 'user', 'content': '今日数据'}])
 
+    def test_bounded_callers_can_disable_sdk_retries(self):
+        """SDK 默认 2 次重试：超时 600 秒 × 3 次，远超任何有 systemd 时限的定时任务。"""
+        fake = FakeAnthropicModule(FakeMessage('{"ok": true}'))
+        seen = {}
+        orig = fake.Anthropic
+
+        class Spy(orig):
+            def __init__(self, **kw):
+                seen.update(kw)
+                super().__init__(**kw)
+        fake.Anthropic = Spy
+        with with_fake(fake):
+            claude_client.complete_json('s', 'u', {}, timeout=100, max_retries=0)
+        self.assertEqual((seen['timeout'], seen['max_retries']), (100, 0))
+        seen.clear()
+        with with_fake(fake):
+            claude_client.complete_json('s', 'u', {})
+        self.assertNotIn('max_retries', seen)                 # 不指定就沿用 SDK 默认
+
     def test_truncated_output_is_rejected_not_half_parsed(self):
         fake = FakeAnthropicModule(FakeMessage('{"partial": ', stop_reason='max_tokens'))
         with with_fake(fake):

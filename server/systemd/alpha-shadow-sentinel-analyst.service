@@ -1,0 +1,12 @@
+[Unit]
+Description=Alpha Shadow 哨兵情景研判（待研判队列 → Claude → 校验 → 留档 → 推送）
+After=network-online.target
+
+[Service]
+Type=oneshot
+# ANTHROPIC_API_KEY / PRIVATE_DATA_DIR / CONFIG_PATH 都在这个文件里。没有 key 时任务照常
+# 完成，只是把待研判事件标为 no_ai；规则层告警不受影响（那是另一个进程）。
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_sentinel_analyst.sh
+# 单次 AI 调用最多等 100 秒且不重试（见 scenario_analyst.ANALYSIS_TIMEOUT_S），加上取报价和推送。
+TimeoutStartSec=150

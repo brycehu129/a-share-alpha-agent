@@ -225,9 +225,14 @@ def apply_signals(state, signals, quotes, now):
     才提交状态**。被上限挤掉的不标记已推——下一轮它们仍是"从未推过/刚转真"，会顺延推出，
     而不是悄悄丢失。返回 (events, deferred_keys, flap_suppressed_keys)。"""
     now_iso = now.isoformat()
-    plan, flapped = [], []
+    plan, flapped, seen = [], [], set()
     for raw in signals:
         sig = normalize_signal(raw)
+        if sig['key'] in seen:
+            # 同一个 key 在同一轮出现两次（比如两个评估器都汇报了它）：只认第一条。
+            # 否则两条会各自判定为"从未推过"，同一件事推两次；而且状态提交阶段还会互相覆盖。
+            continue
+        seen.add(sig['key'])
         rec = state['signals'].setdefault(sig['key'], {
             'active': False, 'carry': sig['carry'], 'fired': 0,
             'last_fired_at': None, 'inactive_since': None})
@@ -320,7 +325,7 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
     minute_fn = minute_fn or minute_data.fetch_minute
     evaluators = EVALUATORS if evaluators is None else evaluators
     started = _time.monotonic()
-    summary = {'at': now.isoformat(), 'ran': False}
+    summary = {'at': now.isoformat(), 'ran': False, 'dry_run': dry_run}
 
     if calendar_fn is None:
         from session_brief import calendar_state
@@ -419,13 +424,20 @@ def main():
     # 挂上条件执行器（exec-0.2）。它需要盯的股票——今天还在观察的计划和所有持仓——在通过
     # 时段闸门之后才去读，所以 symbols 传的是函数。
     import conditional_exec
+    import sentinel as sentinel_mod
     executor = conditional_exec.attach(a.history)
+    watcher = sentinel_mod.Sentinel(a.history)          # 自选股哨兵：持仓/自选 → 规则信号 → 告警
+    register(watcher.evaluate)
 
     def symbols():
-        base = explicit if explicit is not None else default_symbols()
+        base = explicit if explicit is not None else watcher.symbols()
         return sorted(set(base) | set(executor.watch_symbols(datetime.now(CST), dry_run=a.dry_run)))
 
     result = run_tick(a.history, symbols, force=a.force_session, dry_run=a.dry_run)
+    # 告警在这里推，而不是在评估器里：评估器只汇报"条件成不成立"，推不推由引擎去重之后才知道。
+    # 只推快的（规则层事实）；慢的 AI 情景研判由 sentinel.py analyze 独立进程处理。
+    if result.get('ran'):
+        result['sentinel'] = watcher.after_tick(result)
     if a.json:
         print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     else:
@@ -442,6 +454,8 @@ def main():
                 print('  事件 [%s] %s %s：%s' % (e['severity'], e['symbol'], e['kind'], e['detail']))
             for err in result['evaluator_errors']:
                 print('  评估器异常: ' + err)
+            if result.get('sentinel', {}).get('alerts'):
+                print('  哨兵告警 %d 条，推送：%s' % (result['sentinel']['alerts'], result['sentinel'].get('push')))
     return 0 if result.get('ran') or result.get('skipped') else 1
 
 

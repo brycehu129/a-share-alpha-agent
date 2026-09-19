@@ -73,9 +73,13 @@ def price_facts(bars, quote):
     window = closes + [last]
     facts['ma5'] = round(statistics.mean(window[-5:]), 4)
     facts['ma20'] = round(statistics.mean(window[-20:]), 4)
+    if len(window) >= 60:                 # 不足60根就不给 MA60，而不是拿短窗口的均值冒充
+        facts['ma60'] = round(statistics.mean(window[-60:]), 4)
+        facts['ma60_deviation_pct'] = round((last / facts['ma60'] - 1) * 100, 4)
     facts['ma5_deviation_pct'] = round((last / facts['ma5'] - 1) * 100, 4)
     facts['ma20_deviation_pct'] = round((last / facts['ma20'] - 1) * 100, 4)
     high20 = max(closes[-20:])
+    facts['low20_close'] = round(min(closes[-20:]), 4)
     facts['high20_close'] = round(high20, 4)
     facts['high20_ratio'] = round(last / high20, 4)
     facts['distance_to_high20_pct'] = round((last / high20 - 1) * 100, 4)
@@ -160,9 +164,15 @@ def holding_facts(holding, quote):
     cost, shares = float(holding['cost_price']), int(holding['shares'])
     value = round(last * shares, 2)
     pnl = round((last - cost) * shares, 2)
+    stop, target = holding.get('stop_price'), holding.get('target_price')
     return {'shares': shares, 'cost_price': cost, 'market_value': value,
             'unrealized_pnl': pnl, 'unrealized_pct': round((last / cost - 1) * 100, 4),
-            'opened_on': holding.get('opened_on'), 'note': holding.get('note') or None}
+            'opened_on': holding.get('opened_on'), 'note': holding.get('note') or None,
+            # 用户自己声明的：不填就是 None，下游据此决定这类信号触不触发，绝不代填默认值。
+            'hold_type': holding.get('hold_type'), 'stop_price': stop, 'target_price': target,
+            't_base_shares': holding.get('t_base_shares') or 0,
+            'to_stop_pct': round((last / stop - 1) * 100, 4) if stop else None,
+            'to_target_pct': round((target / last - 1) * 100, 4) if target else None}
 
 
 def check(history, quotes, holdings=None, watchlist=None, agent=None):

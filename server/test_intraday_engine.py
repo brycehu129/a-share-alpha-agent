@@ -63,6 +63,13 @@ class SignalDecisionTests(unittest.TestCase):
         e3, _, _ = self.fire(st, [sig(True)], at(10, 2))
         self.assertEqual((len(e1), len(e2), len(e3)), (1, 0, 0))
 
+    def test_duplicate_keys_in_one_tick_fire_once(self):
+        """两个评估器都汇报了同一个 key（比如一只股票既是持仓又在自选）：只能推一次。"""
+        st = ie.new_state('2026-09-21')
+        events, _, _ = self.fire(st, [sig(True), sig(True), sig(True, detail='另一个评估器')], at(10, 0))
+        self.assertEqual(len(events), 1)
+        self.assertEqual(st['signals']['k']['fired'], 1)
+
     def test_inactive_signal_never_fires(self):
         st = ie.new_state('2026-09-21')
         self.assertEqual(self.fire(st, [sig(False)], at(10, 0))[0], [])

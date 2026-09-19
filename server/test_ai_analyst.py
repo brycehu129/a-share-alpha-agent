@@ -78,6 +78,21 @@ class PromptTests(unittest.TestCase):
         self.assertIn(str(BREAKOUT['return3_min']), prompt)
         self.assertIn(str(SHORT_POLICY['hold_sessions']), prompt)
 
+    def test_holdings_are_not_judged_by_the_candidate_pools_rules(self):
+        """早先这份提示词把"最长持有3个交易日、止损3%止盈5%"拿来衡量用户自己买的票——
+        而系统根本不知道用户为什么买。"""
+        p = ai_analyst.system_prompt()
+        self.assertIn('只适用于候选池，不适用于用户的持仓', p)
+        self.assertIn('不知道用户为什么买', p)
+        self.assertIn('没声明的就是没设', p)
+        self.assertNotIn('最长持有', p)
+        self.assertNotIn('止损3%', p)
+
+    def test_swing_t_is_gone_from_holding_verdicts(self):
+        """盘后报告没有日内高低点/均价线/底仓，"适合做T"完全是凭空的。"""
+        self.assertNotIn('swing_t', ai_analyst.HOLDING_VERDICTS)
+        self.assertNotIn('swing_t', json.dumps(ai_analyst.SCHEMA))
+
     def test_prompt_refuses_to_present_scores_as_win_rates(self):
         self.assertIn('不是胜率', ai_analyst.system_prompt())
 

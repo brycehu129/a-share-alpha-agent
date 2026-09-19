@@ -1,0 +1,11 @@
+[Unit]
+Description=Alpha Shadow 哨兵情景研判定时器（每分钟第30秒）
+
+[Timer]
+# 错开 intraday 的整分钟：告警先发，研判随后追加。写法同 intraday.timer，只求最不容易出错。
+OnCalendar=Mon..Fri 09..15:*:30 Asia/Shanghai
+Persistent=false
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

@@ -14,10 +14,12 @@ import json
 
 from shortterm_model import BREAKOUT, PULLBACK, SHORT_POLICY, SELECTION_VERSION as STRATEGY_VERSION
 
-PROMPT_VERSION = 'postclose-analyst-1'
+PROMPT_VERSION = 'postclose-analyst-2'
 
 CANDIDATE_VERDICTS = ['buy_tomorrow', 'watch', 'pass']
-HOLDING_VERDICTS = ['hold', 'add', 'reduce', 'exit', 'swing_t']
+# 持仓判断里没有 swing_t（做T）：盘后报告没有日内高低点、均价线这类支撑数据，模型给出"适合做T"
+# 完全是凭空的。做T提示只在盘中哨兵里出现，那里有分时数据和用户声明的底仓（见 sentinel_rules.t_signals）。
+HOLDING_VERDICTS = ['hold', 'add', 'reduce', 'exit']
 
 # 结构化输出只接受 JSON Schema 的一个子集：type / enum / description / title /
 # properties / required / additionalProperties / items / minItems(仅0或1) /
@@ -80,7 +82,7 @@ SCHEMA = {
         'candidates': {'type': 'array', 'items': _judgement(
             CANDIDATE_VERDICTS, 'buy_tomorrow=明日开盘可考虑按计划买入；watch=继续观察不动手；pass=这轮放弃')},
         'holdings': {'type': 'array', 'items': _judgement(
-            HOLDING_VERDICTS, 'hold=继续持有；add=可考虑加仓；reduce=减仓；exit=清仓；swing_t=适合做T')},
+            HOLDING_VERDICTS, 'hold=继续持有；add=可考虑加仓；reduce=减仓；exit=清仓')},
         'data_caveats': {'type': 'array', 'items': {'type': 'string'},
                          'description': '本次输入里缺失或可疑的数据，以及它们如何限制上面的判断；最多8条'},
     },
@@ -93,7 +95,7 @@ def system_prompt():
     """策略口径直接写进提示词，让模型的研判和规则层对齐，而不是自由发挥。"""
     return f"""你是一个A股盘后分析助手，服务于一套已经在运行的量化研究系统。
 
-# 这套系统的策略口径（版本 {STRATEGY_VERSION}）
+# 这套系统的策略口径（版本 {STRATEGY_VERSION}）——**只适用于候选池，不适用于用户的持仓**
 
 候选股来自两条互相独立、分别校准的规则track，都只在**已收盘**的日线上筛选：
 
@@ -103,10 +105,9 @@ def system_prompt():
 - **回调反弹(pullback)**：行业强度前10%；20日超额为正（已确认中期强势）；近2日回调≤{PULLBACK['return2_max']}%；
   回调缩量（量比≤{PULLBACK['volume_ratio_20d_max']}）；MA20偏离在0–{PULLBACK['deviation_max']}%；当日收阳确认。
 
-持仓规则：最多{SHORT_POLICY['max_positions']}只，单只最多{SHORT_POLICY['max_weight']*100:.0f}%仓位，
-止损{SHORT_POLICY['stop_pct']*100:.0f}%、止盈{SHORT_POLICY['target_pct']*100:.0f}%、
-最长持有{SHORT_POLICY['hold_sessions']}个交易日。买入只在次日09:30–09:35窗口按冻结计划的
-±{SHORT_POLICY['entry_gap_max']*100:.0f}%入场带执行，错过就跳过不补买。
+候选池的虚拟账户规则（**与用户自己的持仓无关**）：最多{SHORT_POLICY['max_positions']}只，
+单只最多{SHORT_POLICY['max_weight']*100:.0f}%仓位；买入由盘中引擎按冻结计划的条件触发，
+当日未触发即过期，不补买。
 
 候选的"综合分"是规则打分，**不是胜率**。附带的概率如果标注为"有回看偏差的历史研究"，
 说明它来自用当前名单回看历史的统计，存在幸存者偏差，不能当作真实胜率。
@@ -114,6 +115,12 @@ def system_prompt():
 # 你的任务
 
 基于用户消息里的结构化事实，给出：当天大盘情况、候选池逐只研判、持仓逐只研判。
+
+**持仓的判断和候选池是两回事。** 你不知道用户为什么买这只股票，所以：
+- 不要拿上面候选池的规则（track 门槛、持有期、止损止盈比例）去衡量用户的持仓；
+- 只依据 `holding` 里**用户自己声明**的信息：成本价、持有类型(hold_type)、止损价、目标价。
+  没声明的就是没设——不要替用户设一个止损位，也不要说"应该止损在X"；
+- 持有类型是"长期"的，不要按短线的标准建议减仓；"套牢待解"的，低于成本价是常态而不是危险信号。
 
 # 硬性要求
 

@@ -52,7 +52,7 @@ def available():
 
 
 def complete_json(system, user_content, schema, model=None, effort=None,
-                  max_tokens=MAX_TOKENS, timeout=TIMEOUT_SECONDS):
+                  max_tokens=MAX_TOKENS, timeout=TIMEOUT_SECONDS, max_retries=None):
     """要求模型按 json_schema 返回结构化结果，返回 (数据, 元信息)。
 
     用结构化输出而不是"请你输出JSON"的提示词，是因为后面几期要按这些字段自动
@@ -70,7 +70,9 @@ def complete_json(system, user_content, schema, model=None, effort=None,
 
     model = model or MODEL
     started = datetime.now(CST)
-    client = anthropic.Anthropic(timeout=timeout)
+    # SDK 默认带 2 次重试：超时 600 秒 × 3 次，远超任何一个有 systemd 时限的定时任务。
+    # 有时限的调用方显式传 max_retries=0，让"总耗时 ≤ timeout"成立。
+    client = anthropic.Anthropic(timeout=timeout, **({} if max_retries is None else {'max_retries': max_retries}))
     try:
         with client.messages.stream(
             model=model,

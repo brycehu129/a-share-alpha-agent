@@ -1,0 +1,9 @@
+[Unit]
+Description=Alpha Shadow 哨兵情景收盘对账
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_sentinel_reconcile.sh
+TimeoutStartSec=300

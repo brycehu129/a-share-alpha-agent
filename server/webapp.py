@@ -205,6 +205,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send_html(200, self._book_page())
             return
+        if self.path.split("?")[0] in ("/sentinel", "/sentinel/"):
+            if not self._require_auth():
+                return
+            import sentinel_view
+            from urllib.parse import parse_qs as _qs
+            day = (_qs(self.path.partition("?")[2]).get("day") or [None])[0]
+            self._send_html(200, sentinel_view.render_sentinel_page(day))
+            return
         if self.path in ("/postclose", "/postclose/"):
             if not self._require_auth():
                 return
