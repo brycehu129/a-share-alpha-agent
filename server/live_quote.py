@@ -19,6 +19,7 @@
 盘后分析来说只需要"昨夜涨跌多少"，不需要精确到秒的新鲜度。
 """
 import argparse
+import hashlib
 import json
 import re
 import time
@@ -40,7 +41,7 @@ COMMON = {'name': 1, 'code': 2, 'last': 3, 'previous_close': 4, 'open': 5,
           'quote_time': 30, 'change': 31, 'change_pct': 32, 'high': 33, 'low': 34}
 
 # 只有 A 股（含 A 股指数）才有的字段下标。
-CN_EXTRA = {'volume_hand': 36, 'amount_wan': 37, 'turnover_pct': 38, 'pe': 39,
+CN_EXTRA = {'volume_raw': 36, 'amount_wan': 37, 'turnover_pct': 38, 'pe': 39,
             'amplitude_pct': 43, 'float_cap_yi': 44, 'total_cap_yi': 45, 'pb': 46,
             'limit_up': 47, 'limit_down': 48, 'volume_ratio': 49}
 
@@ -150,6 +151,11 @@ def parse_one(body, symbol, fetched_at):
     # 前三位相同，只有前缀+市场能分开：沪市股票是 6xxxxx/688xxx，sh000/sh880 必是指数；
     # 深市 sz399 必是指数，sz000/001/002/003 是股票。
     quote['is_index'] = symbol.startswith(('sh000', 'sh880', 'sz399'))
+    # 成交量单位不统一：科创板(sh688)返回"股"，其余沪深个股返回"手"(100股)。实测
+    # sh688061 累计量 2500240 对应成交额 1.13 亿、价格 45 元——只可能是股。字段原先
+    # 叫 volume_hand，对科创板是错的；现在叫 volume_raw 并显式标注单位。指数的成交量
+    # 单位另有口径，这里不断言。
+    quote['volume_unit'] = None if quote['is_index'] else ('share' if symbol.startswith('sh688') else 'hand')
     return quote
 
 
@@ -219,7 +225,12 @@ def snapshot(symbols, now=None, batch_size=BATCH_SIZE, pause=0.2):
         started = datetime.now(CST)
         try:
             raw = request(url)
+            batch_hash = hashlib.sha256(raw).hexdigest()
             quotes, failures = parse_batch(raw, batch, datetime.now(CST))
+            for q in quotes:
+                # 事件要能追溯到"哪一次响应"：同批报价共用一个哈希与采集时刻。
+                q['batch_sha256'] = batch_hash
+                q['batch_fetched_at'] = started.isoformat()
             result['quotes'].extend(quotes)
             result['failures'].extend(failures)
             status = 'success' if not failures else 'partial'

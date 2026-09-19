@@ -1,0 +1,11 @@
+[Unit]
+Description=Alpha Shadow 盘中轮询（实时报价 → 信号 → 事件）
+After=network-online.target
+
+[Service]
+Type=oneshot
+# PRIVATE_DATA_DIR / CONFIG_PATH 等都在这个文件里；状态与日志落在其下的 intraday/，不进 git。
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_intraday.sh
+# 一分钟一轮：超过 50 秒的一轮直接杀掉，别拖到下一轮去和它重叠。
+TimeoutStartSec=50

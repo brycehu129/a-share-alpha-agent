@@ -1,0 +1,13 @@
+[Unit]
+Description=Alpha Shadow 盘中轮询定时器（每分钟）
+
+[Timer]
+# 故意只写最不容易出错的形式：工作日 09–15 点每分钟。09:00–09:29、11:31–12:59、15:03 之后
+# 的多余触发由引擎自己的时段闸门在读任何网络之前就退出（每次约几十毫秒），
+# 比在这里手写一堆容易写错的分钟区间可靠——这个仓库刚因为 OnCalendar 时区写法修过一次。
+OnCalendar=Mon..Fri 09..15:*:00 Asia/Shanghai
+Persistent=false
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

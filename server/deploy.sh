@@ -18,9 +18,10 @@ systemctl restart alpha-shadow-webapp
 cp server/systemd/alpha-shadow-daily.service server/systemd/alpha-shadow-daily.timer /etc/systemd/system/
 cp server/systemd/alpha-shadow-opening.service server/systemd/alpha-shadow-opening.timer /etc/systemd/system/
 cp server/systemd/alpha-shadow-postclose.service server/systemd/alpha-shadow-postclose.timer /etc/systemd/system/
+cp server/systemd/alpha-shadow-intraday.service server/systemd/alpha-shadow-intraday.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now alpha-shadow-daily.timer alpha-shadow-opening.timer alpha-shadow-postclose.timer
-systemctl restart alpha-shadow-daily.timer alpha-shadow-opening.timer alpha-shadow-postclose.timer
+systemctl enable --now alpha-shadow-daily.timer alpha-shadow-opening.timer alpha-shadow-postclose.timer alpha-shadow-intraday.timer
+systemctl restart alpha-shadow-daily.timer alpha-shadow-opening.timer alpha-shadow-postclose.timer alpha-shadow-intraday.timer
 
 echo "$(date -Is) deployed $(git rev-parse --short HEAD)" >> /var/log/alpha-shadow-deploy.log
 
