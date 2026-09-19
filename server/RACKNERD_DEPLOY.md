@@ -158,3 +158,19 @@ echo "=================================================================="
 - 失败会：记下原因并在配置页标"需要留意"、推一条企业微信；超过 36 小时没有新的成功快照也会标警告。
 - 命令：`python3 server/backup.py snapshot | list | verify [归档] | restore 归档 --to server/data/private [--force]`。恢复默认**拒绝覆盖**内容不同的文件，解包时逐个成员检查路径（不允许绝对路径、`..`、链接）。
 - 部署后第一次定时器触发在当天 17:30；想立刻确认：`systemctl start alpha-shadow-backup && journalctl -u alpha-shadow-backup -n 20`。
+
+## 系统健康告警（`health_check.py`）
+
+`alpha-shadow-health.timer` 每 5 分钟检查一遍，出问题推企业微信。**看产出，不看退出码**：盘中引擎最后一轮是不是 4 分钟内、今天的日线报告有没有生成、盘后报告有没有 AI 研判、情景对账、备份、systemd 失败单元、磁盘、HTTPS 证书有效期、行情源质量、评估器报错、研判队列积压、AI key/余额……
+
+- **克制**：`warn` 要连续两次才推、`crit` 立即推；同一问题 crit 每 2 小时最多提醒一次、warn 每 12 小时一次；夜间（22:30–07:00）只发首次 crit；问题消失推"已恢复"；多个问题合并成一条；非交易日、午休、开盘前不会因为"引擎没在跑"报警。
+- **`skip` 不算恢复**：报警窗口结束时检查变成"未检查"，不会误报"已恢复"。
+- **入口不先跑测试、不取锁**（同备份）：检查器要在别的东西坏掉时照常工作。
+- 后台"推送配置"页有"系统健康"面板：每项检查的当前状态、最近一次告警是否送达、检查器自己的心跳（超过 20 分钟没运行会明说"没人在盯着系统了"）。
+- 命令：`python3 server/health_check.py status`（最近结果）、`python3 server/health_check.py run --no-send`（现场检查一遍，不推送、不写状态）。
+
+**局限**：
+1. 检查器和被检查的系统在同一台机器上，**机器整个挂了它发不出告警**。补救是**外部心跳**：`/health/deep`（不需要登录，只返回 `ok` / `stale` / `critical`，不含任何细节），仓库里的 `.github/workflows/health-ping.yml` 每 30 分钟从 GitHub 一侧访问它，非 200 就让这次运行失败，GitHub 会给你发失败邮件。它只是"活着且没有严重问题"的粗探测；GitHub 定时任务可能延迟几十分钟，仓库 60 天无活动会被自动停用。
+2. 没配企业微信 webhook 时告警**发不出去**（页面和检查里都会明说）。
+3. 阈值（4 分钟、两次去抖、2/12 小时）是经验值，没在真实盘中校准过，第一周很可能要调。
+- 部署后确认：`systemctl list-timers | grep alpha-shadow-health`，`python3 server/health_check.py run --no-send`。

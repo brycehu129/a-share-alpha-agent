@@ -35,6 +35,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import backup
 import exec_spec
+import health_check
 import llm_settings
 import portfolio_book
 import webapp_views
@@ -195,6 +196,39 @@ def render_backup_panel(message="", error=False):
 </div>"""
 
 
+LEVEL_TEXT = {"ok": "正常", "warn": "注意", "crit": "严重", "skip": "未检查"}
+
+
+def render_health_panel():
+    s = health_check.summary()
+    if s["heartbeat_age_min"] is None:
+        head = '<span class="pill status-wait">尚未运行</span> 健康检查还没有运行过（部署后 5 分钟内第一次触发）。'
+    elif s["stale"]:
+        head = ('<span class="pill status-wait">已停止</span> 健康检查已 %d 分钟没有运行——<b>没人在盯着系统了</b>，'
+                "请在服务器上看 systemctl status alpha-shadow-health.timer。" % s["heartbeat_age_min"])
+    else:
+        head = '<span class="pill %s">%s</span> 最近一次检查 %d 分钟前。' % (
+            "status-wait" if s["critical"] else "status-ready", "有严重问题" if s["critical"] else "运行中", s["heartbeat_age_min"])
+    rows = "".join(
+        '<tr><td>%s</td><td>%s</td><td class="hint" style="margin:0">%s</td></tr>' % (
+            html.escape(c["title"]), LEVEL_TEXT.get(c["level"], html.escape(c["level"])), html.escape(c["message"]))
+        for c in sorted(s["checks"], key=lambda c: {"crit": 0, "warn": 1, "ok": 2, "skip": 3}.get(c["level"], 4)))
+    delivery = s.get("last_delivery")
+    dline = ""
+    if delivery:
+        dline = '<p class="hint">%s最近一次告警推送（%s）：%s</p>' % (
+            "" if delivery["ok"] else "<b>未送达！</b>", html.escape(delivery["at"][:16].replace("T", " ")),
+            "已送达" if delivery["ok"] else html.escape(delivery["reason"]))
+    return f"""<div class="panel">
+  <h2>系统健康</h2>
+  <p>{head}</p>{dline}
+  <table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>{rows or '<tr><td class="hint">暂无检查结果</td></tr>'}</tbody></table>
+  <p class="hint">每 5 分钟检查一遍：看的是"该出现的产出有没有出现"（盘中引擎最后一轮、日线报告、盘后 AI 研判、备份、证书、磁盘……），
+  不只是进程有没有退出。问题会推企业微信（warn 要连续两次才推，crit 立即推）。<b>这台机器整个挂了它发不出告警</b>——
+  仓库里的 GitHub Actions 会定期访问 /health/deep，异常时 GitHub 给你发邮件。</p>
+</div>"""
+
+
 def render_page(message="", llm=None, backup_message=None):
     config = load_config(config_path())
     masked = mask_webhook_url(config.get("webhook_url"))
@@ -263,6 +297,7 @@ pre.check.bad{{background:#fbeae8;color:#a1281f;}}
 </div>
 {render_llm_panel(**(llm or {}))}
 {render_backup_panel(**(backup_message or {}))}
+{render_health_panel()}
 <p class="footer-note">由 GitHub Actions 自动部署（push 到 master 后自动生效）</p>
 </body></html>"""
 
@@ -327,6 +362,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self._send_html(200, "ok")
+            return
+        if self.path == "/health/deep":
+            # 不需要登录，只给外部心跳用：只返回 ok / stale / critical，不含任何细节。
+            code, text = health_check.deep_status()
+            self._send_html(code, text)
             return
         if self.path in ("/dashboard", "/dashboard/"):
             if not self._require_auth():

@@ -13,6 +13,7 @@ from collect_quotes import CST
 from dashboard_export import latest
 from hotmoney_features import load as load_hotmoney
 from review_pipeline import current_tuning
+import baseline
 import contract_labels
 from exec_spec import EXEC_MODE, build_spec, execution_version
 from shortterm_model import (SELECTION_VERSION, ARCHIVE_SIZE, TARGET,
@@ -132,7 +133,7 @@ def run(history, run_id, exec_revision=None, exec_account=None):
               'generated_at': now.isoformat(), 'status': 'waiting_data',
               'target': TARGET, 'policy': POLICY, 'mid_policy': MID_POLICY, 'issues': [], 'screen': None,
               'candidates': [], 'calibration': None, 'calibration_short': None, 'portfolio': None,
-              'forecasts': [], 'outcomes': [], 'source_hashes': {}, 'evidence': None, 'exec02': None}
+              'forecasts': [], 'outcomes': [], 'source_hashes': {}, 'evidence': None, 'exec02': None, 'baseline': None}
     master_path = history / 'tushare_data/stock_basic.json'
     benchmark_path = root / 'series/sh000300.json'
     previous_path, previous = latest(history, 'agent')
@@ -209,6 +210,13 @@ def run(history, run_id, exec_revision=None, exec_account=None):
     except Exception as exc:
         report['evidence'] = None
         report['issues'].append('证据三层（合约模拟/反事实）本轮计算失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
+    # 随机基线：同样是可选研究层，出错只记 issue。抽样在这里冻结（15:35 的截止日数据），标签等日线走完才算。
+    try:
+        report['baseline'] = baseline.run_daily(history, stocks, series, benchmark, cutoff, screened['complete'],
+                                                forecasts, outcomes, now, SELECTION_VERSION, immutable, read)
+    except Exception as exc:
+        report['baseline'] = None
+        report['issues'].append('随机基线本轮计算失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
     # 3天窗口的验收按**选股版本**再切一刀，不能只看 horizon：0.3 和 0.4 窗口相同，
     # 但筛选规则不同，混进一个池子算出的胜率哪个版本都不代表。
     live_short, legacy_short = split_short_pools(outcomes)
@@ -368,6 +376,8 @@ def render(r):
         lines += conditional_exec.render_account(r['exec02'])
     if r.get('evidence'):
         lines += contract_labels.render(r['evidence'])
+    if r.get('baseline'):
+        lines += baseline.render(r['baseline'])
     lines += ['## 预测验收', '', f'冻结预测 {len(r["forecasts"])} 条；已验收记录 {len(r["outcomes"])} 条。预测标签与实际虚拟成交盈亏分开统计。', '',
               '验收等待真实交易日自然到期；跳过成交不删除预测。错误归因先展示可计算结果，因果判断留待复核，不编造责任百分比。', '']
     cs = r.get('calibration_short') or {}

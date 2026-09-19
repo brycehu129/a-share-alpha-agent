@@ -1,0 +1,12 @@
+[Unit]
+Description=Alpha Shadow 系统健康检查定时器（每 5 分钟，全天）
+
+[Timer]
+# 明确列出分钟，不用 */5 之类的简写——这个仓库刚因为 OnCalendar 写法修过一次。全天都跑：备份、日线流程、证书、
+# 磁盘这些不在盘中；引擎相关的检查在自己内部按交易日和时段决定查不查。
+OnCalendar=*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00 Asia/Shanghai
+Persistent=false
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

@@ -329,6 +329,14 @@ td.rank{color:var(--ink-3); font-weight:600;}
     <div id="evidenceBody"></div>
   </section>
 
+  <section class="panel baseline-panel">
+    <div class="panel-head">
+      <h2>随机基线（策略选股 vs 随手抽样）</h2>
+      <span class="panel-sub" id="baselineSub"></span>
+    </div>
+    <div id="baselineBody"></div>
+  </section>
+
   <section class="panel board-panel">
     <div class="panel-head">
       <h2>游资龙虎榜 / 涨跌停池</h2>
@@ -569,6 +577,41 @@ function renderEvidence(ev){
   body.innerHTML = html;
 }
 
+const BASELINE_VERDICT = {better:'策略优于随机', worse:'策略不如随机', indistinguishable:'目前无法区分策略与随机'};
+
+function baselineBlock(b, title){
+  if(!b) return `<div class="sub-block"><h3>${esc(title)}</h3><div class="empty-state">暂无数据。</div></div>`;
+  const p = b.primary_result;
+  const verdict = p && p.verdict ? BASELINE_VERDICT[p.verdict] : '样本不足';
+  const detail = p && p.mean!==null && p.mean!==undefined ? `（差值 ${fmtNum(p.mean,2)} pp，95% 区间 [${fmtNum(p.low,2)}, ${fmtNum(p.high,2)}]，${p.days} 个日期组）` : '';
+  let rows = '';
+  Object.values(b.baselines||{}).forEach(base=>{
+    const br = base.base_rate;
+    const baseText = br ? `${br.win_rate_pct}% / ${fmtNum(br.mean_return_pct,2)}% / ${fmtNum(br.mean_excess_pp,2)} pp` : `样本不足（${base.days} 个日期组，需要 ${b.gate.min_days}）`;
+    ['top10','top3'].forEach(t=>{
+      const v = (base.vs||{})[t]; if(!v) return;
+      const s = v.strategy, ex = v.mean_excess_pp||{};
+      rows += `<tr><td>${esc(base.label)}</td><td class="num">${base.days}</td><td style="font-size:12px">${baseText}</td><td>${t==='top10'?'前10名':'前3名'}</td>` +
+        `<td style="font-size:12px">${s?`${s.win_rate_pct}% / ${fmtNum(s.mean_return_pct,2)}% / ${fmtNum(s.mean_excess_pp,2)} pp`:`样本不足（${v.days} 个日期组、${v.strategy_n} 条）`}</td>` +
+        `<td class="num" style="font-size:12px">${ex.mean!==null&&ex.mean!==undefined?`${fmtNum(ex.mean,2)} [${fmtNum(ex.low,2)}, ${fmtNum(ex.high,2)}]`:'—'}</td><td style="font-size:12px">${esc(BASELINE_VERDICT[ex.verdict]||'样本不足')}</td></tr>`;
+    });
+  });
+  return `<div class="sub-block"><h3>${esc(title)}</h3><p><b>主指标：${esc(verdict)}</b>${detail}</p><div class="table-scroll"><table><thead><tr><th>基线</th><th>日期组</th><th>底数：胜率 / 净收益 / 超额</th><th>策略档</th><th>策略：胜率 / 净收益 / 超额</th><th>超额差值 [95%区间]</th><th>结论</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+
+function renderBaseline(b){
+  const sub = document.getElementById('baselineSub'), body = document.getElementById('baselineBody');
+  if(!b){
+    sub.textContent = '';
+    body.innerHTML = '<div class="empty-state">尚无基线数据：每天 15:35 冻结当天的随机抽样，日线走完后才验收，第一批约在第 4 个交易日。</div>';
+    return;
+  }
+  sub.textContent = `已冻结 ${b.frozen} 份抽样 · 已验收 ${b.resolved} 份`;
+  body.innerHTML = `<p class="exclusion-note" style="margin-top:0">固定标签的"赢"（3 日、扣 0.5% 成本、且跑赢沪深 300）的<b>底数不是 50%</b>——不知道底数就没法判断胜率是好是坏。每个截止日各抽 ${30} 只与策略留档的前 10 / 前 3 <b>逐日配对</b>。区间的标准误按日期算，需要至少 ${b.gate.min_days} 个日期组；区间跨过 0 就是"目前无法区分"，这是早期最常见的结果，不是故障。<b>主指标（看数据之前就定死的）</b>：前10名相对「强势行业内」基线的平均超额收益逐日差值，其余都是次要指标。</p>` +
+    baselineBlock(b, '前瞻（每日冻结、逐日验收——这才是证据）') +
+    baselineBlock(b.backfill, '历史回放（带幸存者/分类回看偏差，只做对照，不是前瞻证据）');
+}
+
 function renderDashboard(DATA){
   document.getElementById('targetText').textContent = DATA.agent.target;
   document.getElementById('statusText').textContent = DATA.agent.status === 'ready' ? '数据完整（ready）' : '部分完整（partial）';
@@ -755,6 +798,7 @@ function renderDashboard(DATA){
 
   renderExec02(DATA.agent.exec02);
   renderEvidence(DATA.agent.evidence);
+  renderBaseline(DATA.agent.baseline);
 
   renderHotmoneyBoard(DATA.hotmoney_board);
 

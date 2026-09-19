@@ -78,6 +78,7 @@ def build(history):
         # exec-0.2 虚拟账户快照与候选池证据三层：旧报告没有这两项，用 .get 容忍缺失。
         result['agent']['exec02'] = agent.get('exec02')
         result['agent']['evidence'] = agent.get('evidence')
+        result['agent']['baseline'] = agent.get('baseline')
         result['agent']['forecast_count'] = len(agent['forecasts'])
         result['agent']['outcome_count'] = len(agent['outcomes'])
         result['sources'].append({'kind': '候选预测与虚拟组合', 'id': agent_path.stem, 'generated_at': agent['generated_at'],
