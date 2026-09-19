@@ -136,6 +136,27 @@ class ApplyTests(Hermetic):
         self.apply(env, memo)
         self.assertNotIn('OPENROUTER_API_KEY', env)
 
+    def test_never_touches_variables_it_did_not_override(self):
+        """没有页面保存值时，进程里别处设置的同名环境变量不能被 apply() 删掉或改掉。"""
+        env, memo = {'OPENROUTER_API_KEY': OTHER}, {}
+        self.assertEqual(self.apply(env, memo), [])
+        self.assertEqual(env, {'OPENROUTER_API_KEY': OTHER})
+        memo2 = {}                                  # 另一个进程/调用：环境在两次 apply 之间被别人改了
+        self.apply(env, memo2)
+        env['OPENROUTER_API_KEY'] = 'sk-or-v1-changed-by-someone-else-123456'
+        self.apply(env, memo2)
+        self.assertEqual(env['OPENROUTER_API_KEY'], 'sk-or-v1-changed-by-someone-else-123456')
+
+    def test_a_value_someone_else_set_after_our_override_is_not_restored_over(self):
+        """我们覆盖过之后，环境变量被别处改成了别的值：清除页面值时不能拿"原值"把它盖回去。"""
+        llm_settings.save_key(KEY)
+        env, memo = {'OPENROUTER_API_KEY': OTHER}, {}
+        self.apply(env, memo)
+        env['OPENROUTER_API_KEY'] = 'sk-or-v1-set-later-by-someone-123456'
+        llm_settings.clear_key(self.dir)
+        self.apply(env, memo)
+        self.assertEqual(env['OPENROUTER_API_KEY'], 'sk-or-v1-set-later-by-someone-123456')
+
     def test_idempotent_and_leaves_unrelated_env_alone(self):
         llm_settings.save_key(KEY)
         env, memo = {'PATH': '/bin', 'OPENROUTER_MODEL': 'env/model'}, {}

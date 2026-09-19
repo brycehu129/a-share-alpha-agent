@@ -1,0 +1,9 @@
+[Unit]
+Description=Alpha Shadow 私有数据每日快照
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_backup.sh
+TimeoutStartSec=300

@@ -28,7 +28,7 @@ ENV_NAMES = {'api_key': 'OPENROUTER_API_KEY', 'model': 'OPENROUTER_MODEL', 'sent
 KEY_PATTERN = re.compile(r'sk-or-[A-Za-z0-9_\-]{16,200}')
 MODEL_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:/\-]{1,99}')
 
-# 进程内"没被页面覆盖之前，环境里原来是什么"。清除页面值时据此恢复，而不是留着旧值。
+# 进程内 {环境变量名: (被覆盖前的原值, 我们放进去的值)}。清除页面值时据此恢复；环境变量已被别人改掉就不碰。
 _ORIGINALS = {}
 
 
@@ -132,7 +132,8 @@ def mask_key(key):
 
 
 def apply(directory=None, environ=None, memo=None):
-    """把页面保存的值放进环境变量（覆盖），并把已不再被页面设置的项恢复成原来的环境值。
+    """把页面保存的值放进环境变量（覆盖），并把**之前被页面覆盖、现已清除**的项恢复成原来的环境值；
+    从没被覆盖过的环境变量一概不碰（否则同一进程里别处设置的值会被误删——测试里就出过这种事）。
     返回被页面覆盖的环境变量名列表（只有名字，不含值）。幂等，可反复调用。
 
     由程序入口调用，见模块说明第 2 条。"""
@@ -142,15 +143,20 @@ def apply(directory=None, environ=None, memo=None):
     settings, _ = load(directory)
     applied = []
     for field, env_name in ENV_NAMES.items():
-        if env_name not in memo:
-            memo[env_name] = environ.get(env_name)
         if field in settings:
+            if env_name not in memo:
+                memo[env_name] = (environ.get(env_name), None)      # 只在第一次覆盖时记下原值
+            memo[env_name] = (memo[env_name][0], settings[field])
             environ[env_name] = settings[field]
             applied.append(env_name)
-        elif memo[env_name] is None:
-            environ.pop(env_name, None)
-        else:
-            environ[env_name] = memo[env_name]
+        elif env_name in memo:
+            # 只恢复"我们自己覆盖过、且现在还是我们放的那个值"的项。环境变量此后被别人改了，就是别人的，不动。
+            original, ours = memo.pop(env_name)
+            if environ.get(env_name) == ours:
+                if original is None:
+                    environ.pop(env_name, None)
+                else:
+                    environ[env_name] = original
     return applied
 
 
@@ -161,7 +167,7 @@ def describe(directory=None, environ=None):
     settings, problem = load(directory)
     out = {'problem': problem}
     for field, env_name in ENV_NAMES.items():
-        env_value = memo[env_name] if env_name in memo else environ.get(env_name)
+        env_value = memo[env_name][0] if env_name in memo else environ.get(env_name)
         if field in settings:
             source, value = 'page', settings[field]
         elif env_value:

@@ -1,0 +1,12 @@
+[Unit]
+Description=Alpha Shadow 私有数据每日快照定时器
+
+[Timer]
+# 17:30：排在 16:30 盘后报告之后，这一天的持仓、账本、情景对账、提议都已落盘。每天都跑（周末改持仓也要保）。
+# Persistent=true：机器停过机的话，恢复后补跑一次，而不是漏掉一天。
+OnCalendar=*-*-* 17:30:00 Asia/Shanghai
+Persistent=true
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

@@ -33,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import backup
 import exec_spec
 import llm_settings
 import portfolio_book
@@ -174,7 +175,27 @@ def render_llm_panel(message="", error=False, check_lines=None, check_ok=None):
 </div>"""
 
 
-def render_page(message="", llm=None):
+def render_backup_panel(message="", error=False):
+    level, text = backup.health()
+    cls = {"ok": "status-ready", "warn": "status-wait", "none": "status-wait"}[level]
+    msg_html = ('<p class="notice%s">%s</p>' % (" error" if error else "", html.escape(message)) if message else "")
+    warn = '<p class="hint warn">%s</p>' % html.escape(text) if level == "warn" else ""
+    ok_line = '<p class="hint">%s</p>' % html.escape(text) if level != "warn" else ""
+    return f"""<div class="panel">
+  <h2>私有数据备份</h2>
+  <p>本机每日快照：<span class="pill {cls}">{ {"ok": "正常", "warn": "需要留意", "none": "尚未运行"}[level] }</span></p>
+  {msg_html}{warn}{ok_line}
+  <form method="post" action="/backup/download">
+    <button type="submit">下载备份到我的电脑</button>
+  </form>
+  <p class="hint">持仓与自选、exec-0.2 账本、情景账本、提议与修订、盘后报告都只存在这台服务器上、不进 git。
+  本机快照（每天 17:30，保留 14 份）防的是损坏和误操作，<b>防不了这台机器本身丢失</b>——
+  真正的异地备份是上面这个按钮：隔一段时间点一下，把文件存在你自己的电脑上。
+  归档<b>不含凭据</b>（OpenRouter key、企业微信 webhook），恢复后需要重新填。</p>
+</div>"""
+
+
+def render_page(message="", llm=None, backup_message=None):
     config = load_config(config_path())
     masked = mask_webhook_url(config.get("webhook_url"))
     configured = bool(masked)
@@ -241,6 +262,7 @@ pre.check.bad{{background:#fbeae8;color:#a1281f;}}
   </form>
 </div>
 {render_llm_panel(**(llm or {}))}
+{render_backup_panel(**(backup_message or {}))}
 <p class="footer-note">由 GitHub Actions 自动部署（push 到 master 后自动生效）</p>
 </body></html>"""
 
@@ -390,6 +412,34 @@ class Handler(BaseHTTPRequestHandler):
             message, error = "写入失败：%s" % type(exc).__name__, True
         self._send_html(200, self._proposals_page(message, error))
 
+    def _handle_backup_download(self):
+        import io
+        root = backup.root_dir()
+        try:
+            size = backup.total_size(root)
+            if size > backup.MAX_DOWNLOAD_BYTES:
+                self._send_html(200, render_page(backup_message={
+                    "message": "私有数据 %.0f MB，超过网页下载上限 %d MB；请在服务器上用 backup.py snapshot 后自行拷走。" % (
+                        size / 1e6, backup.MAX_DOWNLOAD_BYTES // 1_000_000), "error": True}))
+                return
+            buf = io.BytesIO()
+            manifest = backup.build_archive(root, buf)
+        except OSError as exc:
+            self._send_html(200, render_page(backup_message={"message": "打包失败：%s" % type(exc).__name__, "error": True}))
+            return
+        if not manifest["files"]:
+            self._send_html(200, render_page(backup_message={"message": "私有目录里没有任何文件可备份（目录配错了？）。", "error": True}))
+            return
+        data = buf.getvalue()
+        name = "alpha-shadow-private-%s.tar.gz" % datetime.now(CST).strftime("%Y%m%d-%H%M%S")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/gzip")
+        self.send_header("Content-Disposition", 'attachment; filename="%s"' % name)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
     def _handle_llm_post(self, form):
         llm = {}
         try:
@@ -436,6 +486,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/proposals/"):
             self._handle_proposals_post(self._read_form())
+            return
+        if self.path == "/backup/download":
+            self._handle_backup_download()
             return
         if self.path.startswith("/book/"):
             if self.path not in ("/book/holding", "/book/watch",
