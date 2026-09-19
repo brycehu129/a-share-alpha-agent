@@ -29,8 +29,11 @@ import ssl
 import sys
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs
 
+import portfolio_book
+import webapp_views
 from dashboard_page import render_dashboard_page
 from wecom_push import (
     ConfigError,
@@ -43,6 +46,13 @@ from wecom_push import (
 
 CST = timezone(timedelta(hours=8))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "data", "webapp_config.json")
+# 盘后分析要读归档（候选池、日线缓存）。服务器上 cron_common.sh 把 market-data 分支
+# clone 到仓库根目录的 .history/；本机开发可以用 HISTORY_DIR 指到别处。
+DEFAULT_HISTORY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".history")
+
+
+def history_dir():
+    return Path(os.environ.get("HISTORY_DIR", DEFAULT_HISTORY_DIR))
 
 
 def config_path():
@@ -106,7 +116,7 @@ button:hover{{color:var(--accent);border-color:var(--accent);}}
 .footer-note{{color:var(--ink-3);font-size:11.5px;margin-top:24px;}}
 </style></head>
 <body>
-<nav class="nav-pills"><a href="/dashboard">看板</a><a href="/" class="active">推送配置</a></nav>
+{webapp_views.nav("/")}
 <h1>Alpha Shadow 盘中推送配置</h1>
 <div class="panel">
   <p>企业微信群机器人 webhook 状态：<span class="pill {status_cls}">{status}</span></p>
@@ -155,6 +165,32 @@ class Handler(BaseHTTPRequestHandler):
         parsed = parse_qs(raw.decode("utf-8"))
         return {k: v[0] for k, v in parsed.items()}
 
+    def _book_page(self, message="", error=False):
+        """持仓/自选页顺带展示现价。取价失败不影响页面本身——账本是本地数据，
+        行情只是锦上添花，不能因为网络问题让人连自己录的持仓都看不到。
+
+        但也不能静默：拿不到价的股票在表格里只会显示“—”，不说一声容易被当成
+        行情就是这样。所以没有别的消息要显示时，把取价失败报出来。"""
+        holdings = portfolio_book.load("holdings")
+        watchlist = portfolio_book.load("watchlist")
+        quotes, trouble = {}, ""
+        symbols = sorted({r["symbol"] for r in holdings} | {r["symbol"] for r in watchlist})
+        if symbols:
+            try:
+                import live_quote
+                snapshot = live_quote.snapshot(symbols)
+                quotes = {q["symbol"]: q for q in snapshot["quotes"]}
+                if snapshot["failures"]:
+                    trouble = "%d 只股票未取得行情，现价显示为“—”：%s" % (
+                        len(snapshot["failures"]),
+                        ",".join(f["symbol"] for f in snapshot["failures"][:5]))
+            except (OSError, ValueError) as exc:
+                trouble = "行情获取失败，只显示账本数据：%s" % exc
+        # 刚做完增删的提示优先；没有的话才报行情问题。
+        if trouble and not message:
+            message, error = trouble, True
+        return webapp_views.render_book_page(holdings, watchlist, quotes, message, error)
+
     def do_GET(self):
         if self.path == "/health":
             self._send_html(200, "ok")
@@ -164,6 +200,18 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send_html(200, render_dashboard_page())
             return
+        if self.path in ("/book", "/book/"):
+            if not self._require_auth():
+                return
+            self._send_html(200, self._book_page())
+            return
+        if self.path in ("/postclose", "/postclose/"):
+            if not self._require_auth():
+                return
+            import postclose_report
+            self._send_html(200, webapp_views.render_postclose_page(
+                postclose_report.latest_report(), webapp_views.run_state()))
+            return
         if self.path != "/":
             self._send_html(404, "not found")
             return
@@ -171,8 +219,42 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_html(200, render_page())
 
+    def _handle_book_post(self, form):
+        actions = {
+            "/book/holding": lambda: (portfolio_book.add_holding(form), "已保存持仓。"),
+            "/book/watch": lambda: (portfolio_book.add_watch(form), "已加入自选。"),
+            "/book/holding/remove": lambda: (
+                portfolio_book.remove("holdings", form.get("symbol", "")), "已从持仓中删除。"),
+            "/book/watch/remove": lambda: (
+                portfolio_book.remove("watchlist", form.get("symbol", "")), "已从自选中删除。"),
+        }
+        try:
+            _, message = actions[self.path]()
+            error = False
+        except portfolio_book.BookError as exc:
+            message, error = str(exc), True
+        except OSError as exc:
+            message, error = "写入账本失败：%s" % exc, True
+        self._send_html(200, self._book_page(message, error))
+
     def do_POST(self):
         if not self._require_auth():
+            return
+        if self.path.startswith("/book/"):
+            if self.path not in ("/book/holding", "/book/watch",
+                                 "/book/holding/remove", "/book/watch/remove"):
+                self._send_html(404, "not found")
+                return
+            self._handle_book_post(self._read_form())
+            return
+        if self.path == "/postclose/run":
+            form = self._read_form()
+            started, message = webapp_views.start_run(
+                history_dir(), push_enabled=not form.get("no_push"))
+            import postclose_report
+            self._send_html(200, webapp_views.render_postclose_page(
+                postclose_report.latest_report(), webapp_views.run_state(),
+                message, error=not started))
             return
         if self.path == "/config":
             form = self._read_form()

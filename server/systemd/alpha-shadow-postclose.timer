@@ -1,0 +1,11 @@
+[Unit]
+Description=Alpha Shadow 盘后分析定时器
+
+[Timer]
+# 排在 15:35 的日线流程之后，确保用得上当天新生成的候选池。
+OnCalendar=Mon..Fri 16:30:00 Asia/Shanghai
+Persistent=false
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

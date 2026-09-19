@@ -1,0 +1,10 @@
+[Unit]
+Description=Alpha Shadow 盘后分析（实时行情 + 规则复核 + AI研判）
+After=network-online.target
+
+[Service]
+Type=oneshot
+# ANTHROPIC_API_KEY / CONFIG_PATH 等都在这个文件里；没有 key 时任务照常完成，
+# 只是降级成纯规则报告（见 postclose_report.py）。
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_postclose.sh

@@ -42,3 +42,11 @@
 - [上交所交易规则入口](https://www.sse.com.cn/lawandrules/sselawsrules2025/fund/trading/c/c_20260424_10817739.shtml)：模拟规则并未覆盖所有板块例外及特殊股票；不代替交易所逐股可交易状态。
 
 运行：`python3 server/alpha_data.py --history .history --run-id <运行号-次数>`，随后`alpha_baostock.py`与`alpha_engine.py`使用相同参数。GitHub独立任务可手动运行，日常由09:00/15:30流程调用。实际完成时间取决于队列及逐股扫描耗时，不保证09:00整给出结果，迟到的预测不会追溯成交。
+
+## 盘后分析层（0.1，不改变策略）
+
+`live_check.py` 用实时价重算 MA5/MA20 偏离、20日高点距离、两条 track 的门槛和冻结计划的入场带，`ai_analyst.py` 把这些结构化事实交给 Claude 做定性研判。**这条链路不改变上文任何规则**：候选筛选、冻结预测、标签口径、虚拟账户的成交与退出规则完全照旧，盘中价格不进入任何决策路径。
+
+AI 只解读不决策：不写 `predictions/`、`outcomes/`、虚拟账户，不改风控参数，不下单。它的结论是研究假设，未经前瞻验证，不计入本文档任何胜率统计。本期未接入新闻与公告，提示词明确禁止模型提及消息面。完整权限边界见 [AI_LAYER.md](AI_LAYER.md)。
+
+盘后报告含真实持仓成本价，只存服务器本地，不进公开的 market-data 分支。

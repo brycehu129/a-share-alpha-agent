@@ -9,13 +9,18 @@ cd /opt/alpha-shadow
 git fetch origin master --quiet
 git reset --hard origin/master
 
+# AI 分析层是本仓库唯一的第三方依赖，只有盘后任务和后台页面用得上；装不上时
+# 纯规则的日线流程和开盘观察照常工作，所以这里失败不中断部署。
+pip3 install --quiet --upgrade anthropic || echo "WARN: anthropic 安装失败，盘后分析将降级为纯规则报告"
+
 systemctl restart alpha-shadow-webapp
 
 cp server/systemd/alpha-shadow-daily.service server/systemd/alpha-shadow-daily.timer /etc/systemd/system/
 cp server/systemd/alpha-shadow-opening.service server/systemd/alpha-shadow-opening.timer /etc/systemd/system/
+cp server/systemd/alpha-shadow-postclose.service server/systemd/alpha-shadow-postclose.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now alpha-shadow-daily.timer alpha-shadow-opening.timer
-systemctl restart alpha-shadow-daily.timer alpha-shadow-opening.timer
+systemctl enable --now alpha-shadow-daily.timer alpha-shadow-opening.timer alpha-shadow-postclose.timer
+systemctl restart alpha-shadow-daily.timer alpha-shadow-opening.timer alpha-shadow-postclose.timer
 
 echo "$(date -Is) deployed $(git rev-parse --short HEAD)" >> /var/log/alpha-shadow-deploy.log
 

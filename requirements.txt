@@ -1,2 +1,10 @@
-# 本项目服务器代码只依赖 Python 标准库，这里留空只是为了让 Railway/Nixpacks
-# 能识别出这是一个 Python 项目（触发 Python builder）。
+# 本项目绝大部分代码只用 Python 标准库，这是有意的约定：日线采集、策略筛选、
+# 虚拟账户、开盘观察这几条主链路不引入任何第三方包，部署和排错都简单。
+#
+# 唯一的例外是 AI 分析层（server/claude_client.py），它用官方 anthropic SDK。
+# 这个依赖是**可选**的：
+#   - server/claude_client.py 里 `import anthropic` 写在函数内部做惰性导入；
+#   - 包没装时 available() 返回 False，盘后分析降级成纯规则报告；
+#   - 15:35 的日线流程、09:31 的开盘观察、webapp 本身都不碰它。
+# 换句话说，装不上 anthropic 不会影响既有的任何功能。
+anthropic

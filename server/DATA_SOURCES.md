@@ -19,3 +19,12 @@ GitHub Settings → Secrets and variables → Actions → New repository secret�
 该域名是用户提供的第三方服务，不标记为 Tushare 官方来源。
 
 BaoStock 因明确返回黑名单错误暂停，保留已下载数据，需服务方解除后再恢复。
+
+## AI 分析层凭证（2026-09-19）
+
+`/etc/alpha-shadow.env` 增加 `ANTHROPIC_API_KEY=sk-ant-...`，由盘后分析任务和后台页面读取。
+可选变量：`CLAUDE_MODEL`（默认 `claude-opus-5`）、`CLAUDE_EFFORT`（默认 `high`）。
+
+没有配置时盘后分析照常运行，只是降级成纯规则报告并在报告里说明原因；日线流程和开盘观察完全不读这个凭证。凭证只从环境变量读取，不写日志、不进报告、不进归档，错误信息返回前统一脱敏。
+
+实时行情走腾讯 `qt.gtimg.cn`，**不需要任何凭证**；同一接口覆盖沪深个股、A股指数、港股和美股指数。
