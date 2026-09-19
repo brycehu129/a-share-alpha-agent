@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-19T20:19:35.758594+08:00",
+  "exported_at": "2026-09-19T21:54:22.184756+08:00",
   "market": {
     "generated_at": "2026-09-18T15:36:18.194778+08:00",
     "status": "success",
@@ -7035,6 +7035,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7059,6 +7060,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7083,6 +7085,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7106,6 +7109,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7129,6 +7133,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7152,6 +7157,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7175,6 +7181,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7198,6 +7205,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7221,6 +7229,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7244,6 +7253,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7267,6 +7277,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7290,6 +7301,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7313,6 +7325,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7336,6 +7349,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7359,6 +7373,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7382,6 +7397,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7405,6 +7421,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7429,6 +7446,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7453,6 +7471,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": [
@@ -7486,6 +7505,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": [
@@ -7519,6 +7539,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
         "ledger": [
@@ -7552,6 +7573,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 10,
         "max_weight_pct": 30.0,
         "ledger": [
@@ -7585,6 +7607,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": "observed-quote-v1",
         "hold_sessions": 10,
         "max_weight_pct": 30.0,
         "ledger": [
@@ -7617,6 +7640,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 10,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7640,6 +7664,7 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 10,
         "max_weight_pct": 30.0,
         "ledger": []
@@ -7663,11 +7688,14 @@
         "target_price": null,
         "shares": null,
         "entry_price": null,
+        "execution_mode": null,
         "hold_sessions": 10,
         "max_weight_pct": 30.0,
         "ledger": []
       }
     ],
+    "exec02": null,
+    "evidence": null,
     "forecast_count": 16,
     "outcome_count": 0
   }
