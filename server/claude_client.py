@@ -1,13 +1,17 @@
-"""Claude API 封装。本仓库唯一一处调用大模型的地方。
+"""大模型调用的统一入口。本仓库唯一一处调用大模型的地方。
 
-**这是本项目第一个第三方依赖。** 其余代码只用标准库（见 requirements.txt），
-所以 `import anthropic` 写在函数内部做惰性导入：cron 脚本每次跑之前都会执行
-全量测试套件，如果这个包没装就在导入期报错，会连带把 15:35 的日线流程和 09:31
-的开盘观察任务一起弄挂——那两条是纯规则的，不该被 AI 层的依赖问题影响。
-同样的处理方式在 alpha_data.py 里对 baostock 已经用过。
+**两个后端，同一套接口**（`available()` / `complete_json()` / `ClaudeError`）：
 
-凭证只通过环境变量 ANTHROPIC_API_KEY 读取，永远不写进日志、报告或归档；
-错误信息返回前统一做脱敏（沿用 tushare_probe.classify 的 [REDACTED] 做法）。
+- `openrouter`：经 OpenRouter 调用（`openrouter_client.py`，只用标准库，**不需要装任何包**）。
+- `anthropic`：直连 Anthropic SDK（本项目第一个第三方依赖，`import anthropic` 写在函数内部
+  惰性导入——cron 脚本每次跑之前都会执行全量测试套件，包没装就在导入期报错会连带把日线
+  流程和开盘观察一起弄挂，那两条是纯规则的，不该被 AI 层的依赖问题影响）。
+
+选择规则：环境变量 `LLM_PROVIDER` 显式指定；没指定时，配了 OPENROUTER_API_KEY 就用 OpenRouter，
+否则用 Anthropic。上层（ai_analyst / scenario_analyst / sentinel）只认这里的接口，切换后端
+不用改任何一行。模块名保留 claude_client 是为了不牵动大量引用，它现在是"LLM 入口"。
+
+凭证只通过环境变量读取，永远不写进日志、报告或归档；错误信息返回前统一做脱敏。
 """
 import json
 import os
@@ -22,28 +26,34 @@ MAX_TOKENS = 32000
 TIMEOUT_SECONDS = 600
 
 
-class ClaudeError(RuntimeError):
-    """调用失败。带 `status` 字段区分可重试与不可重试，便于上层决定怎么降级。"""
-
-    def __init__(self, status, message):
-        super().__init__(message)
-        self.status = status
-        self.message = message
+from llm_errors import ClaudeError  # noqa: E402,F401  重新导出，保持 claude_client.ClaudeError 可用
 
 
 def _redact(text):
     """把任何看起来像 API key 的串抹掉，再把可能被回显的真实 key 也抹掉。"""
-    text = re.sub(r'sk-ant-[A-Za-z0-9_\-]{8,}', '[REDACTED]', str(text))
-    key = os.environ.get('ANTHROPIC_API_KEY', '')
-    if key and len(key) > 8:
-        text = text.replace(key, '[REDACTED]')
+    text = re.sub(r'sk-(?:ant|or)-[A-Za-z0-9_\-]{8,}', '[REDACTED]', str(text))
+    for name in ('ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY'):
+        key = os.environ.get(name, '')
+        if key and len(key) > 8:
+            text = text.replace(key, '[REDACTED]')
     return text[:800]
+
+
+def provider():
+    """当前使用哪个后端。LLM_PROVIDER 显式指定优先；否则有 OpenRouter 的 key 就用它。"""
+    chosen = os.environ.get('LLM_PROVIDER', '').strip().lower()
+    if chosen in ('openrouter', 'anthropic'):
+        return chosen
+    return 'openrouter' if os.environ.get('OPENROUTER_API_KEY') else 'anthropic'
 
 
 def available():
     """(能不能调用, 原因)。上层据此决定是只出规则报告还是带 AI 研判。"""
+    if provider() == 'openrouter':
+        import openrouter_client
+        return openrouter_client.available()
     if not os.environ.get('ANTHROPIC_API_KEY'):
-        return False, '未配置 ANTHROPIC_API_KEY'
+        return False, '未配置 ANTHROPIC_API_KEY（或改用 OpenRouter：配置 OPENROUTER_API_KEY）'
     try:
         import anthropic  # noqa: F401
     except ImportError:
@@ -66,6 +76,10 @@ def complete_json(system, user_content, schema, model=None, effort=None,
     ok, reason = available()
     if not ok:
         raise ClaudeError('unavailable', reason)
+    if provider() == 'openrouter':
+        import openrouter_client
+        return openrouter_client.complete_json(system, user_content, schema, model=model, effort=effort or EFFORT,
+                                               max_tokens=max_tokens, timeout=timeout, max_retries=max_retries)
     import anthropic
 
     model = model or MODEL
@@ -123,3 +137,57 @@ def complete_json(system, user_content, schema, model=None, effort=None,
         'cache_creation_input_tokens': getattr(usage, 'cache_creation_input_tokens', None),
     }
     return data, meta
+
+
+CHECK_SCHEMA = {'type': 'object', 'properties': {'ok': {'type': 'boolean'}, 'echo': {'type': 'string'}},
+                'required': ['ok', 'echo'], 'additionalProperties': False}
+
+
+def check(model=None, effort='low'):
+    """用最小的一次结构化调用验证：key 有效、余额够、模型存在、结构化输出可用。返回 (成功?, 报告行列表)。
+
+    花费约几分钱。没有 key 时不发请求。这是给你上线前自检用的——没配好就会在这里明确报错，
+    而不是等到周一盘中哨兵触发时才发现研判一直静默失败。"""
+    import time
+    lines = ['后端：%s' % provider()]
+    ok, why = available()
+    if not ok:
+        return False, lines + ['不可用：' + why]
+    if provider() == 'openrouter':
+        import openrouter_client
+        lines.append('模型：%s（可用 OPENROUTER_MODEL 修改）' % (model or openrouter_client.default_model()))
+    else:
+        lines.append('模型：%s（可用 CLAUDE_MODEL 修改）' % (model or MODEL))
+    started = time.monotonic()
+    try:
+        data, meta = complete_json('你是连通性自检程序，只按 schema 回答。', '请返回 ok=true，echo 填 "pong"。',
+                                   CHECK_SCHEMA, model=model, effort=effort, max_tokens=2000, timeout=60, max_retries=0)
+    except ClaudeError as exc:
+        return False, lines + ['失败 [%s]：%s' % (exc.status, exc.message)]
+    lines.append('成功：%.1f 秒，实际模型 %s' % (time.monotonic() - started, meta.get('model')))
+    lines.append('token：输入 %s / 输出 %s（其中推理 %s）' % (meta.get('input_tokens'), meta.get('output_tokens'),
+                                                        meta.get('reasoning_tokens')))
+    if meta.get('cost') is not None:
+        lines.append('本次花费：%s（OpenRouter 积分）' % meta['cost'])
+    if meta.get('json_repaired'):
+        lines.append('注意：该模型/服务商返回的 JSON 需要修复才能解析（strict 模式只当参考）——'
+                     '结构化输出不够可靠，建议换一个模型')
+    if data != {'ok': True, 'echo': 'pong'}:
+        lines.append('注意：返回内容和预期不完全一致：%r' % (data,))
+    return True, lines
+
+
+def main(argv=None):
+    import argparse
+    p = argparse.ArgumentParser(description='验证大模型配置是否可用（会发一次极小的真实请求）')
+    p.add_argument('command', choices=['check'])
+    p.add_argument('--model', help='覆盖默认模型')
+    p.add_argument('--effort', default='low')
+    a = p.parse_args(argv)
+    ok, lines = check(a.model, a.effort)
+    print('\n'.join(lines))
+    return 0 if ok else 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

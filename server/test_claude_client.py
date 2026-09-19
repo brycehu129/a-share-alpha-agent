@@ -22,7 +22,7 @@ class AvailabilityTests(unittest.TestCase):
                 raise ImportError('No module named anthropic')
             return real_import(name, *args, **kwargs)
 
-        with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-ant-test'}):
+        with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-ant-test', 'LLM_PROVIDER': 'anthropic'}):
             with patch('builtins.__import__', side_effect=fake_import):
                 ok, reason = claude_client.available()
         self.assertFalse(ok)
@@ -143,7 +143,8 @@ def with_fake(module):
 
 class CompleteJsonTests(unittest.TestCase):
     def setUp(self):
-        self.env = patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-ant-test'})
+        # 显式指定后端：开发机上如果恰好配了 OPENROUTER_API_KEY，默认选择会变，这组测试测的是直连路径。
+        self.env = patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-ant-test', 'LLM_PROVIDER': 'anthropic'})
         self.env.start()
         self.addCleanup(self.env.stop)
 

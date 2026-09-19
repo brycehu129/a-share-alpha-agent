@@ -73,13 +73,43 @@ AI 调用失败（没配 key、没装包、限流、超时、被拒、输出截�
 
 ## 配置
 
-`/etc/alpha-shadow.env` 增加：
+**两个后端，同一套接口**（`claude_client.py` 是统一入口，`ai_analyst`/`scenario_analyst`/哨兵不知道也不关心用的是哪个）。
+`/etc/alpha-shadow.env` 里二选一：
 
 ```
+# 方案 A：OpenRouter（只用标准库，不需要装任何包）
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=anthropic/claude-opus-5        # 可选，默认就是它
+SENTINEL_MODEL=anthropic/claude-sonnet-5        # 可选：哨兵每天最多15次，可用比盘后报告更便宜的模型
+
+# 方案 B：直连 Anthropic
 ANTHROPIC_API_KEY=sk-ant-...
+CLAUDE_MODEL=claude-opus-5                      # 可选
 ```
 
-凭证只从环境变量读，不写日志、不进报告、不进归档；错误信息返回前统一脱敏。
+选择规则：`LLM_PROVIDER=openrouter|anthropic` 显式指定优先；没指定时，配了 `OPENROUTER_API_KEY` 就用 OpenRouter，否则用 Anthropic。
+`SENTINEL_MODEL` 的模型 id 必须符合当前后端的写法（OpenRouter 用 `anthropic/claude-sonnet-5`，直连用 `claude-sonnet-5`）。
+其他可选：`OPENROUTER_SITE_URL`（归因用的站点 URL）、`OPENROUTER_BASE_URL`（代理或测试用）。
+
+**上线前先自检**（一次极小的真实请求，花费约几分钱；没配好会明确报错，而不是等周一盘中哨兵触发时才发现研判一直静默失败）：
+
+```
+python3 server/claude_client.py check
+python3 server/claude_client.py check --model deepseek/deepseek-v4.1-flash   # 试别的模型
+```
+
+### OpenRouter 的几个坑（都已在 `openrouter_client.py` 里处理）
+
+- **推理 token 和可见输出共用同一个 `max_tokens` 预算。** 推理把预算吃光时返回 `finish_reason: length` 且**内容为空，但推理 token 照样计费**。客户端专门识别并报出"推理消耗了几乎全部 max_tokens"，别的报错都不会这么说。
+- **strict 结构化输出各家实现不同**：有的服务商保证合规，有的只当参考。所以返回的 JSON 不能盲信——客户端容忍 ` ```json ` 围栏并在元信息里标 `json_repaired`，`check` 命令遇到会警告"该模型结构化输出不够可靠"；真正的兜底是上层的价位/schema 校验。
+- 请求带 `provider.require_parameters=true`，只路由到真正支持 `json_schema` 的服务商，不会被悄悄转给不支持的端点。
+- 402 = 余额不足，单独分类（`payment_required`），不是"服务挂了"，重试没用；HTTP 200 但 body 里带 `error` 也按失败处理。
+- 有 systemd 时限的调用（哨兵研判）传 `max_retries=0`，让"总耗时 ≤ timeout"成立。
+- 不依赖 OpenRouter 的响应修复插件——其文档页面无法核实确切参数，没验证过的参数不发。
+
+OpenRouter 上 `anthropic/claude-opus-5`、`claude-sonnet-5`、`claude-fable-5.1` 都声明支持 `structured_outputs` 和 `reasoning`（2026-09-19 查询公开模型列表所得，随时会变）。
+
+凭证只从环境变量读，不写日志、不进报告、不进归档；错误信息返回前统一脱敏（`sk-ant-…` 和 `sk-or-…` 两种格式，以及环境里配置的真实 key）。
 
 
 ## 自选股哨兵与情景研判（2026-09-19）

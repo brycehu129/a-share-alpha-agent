@@ -1,7 +1,8 @@
 # 本项目绝大部分代码只用 Python 标准库，这是有意的约定：日线采集、策略筛选、
 # 虚拟账户、开盘观察这几条主链路不引入任何第三方包，部署和排错都简单。
 #
-# 唯一的例外是 AI 分析层（server/claude_client.py），它用官方 anthropic SDK。
+# 唯一的例外是**直连 Anthropic** 时的 AI 分析层（server/claude_client.py），它用官方 anthropic SDK。
+# 经 OpenRouter 调用（server/openrouter_client.py）只用标准库，不需要装任何包。
 # 这个依赖是**可选**的：
 #   - server/claude_client.py 里 `import anthropic` 写在函数内部做惰性导入；
 #   - 包没装时 available() 返回 False，盘后分析降级成纯规则报告；

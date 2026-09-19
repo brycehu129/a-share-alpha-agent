@@ -13,11 +13,15 @@
 涨跌停区间、目标与失效价在触发价的哪一侧），不合格的情景丢弃并记录原因，不推送。
 """
 import json
+import os
 
 from ai_analyst import SUPPORTED_KEYWORDS  # noqa: F401  同一套结构化输出关键字约束
 
 PROMPT_VERSION = 'sentinel-scenario-1'
 ANALYSIS_TIMEOUT_S = 100
+# 推理 token 和可见输出共用这个预算（Anthropic 直连和 OpenRouter 都是）。情景本身只是几百字的结构化
+# JSON，但推理可能吃掉几千 token；预算太小会出现"推理耗尽、可见内容为空、照样计费"。
+MAX_TOKENS = 12000
 HINTS = ['hold', 'add', 'reduce', 'wait', 't_sell_high', 't_buy_low']
 HOLDING_ONLY_HINTS = ('hold', 'reduce', 't_sell_high', 't_buy_low')
 
@@ -190,9 +194,11 @@ def analyze(payload):
     user = '以下是刚触发提醒的股票及当时的事实，请按 schema 给出情景。\n\n' + json.dumps(payload, ensure_ascii=False)
     try:
         # 由独立的分析服务调用，systemd 时限 150 秒：单次最多等 100 秒且不重试，总耗时才有上界。
-        # max_tokens 也压低——情景是几百字的结构化 JSON，不需要 32000。
+        # SENTINEL_MODEL：哨兵一天最多 15 次调用，可以用比盘后报告更便宜的模型。模型 id 必须符合当前
+        # 后端的写法（OpenRouter 用 `anthropic/claude-sonnet-5`，直连用 `claude-sonnet-5`）。
         data, call_meta = claude_client.complete_json(system_prompt(), user, SCHEMA, effort='medium',
-                                                      max_tokens=8000, timeout=ANALYSIS_TIMEOUT_S, max_retries=0)
+                                                      model=os.environ.get('SENTINEL_MODEL') or None,
+                                                      max_tokens=MAX_TOKENS, timeout=ANALYSIS_TIMEOUT_S, max_retries=0)
     except claude_client.ClaudeError as exc:
         meta.update(status=exc.status, error=exc.message)
         return None, meta

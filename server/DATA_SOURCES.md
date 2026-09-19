@@ -22,8 +22,9 @@ BaoStock 因明确返回黑名单错误暂停，保留已下载数据，需服�
 
 ## AI 分析层凭证（2026-09-19）
 
-`/etc/alpha-shadow.env` 增加 `ANTHROPIC_API_KEY=sk-ant-...`，由盘后分析任务和后台页面读取。
-可选变量：`CLAUDE_MODEL`（默认 `claude-opus-5`）、`CLAUDE_EFFORT`（默认 `high`）。
+`/etc/alpha-shadow.env` 里配 `OPENROUTER_API_KEY=sk-or-v1-...`（经 OpenRouter，不需要装任何包）或 `ANTHROPIC_API_KEY=sk-ant-...`（直连）二选一，
+由盘后分析任务、盘中哨兵研判进程和后台页面读取。完整变量说明和上线前自检命令见 [AI_LAYER.md](AI_LAYER.md) 的"配置"一节。
+通用可选变量：`CLAUDE_EFFORT`（默认 `high`）。
 
 没有配置时盘后分析照常运行，只是降级成纯规则报告并在报告里说明原因；日线流程和开盘观察完全不读这个凭证。凭证只从环境变量读取，不写日志、不进报告、不进归档，错误信息返回前统一脱敏。
 

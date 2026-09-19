@@ -9,9 +9,14 @@ cd /opt/alpha-shadow
 git fetch origin master --quiet
 git reset --hard origin/master
 
-# AI 分析层是本仓库唯一的第三方依赖，只有盘后任务和后台页面用得上；装不上时
-# 纯规则的日线流程和开盘观察照常工作，所以这里失败不中断部署。
-pip3 install --quiet --upgrade anthropic || echo "WARN: anthropic 安装失败，盘后分析将降级为纯规则报告"
+# 直连 Anthropic 才需要 anthropic 包（本仓库唯一的第三方依赖）。用 OpenRouter 时只有标准库的
+# HTTPS 调用，不需要装任何东西。判断依据是 /etc/alpha-shadow.env：配了 OPENROUTER_API_KEY 且没有
+# 显式指定 LLM_PROVIDER=anthropic 就跳过。装不上也不中断部署——纯规则的日线流程和开盘观察照常工作。
+if grep -q '^OPENROUTER_API_KEY=.' /etc/alpha-shadow.env 2>/dev/null && ! grep -q '^LLM_PROVIDER=anthropic' /etc/alpha-shadow.env 2>/dev/null; then
+  echo "使用 OpenRouter，无需安装 anthropic 包"
+else
+  pip3 install --quiet --upgrade anthropic || echo "WARN: anthropic 安装失败，AI 研判将降级为纯规则报告"
+fi
 
 systemctl restart alpha-shadow-webapp
 
