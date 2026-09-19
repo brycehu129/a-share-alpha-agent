@@ -12,7 +12,7 @@
 """
 import json
 
-from shortterm_model import BREAKOUT, PULLBACK, SHORT_POLICY, VERSION as STRATEGY_VERSION
+from shortterm_model import BREAKOUT, PULLBACK, SHORT_POLICY, SELECTION_VERSION as STRATEGY_VERSION
 
 PROMPT_VERSION = 'postclose-analyst-1'
 

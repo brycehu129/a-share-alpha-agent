@@ -13,7 +13,8 @@ from collect_quotes import CST
 from dashboard_export import latest
 from hotmoney_features import load as load_hotmoney
 from review_pipeline import current_tuning
-from shortterm_model import (VERSION, TARGET, SHORT_POLICY as POLICY, screen_short,
+from shortterm_model import (SELECTION_VERSION, EXECUTION_VERSION, ARCHIVE_SIZE, TARGET,
+                              SHORT_POLICY as POLICY, screen_short,
                               select_candidates, walk_forward_short)
 from tushare_sync import read, save, sha
 
@@ -39,13 +40,48 @@ def eligible_from(now):
     return (now.date() if now.time() < time(9, 20) else now.date()+timedelta(days=1)).isoformat()
 
 
+def selection_version_of(f):
+    """预测记录所属的选股版本。0.2/0.3 的旧记录没有 selection_version 字段，
+    只有 version——当时选股和执行不分家，那个 version 就是它的选股版本标签。"""
+    return f.get('selection_version') or f.get('version')
+
+
+def tagged(outcome, f):
+    """给验收记录补上版本与排名，只改内存里的副本，绝不回写磁盘（验收记录不可改写）。
+
+    早先验收记录里根本没有版本字段，样本池只能靠 horizon 分组——0.2/0.3 碰巧一个
+    10天一个3天才没混。0.4 仍是3天窗口，再靠 horizon 分就会把 0.3 和 0.4 混进
+    同一个池子，而两版的筛选规则已经不同。"""
+    outcome.setdefault('selection_version', selection_version_of(f))
+    outcome.setdefault('execution_version', f.get('execution_version') or 'legacy')
+    outcome.setdefault('rank', f.get('rank'))
+    return outcome
+
+
+def split_short_pools(outcomes):
+    """3天窗口的验收分成 (当前选股版本, 其他版本) 两池，只有前者参与当前版本的概率估计。
+
+    不能只靠 horizon 分：0.3 和 0.4 窗口都是3天但筛选规则不同，混池算出的胜率
+    哪个版本都不代表。其他版本的样本仍然保留计数（legacy），只是不参与估计。"""
+    live = [o for o in outcomes if o['horizon'] == 3 and o.get('selection_version') == SELECTION_VERSION]
+    other = [o for o in outcomes if o['horizon'] == 3 and o.get('selection_version') != SELECTION_VERSION]
+    return live, other
+
+
+def cutoff_slots(forecasts, cutoff):
+    """该选股版本、该截止日已经留档了多少条、其中多少条允许模拟成交。
+    同一截止日会被重跑好几次，靠这个给留档条数和成交名额设上限。"""
+    same = [f for f in forecasts if selection_version_of(f) == SELECTION_VERSION and f['as_of'] == cutoff]
+    return len(same), sum(bool(f['paper_eligible']) for f in same)
+
+
 def resolve(forecasts, series, benchmark, now, history):
     outcomes = []
     dates = [b['date'] for b in benchmark]
     for f in forecasts:
         if not dates or f['eligible_from'] < dates[0]:
             # A rolling provider window cannot redefine an old forecast's entry.
-            outcomes.extend(read(p) for p in (history / 'outcomes').glob(f['id']+'-*.json'))
+            outcomes.extend(tagged(read(p), f) for p in (history / 'outcomes').glob(f['id']+'-*.json'))
             continue
         entry = next((d for d in dates if d >= f['eligible_from']), None)
         if entry is None:
@@ -54,7 +90,7 @@ def resolve(forecasts, series, benchmark, now, history):
         for horizon in horizons:
             path = history / 'outcomes' / (f['id']+'-'+str(horizon)+'.json')
             if path.exists():
-                outcomes.append(read(path))
+                outcomes.append(tagged(read(path), f))
                 continue
             outcome = label(series.get(f['symbol'], []), benchmark, entry, horizon)
             if outcome is not None:
@@ -63,6 +99,9 @@ def resolve(forecasts, series, benchmark, now, history):
                 diagnostic = ('达成目标' if outcome['win'] else '基准同期下跌' if outcome['benchmark_pct'] < 0
                               else '标的未取得净正收益或未跑赢基准')
                 record = {'prediction_id': f['id'], 'generated_at': now.isoformat(), **outcome,
+                          'selection_version': selection_version_of(f),
+                          'execution_version': f.get('execution_version') or 'legacy',
+                          'rank': f.get('rank'),
                           'bucket': f['bucket'], 'regime': f['regime'], 'probability_at_issue': f['probability']['probability'],
                           'diagnostic': diagnostic, 'causal_attribution': '待复核，不能仅凭收益判定原因'}
                 immutable(path, record)
@@ -73,7 +112,9 @@ def resolve(forecasts, series, benchmark, now, history):
 def run(history, run_id):
     now = datetime.now(CST)
     root = history / 'alpha_data'
-    report = {'id': run_id, 'version': VERSION, 'generated_at': now.isoformat(), 'status': 'waiting_data',
+    report = {'id': run_id, 'version': SELECTION_VERSION, 'selection_version': SELECTION_VERSION,
+              'execution_version': EXECUTION_VERSION, 'archive_size': ARCHIVE_SIZE,
+              'generated_at': now.isoformat(), 'status': 'waiting_data',
               'target': TARGET, 'policy': POLICY, 'mid_policy': MID_POLICY, 'issues': [], 'screen': None,
               'candidates': [], 'calibration': None, 'calibration_short': None, 'portfolio': None,
               'forecasts': [], 'outcomes': [], 'source_hashes': {}}
@@ -145,12 +186,15 @@ def run(history, run_id):
     forecasts = [read(p) for p in sorted((history / 'predictions').glob('*.json'))]
     outcomes = resolve(forecasts, series, benchmark, now, history)
     live_mid = [o for o in outcomes if o['horizon'] == 10]
-    live_short = [o for o in outcomes if o['horizon'] == 3]
+    # 3天窗口的验收按**选股版本**再切一刀，不能只看 horizon：0.3 和 0.4 窗口相同，
+    # 但筛选规则不同，混进一个池子算出的胜率哪个版本都不代表。
+    live_short, legacy_short = split_short_pools(outcomes)
     report['calibration'] = {k: v for k, v in calibration.items() if k != 'samples'}
     report['calibration'].update(historical_n=len(calibration['samples']), live_n=len(live_mid),
                                 live_win_rate=round(sum(o['win'] for o in live_mid)/len(live_mid)*100, 2) if live_mid else None)
     report['calibration_short'] = {k: v for k, v in calibration_short.items() if k != 'samples'}
-    report['calibration_short'].update(historical_n=len(calibration_short['samples']), live_n=len(live_short))
+    report['calibration_short'].update(historical_n=len(calibration_short['samples']), live_n=len(live_short),
+                                       legacy_live_n=len(legacy_short), selection_version=SELECTION_VERSION)
     for track in ('breakout', 'pullback'):
         live_t = [o for o in live_short if o['bucket'] == track]
         report['calibration_short'][f'live_win_rate_{track}'] = round(sum(o['win'] for o in live_t)/len(live_t)*100, 2) if live_t else None
@@ -162,15 +206,15 @@ def run(history, run_id):
         c['probability']['source'] = '前瞻留档样本' if live_p['probability'] is not None else '有回看偏差的历史研究'
         if live_p['probability'] is not None:
             c['probability']['status'] = 'forward_empirical'
-    # Display list: both tracks pooled and ranked for browsing (30, not a
-    # trading decision). The actual position-selection ranking is separate
-    # (top3 below) -- per explicit instruction, pooled by raw score, not
-    # split evenly across tracks. See shortterm_model.select_candidates()'s
-    # own docstring for the score-comparability caveat that implies.
-    report['candidates'] = sorted(all_short_candidates, key=lambda r: (-r['score'], r['symbol']))[:30]
-    top3 = select_candidates(screened, POLICY['max_positions'])
+    # 展示列表和留档/成交用同一套排名（两条 track 各自按原始分转百分位再合并，
+    # 见 shortterm_model.select_candidates 的 docstring）。展示排前面的，就是实际
+    # 会被留档、被允许成交的那批——两处排序不一致只会让人对不上账。
+    ranked_all = select_candidates(screened, max(len(all_short_candidates), 1))
+    report['candidates'] = ranked_all[:30]
+    # 前 ARCHIVE_SIZE 名全部留档做研究，其中只有前 max_positions 名允许模拟成交。
+    ranked = ranked_all[:ARCHIVE_SIZE]
     old_state = previous.get('portfolio') if previous else None
-    codes = {c['symbol'] for c in top3}
+    codes = {c['symbol'] for c in ranked}
     codes.update(p['symbol'] for p in (old_state or {}).get('positions', []))
     codes.update(f['symbol'] for f in forecasts if f['paper_eligible'] and f['id'] not in (old_state or {}).get('attempted', []))
     # Keep delisted/missing master positions in the valuation path. A missing
@@ -186,12 +230,20 @@ def run(history, run_id):
     report['portfolio'] = advance(old_state, forecasts, raw_series, series, benchmark, cutoff, execute=False, policy=POLICY)
     report['issues'].extend(report['portfolio']['issues'])
     created = datetime.now(CST)  # Actual freeze time after all requests, not job start.
-    for c in top3:
+    # 同一个截止日一天里会被重跑好几次（整点任务 + 每小时的补偿检查）。每次重跑排名都
+    # 可能因为数据补齐而略有不同，不设上限的话，同一天留档条数会悄悄超过 ARCHIVE_SIZE，
+    # 允许成交的计划也会超过 max_positions。这里按"该选股版本、该截止日"数已有的。
+    archived_n, paper_n = cutoff_slots(forecasts, cutoff)
+    trade_slots = POLICY['max_positions']
+    for rank, c in enumerate(ranked, start=1):
         ref = next((b for b in raw_series.get(c['symbol'], []) if b['date'] == cutoff), None)
-        identity = VERSION + '-' + cutoff + '-' + c['symbol']
+        identity = SELECTION_VERSION + '-' + cutoff + '-' + c['symbol']
         path = history / 'predictions' / (identity+'.json')
         if path.exists():
             continue
+        if archived_n >= ARCHIVE_SIZE:
+            report['issues'].append('%s 已留档 %d 条，达到上限，本轮不再新增。' % (cutoff, archived_n))
+            break
         if ref is None:
             report['issues'].append(c['symbol']+' 未获得未复权参考价，不生成预测记录。')
             continue
@@ -203,7 +255,15 @@ def run(history, run_id):
         if screened['market_score'] < pause_threshold: plan_reasons.append(f'市场评分低于{pause_threshold}')
         if report['portfolio']['valuation_status'] != 'current': plan_reasons.append('虚拟账户估值暂停')
         if report['portfolio']['paused']: plan_reasons.append('账户回撤风控暂停')
-        forecast = {'id': identity, 'version': VERSION, 'created_at': created.isoformat(), 'as_of': cutoff,
+        archive_only = rank > trade_slots
+        if archive_only:
+            plan_reasons.append('仅研究留档：排名第%d，只有前%d名允许模拟成交' % (rank, trade_slots))
+        elif paper_n >= trade_slots:
+            plan_reasons.append('同一截止日已有%d条允许成交的计划' % trade_slots)
+        can_trade = can_trade and not archive_only and paper_n < trade_slots
+        forecast = {'id': identity, 'version': SELECTION_VERSION, 'selection_version': SELECTION_VERSION,
+            'execution_version': EXECUTION_VERSION, 'rank': rank, 'rank_pct': c.get('rank_pct'),
+            'archive_only': archive_only, 'created_at': created.isoformat(), 'as_of': cutoff,
             'plan_reasons': plan_reasons,
             'execution_mode': 'observed-quote-v1',
             'eligible_from': eligible_from(created), 'symbol': c['symbol'], 'name': c['name'], 'industry': c['industry'],
@@ -214,6 +274,8 @@ def run(history, run_id):
             'limitations': calibration_short['limitations'], 'forecast_type': '研究假设，非已验证买入建议'}
         immutable(path, forecast)
         forecasts.append(forecast)
+        archived_n += 1
+        paper_n += int(can_trade)
     report['forecasts'] = sorted(forecasts, key=lambda f: f['created_at'], reverse=True)
     report['outcomes'] = sorted(outcomes, key=lambda o: o['generated_at'], reverse=True)
     report['generated_at'] = datetime.now(CST).isoformat()
@@ -227,7 +289,7 @@ TRACK_LABEL = {'breakout': '突破', 'pullback': '回调反弹'}
 def render(r):
     safe = lambda x: html.escape(str(x)).replace('|', '&#124;').replace('\n', ' ')
     hold = r['policy']['hold_sessions']
-    lines = ['# Alpha 候选、预测与虚拟组合', '', f'生成：{r["generated_at"]} · {r["version"]} · {r["status"]}', '', r['target'], '',
+    lines = ['# Alpha 候选、预测与虚拟组合', '', f'生成：{r["generated_at"]} · 选股 {r.get("selection_version", r["version"])} · 执行 {r.get("execution_version", "—")} · {r["status"]}', '', r['target'], '',
              '策略为固定规则的研究实验；历史估计存在当前名单与行业分类回看偏差。所有胜率分母和数据覆盖均公开。'
              f'{hold}日持有短线策略（突破/回调反弹两条track，独立打标签、独立校准，不互相混用胜率）已替代原T+10版本，'
              '原T+10预测/账户规则冻结留档，不再产生新计划。', '']
@@ -237,18 +299,18 @@ def render(r):
         lines += [f'截至 {s["cutoff"]}；沪深在市 {s["listed"]}，覆盖 {s["coverage_pct"]}%。',
                   f'市场评分 {s["market_score"]} /100（规则分数，不是概率；暂停阈值 {s["market_score_pause"]}）；'
                   f'突破track通过 {breakout_n} 只，回调反弹track通过 {pullback_n} 只。', '',
-                  f'| track | 股票 | 行业 | 综合分 | {hold}日研究胜率 | 有效样本/日期组 | 区间 |', '|---|---|---|---:|---:|---:|---|']
+                  f'| track | 股票 | 行业 | 综合分 | 原始分 | {hold}日研究胜率 | 有效样本/日期组 | 区间 |', '|---|---|---|---:|---:|---:|---:|---|']
         for c in r['candidates']:
             p = c['probability']
             interval = f'{p["low"]}–{p["high"]}%' if p['low'] is not None else '—'
             lines += [f'| {TRACK_LABEL.get(c["strategy_type"], c["strategy_type"])} | {safe(c["name"])} {c["symbol"]} | '
-                      f'{safe(c["industry"])} | {c["score"]} | {p["probability"] if p["probability"] is not None else "尚不可估计"} | '
+                      f'{safe(c["industry"])} | {c["score"]} | {c.get("raw_score", "—")} | {p["probability"] if p["probability"] is not None else "尚不可估计"} | '
                       f'{p["n"]}/{p["cohorts"]} | {interval} |']
         lines += ['', '突破track排除统计：'+safe(s['breakout']['exclusion_counts']),
                   '回调反弹track排除统计：'+safe(s['pullback']['exclusion_counts']), '',
-                  '每只股票的排除理由及完整候选见同编号JSON。两条track各自按固定综合分排序；'
-                  '实际入账户的前3只按两条track合并后的原始分数统一排序（不按track分名额）——'
-                  '两条打分公式量纲不同，混排可能让某条track系统性占多数席位，这点尚未用真实数据验证过，'
+                  '每只股票的排除理由及完整候选见同编号JSON。列表顺序就是实际排名：两条track各自按**截断前的原始分**'
+                  '转成track内百分位，再合并排序（综合分被截断在100，只用于展示，不能用来排序）；'
+                  f'前{r.get("archive_size", 10)}名全部留档做研究，其中只有前{r["policy"]["max_positions"]}名允许模拟成交。'
                   '概率仅作旁证，不能声称它们是全市场真实胜率最高。', '']
     p = r['portfolio']
     if p:

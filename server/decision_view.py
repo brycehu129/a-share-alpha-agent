@@ -1,5 +1,6 @@
 """Explain frozen plans and ledger facts without changing trading decisions."""
 from alpha_model import POLICY
+from shortterm_model import ARCHIVE_SIZE
 
 
 def decisions(agent):
@@ -45,7 +46,7 @@ def decisions(agent):
             if f:
                 reasons=f.get('plan_reasons') or ['该冻结记录只允许观察；旧记录未保存具体拦截原因，不能用当前条件倒推。']
             elif candidate:
-                reasons=['目前仅候选前3名进入冻结计划检查，其余保留观察。' if list(candidates).index(code)>=3 else '尚未生成冻结计划，请查看本轮数据和参考价状态。']
+                reasons=['目前只有候选前%d名留档做研究（其中前%d名允许模拟成交），其余保留观察。'%(ARCHIVE_SIZE,POLICY['max_positions']) if list(candidates).index(code)>=ARCHIVE_SIZE else '尚未生成冻结计划，请查看本轮数据和参考价状态。']
             else:reasons=['尚无允许入场的冻结计划。']
         ref=(f or {}).get('reference_price')
         entry=pos.get('entry_price') if pos else None
