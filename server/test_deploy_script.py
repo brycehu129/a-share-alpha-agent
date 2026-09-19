@@ -82,25 +82,10 @@ class SelfReplacementTests(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertNotIn('AFTER', r.stdout)
 
-    def test_the_new_script_is_safe_to_be_the_replacement_for_older_and_larger_wrappers(self):
-        """服务器上正在运行的旧 wrapper 会把本文件 cp 到自己身上；本文件必须不比它们长，否则重演 127。
-        1249 = a118d063 版本，2710 = 13e3d1c9 版本（两者都可能是当前 wrapper）。这是过渡期的约束。"""
-        size = SCRIPT.stat().st_size
-        self.assertLessEqual(size, 1249, '新 deploy.sh 是 %d 字节，比最小的旧 wrapper(1249) 长，过渡那一次会读到垃圾' % size)
-
-    def test_overwriting_a_running_wrapper_with_the_new_script_is_clean_for_both_old_sizes(self):
-        new = SCRIPT.read_text()
-        for size in (1249, 2710):
-            d = Path(tempfile.mkdtemp())
-            self.addCleanup(shutil.rmtree, d, True)
-            (d / 'new.sh').write_text(new)
-            w = d / 'w.sh'
-            body, last = '#!/bin/bash\nset -euo pipefail\necho start\n', 'cp %s %s\n' % (d / 'new.sh', w)
-            w.write_text(body + '#' * (size - len(body.encode()) - len(last.encode()) - 1) + '\n' + last)
-            self.assertEqual(w.stat().st_size, size)
-            r = subprocess.run(['bash', str(w)], **RUN)
-            self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertNotIn('command not found', r.stderr)
+    # 注意：这里曾经有两条"新 deploy.sh 不得比旧 wrapper(1249/2710 字节)更长"的测试，那只是为了度过
+    # 2026-09-19 那一次过渡（服务器上运行的还是会 cp 覆盖自己的旧 wrapper）。过渡已经完成，服务器上的
+    # wrapper 现在就是 main+exit+install/mv 的新写法，deploy.sh 变长也不会再出事——保留那个尺寸约束
+    # 反而是陷阱：有人给 deploy.sh 加一行，服务器上 cron 跑测试时就会失败，连带让日线流程中止。
 
 
 class DeployBehaviourTests(unittest.TestCase):
