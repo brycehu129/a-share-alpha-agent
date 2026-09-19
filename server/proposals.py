@@ -130,8 +130,16 @@ def active(directory=None):
 
 
 def current_spec(store, track):
+    """当前生效规格（按典型 ATR 解析，用来预览；真正的计划用各自股票的 ATR）。"""
     rev, overrides = effective(store)
     return exec_spec.build_spec(track, overrides.get(track), rev)
+
+
+def current_template(store, track):
+    """当前生效的规格模板（未解析：倍数、上下限等参数的真实当前值）。"""
+    import copy
+    _, overrides = effective(store)
+    return exec_spec.apply_overrides(copy.deepcopy(exec_spec.SPECS[track]), overrides.get(track))
 
 
 # --- 校验 --------------------------------------------------------------------
@@ -145,7 +153,7 @@ def _num(value):
 
 
 def check_change(store, track, parameter, new):
-    """返回 (问题说明或 None, 当前值)。红线/白名单/边界/步长/自洽性。"""
+    """返回 (问题说明或 None, 当前值)。红线/白名单/适用 track/边界/步长/自洽性。"""
     if parameter in exec_spec.RED_LINES:
         return '“%s”是风控红线，任何提议都不能改。' % parameter, None
     spec_def = exec_spec.TUNABLE_PARAMS.get(parameter)
@@ -153,8 +161,9 @@ def check_change(store, track, parameter, new):
         return '“%s”不在可调参数白名单内。' % parameter, None
     if track not in exec_spec.SPECS:
         return '未知 track：%s。' % track, None
-    base = current_spec(store, track)
-    current = exec_spec.get_param(base, parameter)
+    if track not in spec_def['tracks']:
+        return '该参数在 %s track 上没有定义（不适用）。' % track, None
+    current = exec_spec.get_param(current_template(store, track), parameter)
     if current is None:
         return '该参数在 %s track 上没有定义（不适用）。' % track, None
     value = _num(new)
@@ -168,10 +177,10 @@ def check_change(store, track, parameter, new):
         return '新值和当前值相同，不构成调整。', current
     if abs(value - current) > spec_def['step_cap'] + 1e-12:
         return '单次改动 %.4g 超过步长上限 %s。' % (abs(value - current), spec_def['step_cap']), current
-    import copy
-    after = copy.deepcopy(base)
-    exec_spec.apply_overrides(after, {parameter: int(value) if spec_def.get('integer') else value})
-    problems = exec_spec.check_spec(after)
+    rev, overrides = effective(store)
+    merged = dict(overrides.get(track, {}))
+    merged[parameter] = int(value) if spec_def.get('integer') else value
+    problems = exec_spec.check_spec(exec_spec.build_spec(track, merged, rev))
     if problems:
         return '调整后规格不自洽：' + '；'.join(problems), current
     return None, current
@@ -194,12 +203,13 @@ def check_evidence(evidence, required_version):
 
 
 def preview(store, proposal):
-    """批准前给人看的效果：盈亏平衡胜率的变化（改止损/止盈时最重要的一个数）。"""
-    import copy
-    base = current_spec(store, proposal['track'])
-    after = copy.deepcopy(base)
-    exec_spec.apply_overrides(after, {proposal['parameter']: proposal['new']})
-    return {'breakeven_before': round(exec_spec.breakeven_win_rate(base['exit']), 1),
+    """批准前给人看的效果：盈亏平衡胜率的变化（按典型 ATR 估算；每只股票的实际止损/止盈随自己的 ATR 而变）。"""
+    rev, overrides = effective(store)
+    merged = dict(overrides.get(proposal['track'], {}))
+    merged[proposal['parameter']] = proposal['new']
+    before = exec_spec.build_spec(proposal['track'], overrides.get(proposal['track']), rev)
+    after = exec_spec.build_spec(proposal['track'], merged, rev)
+    return {'breakeven_before': round(exec_spec.breakeven_win_rate(before['exit']), 1),
             'breakeven_after': round(exec_spec.breakeven_win_rate(after['exit']), 1)}
 
 

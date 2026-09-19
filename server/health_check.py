@@ -31,7 +31,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, time as clock_time, timedelta
+from datetime import datetime, time as clock_time, timedelta, timezone
 from pathlib import Path
 
 import backup
@@ -214,14 +214,40 @@ def _report_files(directory):
 
 
 def check_daily_pipeline(ctx):
-    title = '日线流程（15:35）'
+    title = '收盘流程（15:35）'
     if ctx.calendar_state() != 'open' or ctx.now.time() < clock_time(17, 15):
         return check('daily', title, SKIP, '尚未到检查时间或非交易日')
     names = [p.name for p in _report_files(ctx.history / 'agent')]
-    if any(n.startswith(ctx.now.strftime('%Y%m%d')) for n in names):
-        return check('daily', title, OK, '今天的候选/账户报告已生成')
-    return check('daily', title, CRIT, '今天 15:35 的日线流程没有产出报告（agent/ 下没有今天的记录）：今天没有新候选，'
-                                       '盘中条件执行明天也没有新计划。')
+    # 报告文件名是 UTC 时间戳 YYYYMMDDHHMMSS-N。08:40 的盘前那轮也会写报告，不能拿它冒充收盘流程：
+    # 收盘流程 15:35 北京时间 = 07:35 UTC，所以要找当天 07:30 UTC 之后的。
+    utc_day = ctx.now.astimezone(timezone.utc).strftime('%Y%m%d')
+    if any(n[:8] == utc_day and n[8:14] >= '073000' for n in names):
+        return check('daily', title, OK, '今天收盘后的报告已生成')
+    return check('daily', title, CRIT, '今天 15:35/18:20 的收盘流程没有产出报告（agent/ 下没有今天的记录）：今天的验收、估值、证据和基线都没有更新。')
+
+
+def check_premarket_plans(ctx):
+    """盘前选股（08:40）必须在执行器的 09:25 截止之前把今天的计划冻结出来——否则今天整天没有买入计划。"""
+    title = '盘前选股（08:40）'
+    if ctx.calendar_state() != 'open' or not (clock_time(9, 26) <= ctx.now.time() <= clock_time(16, 0)):
+        return check('premarket', title, SKIP, '尚未到检查时间或非交易日')
+    from tushare_sync import read
+    files = sorted((ctx.history / 'predictions').glob('select-*.json'), reverse=True) if (ctx.history / 'predictions').is_dir() else []
+    # 文件名是 select-<版本>-<截止日>-<代码>：按截止日倒序看最新的一批，看它们是不是今天冻结的
+    import re
+    def cutoff_of(path):
+        found = re.search(r'\d{4}-\d{2}-\d{2}', path.name)
+        return found.group(0) if found else ''
+    files = sorted(files, key=cutoff_of, reverse=True)[:12]
+    for path in files:
+        try:
+            created = (read(path).get('created_at') or '')[:10]
+        except Exception:
+            continue
+        if created == ctx.today:
+            return check('premarket', title, OK, '今天的买入计划已冻结')
+    return check('premarket', title, CRIT, '今天到现在没有冻结出任何买入计划：盘前选股没有跑完（或选出 0 只）。'
+                                            '执行器 09:25 之后不再等计划，今天不会有条件入场。')
 
 
 def check_postclose(ctx):
@@ -331,7 +357,7 @@ def check_llm(ctx):
 
 
 CHECKS = [check_calendar, check_engine, check_quotes, check_evaluators, check_sentinel_queue, check_sentinel_ai,
-          check_daily_pipeline, check_postclose, check_reconcile, check_backup, check_units, check_disk, check_cert,
+          check_daily_pipeline, check_premarket_plans, check_postclose, check_reconcile, check_backup, check_units, check_disk, check_cert,
           check_webhook, check_llm]
 
 

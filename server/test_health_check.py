@@ -139,11 +139,30 @@ class PipelineTests(Base):
         self.assertEqual(hc.check_daily_pipeline(self.ctx('16:00:00'))['level'], hc.SKIP)
         self.assertEqual(hc.check_daily_pipeline(self.ctx('17:30:00', state='closed'))['level'], hc.SKIP)
         self.assertEqual(hc.check_daily_pipeline(self.ctx('17:30:00'))['level'], hc.CRIT)
-        (self.history / 'agent' / '20260921153500-1.json').write_text('{}')
+        (self.history / 'agent' / '20260921004000-1.json').write_text('{}')                       # 08:40 北京时间的盘前那轮
+        self.assertEqual(hc.check_daily_pipeline(self.ctx('17:30:00'))['level'], hc.CRIT)         # 不能冒充收盘流程
+        (self.history / 'agent' / '20260921073500-1.json').write_text('{}')                       # 15:35 北京时间 = 07:35 UTC
         self.assertEqual(hc.check_daily_pipeline(self.ctx('17:30:00'))['level'], hc.OK)
-        (self.history / 'agent' / '20260921153500-1.json').unlink()
+        (self.history / 'agent' / '20260921073500-1.json').unlink()
+        (self.history / 'agent' / '20260921004000-1.json').unlink()
         (self.history / 'agent' / '20260918153500-1.json').write_text('{}')
         self.assertEqual(hc.check_daily_pipeline(self.ctx('17:30:00'))['level'], hc.CRIT)      # 昨天的不算
+
+    def freeze_plan(self, name, created):
+        from tushare_sync import save
+        save(self.history / 'predictions' / name, {'id': name, 'created_at': created})
+
+    def test_todays_plans_must_be_frozen_before_the_executors_deadline(self):
+        self.assertEqual(hc.check_premarket_plans(self.ctx('09:20:00'))['level'], hc.SKIP)          # 还没到检查时间
+        self.assertEqual(hc.check_premarket_plans(self.ctx('10:00:00', state='closed'))['level'], hc.SKIP)
+        r = hc.check_premarket_plans(self.ctx('09:30:00'))
+        self.assertEqual(r['level'], hc.CRIT)
+        self.assertIn('盘前选股没有跑完', r['message'])
+        self.freeze_plan('select-0.5-2026-09-17-sh600000.json', '2026-09-18T15:40:00+08:00')     # 昨天冻结的不算
+        self.assertEqual(hc.check_premarket_plans(self.ctx('09:30:00'))['level'], hc.CRIT)
+        self.freeze_plan('select-0.5-2026-09-18-sh600001.json', '2026-09-21T08:45:00+08:00')
+        self.assertEqual(hc.check_premarket_plans(self.ctx('09:30:00'))['level'], hc.OK)
+        self.assertEqual(hc.check_premarket_plans(self.ctx('16:30:00'))['level'], hc.SKIP)            # 收盘后不再查
 
     def postclose(self, generated, ai_status=None):
         d = self.private / 'postclose'

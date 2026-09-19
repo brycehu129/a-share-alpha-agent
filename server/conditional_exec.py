@@ -6,7 +6,7 @@
 
 账本存 server/data/private/intraday/ledger-exec-0.2.json（引擎同目录，单写者，原子写）。
 不放进 git 是因为盘中每分钟都可能变，而 .history 由几个持有流水线锁的任务顺序写；
-让一个不取锁的每分钟进程去写 git 会和它们互相踩。每天 15:35 由 alpha_engine 读取账本、
+让一个不取锁的每分钟进程去写 git 会和它们互相踩。每天由 alpha_engine（盘前与收盘各一轮）读取账本、
 生成只读快照并入日报和看板（account_snapshot）；账本本身仍没有异地备份。
 
 四条纪律（和 intraday_engine / opening_observer 一脉相承）：
@@ -38,6 +38,7 @@ from tushare_sync import read
 LEDGER_NAME = 'ledger-exec-0.2.json'
 NEAR_LIMIT_PCT = 0.5          # 买入时距涨停不足 0.5% 就不算能成交
 PLAN_FREEZE_CUTOFF = clock_time(9, 20)
+LOAD_DEADLINE = clock_time(9, 25)     # 这之后还没有今天的计划就不再等
 
 
 def parse_hhmm(text):
@@ -195,14 +196,18 @@ class Executor:
         if self.dates and today in self.dates and ledger['plans_loaded_for'] != today:
             previous = max((d for d in self.dates if d < today), default=None)
             if previous:
-                for f in self.plans_fn(previous):
+                files = self.plans_fn(previous)
+                for f in files:
                     plan, why = admit(f, today, previous, self.dates)
                     if plan is None or plan['id'] in ledger['plans']:
                         continue
                     if why:
                         plan.update(status='skipped', reason=why)
                     ledger['plans'][plan['id']] = plan
-                ledger['plans_loaded_for'] = today
+                # 计划改在盘前（08:40）冻结，可能在引擎 09:00 启动之后才出现：找到了才算"加载完成"，
+                # 找不到就下一轮再找，直到 09:25（那之后冻结的计划本来就不合格，admit 会拒绝）。
+                if files or now.time() >= LOAD_DEADLINE:
+                    ledger['plans_loaded_for'] = today
         if not dry_run and json.dumps(ledger, sort_keys=True) != before:
             save_ledger(self.directory, ledger)
         return ledger
@@ -345,7 +350,10 @@ class Executor:
         ledger['positions'].append(pos)
         ledger['trades'].append({'id': plan['id'] + '-entry', 'prediction_id': plan['id'], 'symbol': plan['symbol'],
                                  'side': 'buy', 'date': pos['entry_day'], 'price': price, 'shares': shares, 'fee': cost_fee,
-                                 'reason': '条件触发：现价满足入场区间', 'execution_mode': EXEC_MODE, **evidence})
+                                 'reason': '条件触发：现价满足入场区间', 'execution_mode': EXEC_MODE,
+                                 'stop_price': pos['stop_base'], 'target_price': pos['target_price'],
+                                 'stop_pct': exit_spec['stop_pct'], 'target_pct': exit_spec['target_pct'],
+                                 'hold_sessions': exit_spec['hold_sessions'], 'atr_pct': plan['spec'].get('atr_pct'), **evidence})
         plan.update(status='filled', reason='成交 %d 股 @ %.2f' % (shares, price), status_at=now.isoformat())
         self._mark_equity(ledger, policy)
         return [self._note('paper-entry', plan, '模拟买入 %s %d股 @ %.2f，止损 %.2f，目标 %.2f'
@@ -411,6 +419,8 @@ class Executor:
                                  'side': 'sell', 'date': now.date().isoformat(), 'price': price, 'shares': pos['shares'],
                                  'fee': cost_fee, 'pnl': pnl, 'return_pct': round(pnl / pos['cost'] * 100, 4),
                                  'reason': reason, 'stop_level_at_exit': round(self._stop_level(pos), 4),
+                                 'breakeven_armed': pos['breakeven_armed'], 'breakeven_armed_at': pos.get('breakeven_armed_at'),
+                                 'peak_price': pos.get('peak_price'), 'entry_price': pos['entry_price'], 'entry_day': pos['entry_day'],
                                  'execution_mode': EXEC_MODE, **evidence})
         self._mark_equity(ledger, policy)
         return [self._note('paper-exit', pos, '模拟卖出 %s @ %.2f（%s），盈亏 %.2f' % (
@@ -460,6 +470,39 @@ def read_ledger(directory=None):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+def operations(ledger, limit=80):
+    """每一次"操作"，按时间倒序：模拟买入、模拟卖出（含原因和盈亏）、保本止损启动、计划作废/过期/被跳过（含原因）。
+    用户要求"每次操作都要记录并能在看板上看到"——这里把账本里散落的记录合成一条时间线。"""
+    ops = []
+    for t in ledger['trades']:
+        at = t.get('observed_at') or t.get('date')
+        if t['side'] == 'buy':
+            ops.append({'at': at, 'type': 'buy', 'symbol': t['symbol'], 'price': t.get('price'), 'shares': t.get('shares'),
+                        'detail': '条件触发买入；止损 %s（−%.1f%%），目标 %s（+%.1f%%），最长持有 %s 个交易日' % (
+                            t.get('stop_price'), (t.get('stop_pct') or 0) * 100, t.get('target_price'),
+                            (t.get('target_pct') or 0) * 100, t.get('hold_sessions', '—'))})
+        elif t['side'] == 'sell':
+            ops.append({'at': at, 'type': 'sell', 'symbol': t['symbol'], 'price': t.get('price'), 'shares': t.get('shares'),
+                        'reason': t.get('reason'), 'pnl': t.get('pnl'), 'return_pct': t.get('return_pct'),
+                        'detail': '%s；入场 %s @ %s，盈亏 %+.2f（%+.2f%%）%s' % (
+                            EXIT_LABEL.get(t.get('reason'), t.get('reason')), t.get('entry_day', '—'),
+                            '%.2f' % t['entry_price'] if isinstance(t.get('entry_price'), (int, float)) else '—',
+                            t.get('pnl') or 0, t.get('return_pct') or 0, '；曾启动保本止损' if t.get('breakeven_armed') else '')})
+            if t.get('breakeven_armed_at'):
+                ops.append({'at': t['breakeven_armed_at'], 'type': 'breakeven_armed', 'symbol': t['symbol'],
+                            'detail': '浮盈达到启动线，止损上移到保本价'})
+    for pos in ledger['positions']:
+        if pos.get('breakeven_armed_at'):
+            ops.append({'at': pos['breakeven_armed_at'], 'type': 'breakeven_armed', 'symbol': pos['symbol'],
+                        'detail': '浮盈达到启动线，止损上移到保本价 %.2f' % pos['breakeven_price']})
+    for plan in ledger['plans'].values():
+        if plan['status'] in ('voided', 'expired', 'skipped') and plan.get('status_at'):
+            ops.append({'at': plan['status_at'], 'type': 'plan_' + plan['status'], 'symbol': plan['symbol'],
+                        'detail': '%s：%s' % (PLAN_STATUS_LABEL.get(plan['status'], plan['status']), plan.get('reason') or '—')})
+    ops.sort(key=lambda o: o['at'] or '', reverse=True)
+    return ops[:limit]
+
+
 def account_snapshot(ledger, now, prior_curve=()):
     """账本的只读快照，并入每日报告/看板。不含任何私密信息（虚拟账户，不是你的真实持仓）。
 
@@ -483,10 +526,11 @@ def account_snapshot(ledger, now, prior_curve=()):
     curve = [c for c in prior_curve if c['date'] != today] + [
         {'date': today, 'equity': ledger['equity'], 'nav': round(ledger['equity'] / capital, 6)}]
     return {'ledger_version': ledger['ledger_version'], 'capital': capital, 'equity': ledger['equity'],
+            'operations': operations(ledger),
             'cash': ledger['cash'], 'nav': round(ledger['equity'] / capital, 6), 'peak': ledger['peak'],
             'drawdown_pct': ledger.get('drawdown_pct', 0), 'paused': ledger['paused'],
             'positions': positions,
-            'trades': ledger['trades'][-30:],
+            'trades': ledger['trades'][-60:],
             'trade_stats': {'closed': len(sells), 'wins': wins,
                             'win_rate_pct': round(wins / len(sells) * 100, 1) if len(sells) >= TRADE_RATE_GATE else None},
             'plans': [{k: pl.get(k) for k in ('id', 'symbol', 'name', 'track', 'rank', 'day', 'status', 'reason', 'last_note')}
@@ -502,8 +546,8 @@ EXIT_LABEL = {'stop': '止损', 'breakeven_stop': '保本止损', 'target': '止
 
 def render_account(acc):
     """报告里的 Markdown 段落。"""
-    lines = ['## exec-0.2 虚拟账户（盘中条件执行）', '',
-             '`select-0.4` 起的新计划由盘中引擎按条件触发执行——独立的 10 万虚拟本金、独立账本，与上面 exec-0.1 那个账户'
+    lines = ['## 盘中条件执行虚拟账户', '',
+             '`select-0.4` 起的条件计划由盘中引擎按条件触发执行——独立的 10 万虚拟本金、独立账本，与上面 exec-0.1 那个账户'
              '互不相干，**两个账户的成交与胜率不得混算**。这是虚拟账户，不是你的真实持仓。', '',
              '快照时间 %s · 总资产 %.2f · 现金 %.2f · 净值 %.4f · 回撤 %.2f%%%s' % (
                  acc['snapshot_at'][:16].replace('T', ' '), acc['equity'], acc['cash'], acc['nav'], acc['drawdown_pct'],

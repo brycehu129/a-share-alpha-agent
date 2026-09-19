@@ -5,7 +5,8 @@ from pathlib import Path
 
 import contract_labels as cl
 from alpha_engine import immutable
-from exec_spec import ROUND_TRIP_COST_PCT, build_spec
+from exec_spec import ROUND_TRIP_COST_PCT
+from spec_fixtures import build_spec      # 固定数字的冻结规格（判定逻辑与 ATR 参数无关），见 spec_fixtures.py
 from tushare_sync import read
 
 BO = build_spec('breakout')
@@ -132,13 +133,23 @@ class ExitTests(unittest.TestCase):
         self.assertEqual(p['pess']['reason'], 'breakeven_stop')
         self.assertAlmostEqual(p['pess']['price'], 10 * (1 + ROUND_TRIP_COST_PCT / 100), places=3)
 
-    def test_level_fills_only_count_entry_day_arming_in_the_optimistic_run(self):
-        """触发价位成交的先后不明：入场当天的高点算不算"入场之后"，悲观不算、乐观算。"""
+    def test_level_fills_only_count_entry_day_arming_in_one_of_the_two_orderings(self):
+        """触发价位成交的先后不明：入场当天的高点算不算"入场之后"，两种推演结果不同——保本止损一旦武装就会更早在保本价离场。"""
         b0 = bar(10, 10.35, 9.95, 10.3)
         p = self.pair([bar(10.2, 10.25, 10.02, 10.1)] + self.quiet(2), bar0=b0, kind='level')
-        self.assertEqual(p['opt']['reason'], 'breakeven_stop')
-        self.assertEqual(p['pess']['reason'], 'hold_expiry')
+        self.assertEqual({p['pess']['reason'], p['opt']['reason']}, {'breakeven_stop', 'hold_expiry'})
         self.assertTrue(p['ambiguous'])
+
+    def test_pessimistic_is_always_the_lower_result_whatever_the_mode_that_produced_it(self):
+        """"悲观/乐观"是结果的上下界，不是推演模式的名字：乐观推演里先武装保本反而会更早离场、净收益更低，此时它就是下界。"""
+        b0 = bar(10, 10.35, 9.95, 10.3)
+        p = self.pair([bar(10.2, 10.25, 10.02, 10.1)] + self.quiet(2), bar0=b0, kind='level')
+        self.assertLessEqual(p['pess']['net_pct'], p['opt']['net_pct'])
+        self.assertEqual(p['pess']['reason'], 'breakeven_stop')                # 保本离场（≈0）比持有到期（+1%）低
+        self.assertEqual(p['opt']['reason'], 'hold_expiry')
+        for later in ([bar(10.0, 10.8, 9.7, 10.0)], [bar(9.6, 9.7, 9.5)], [bar(10.8, 10.9, 10.7)]):
+            q = self.pair(later)
+            self.assertLessEqual(q['pess']['net_pct'], q['opt']['net_pct'])
 
     def test_pullback_stop_is_the_higher_of_percentage_and_ma20(self):
         x = PB['exit']

@@ -42,12 +42,15 @@ from alpha_model import screen as screen_mid
 #
 # 只在对应层的规则真的变了才 bump 对应的号。变了之后旧版本的预测与验收记录原样
 # 冻结留档、不迁移，新样本从零开始计数——所以任何一个号都不要随手改。
-SELECTION_VERSION = 'select-0.4'
+# select-0.5：选股改在盘前（08:40 用昨收数据 + 晚间公告）冻结；夜间公告命中高风险关键词的直接剔除、不占名额；
+#             收盘涨停的候选次日大概率买不到，只留档不成交。选股的打分与门槛本身没变。
+SELECTION_VERSION = 'select-0.5'
 # exec-0.1：09:30–09:35 观察窗口按报价成交（统一 ±3% 入场带、统一 −3%/+5%），由 opening_observer 执行，
 #           只承载 0.3 版留下的 16 条旧计划，已冻结。
 # exec-0.2：条件触发入场 + 按 track 分化的止损止盈 + 盘中止损 + 保本止损，由 conditional_exec 在
 #           盘中引擎上执行，规格见 exec_spec.py。新计划一律走这个。
-EXECUTION_VERSION = 'exec-0.2'
+# exec-0.3：止损/止盈/追高上限按每只股票自己的 ATR 定（不再是固定 −2.5%），最长持有 5 个交易日，入场时段延到 14:30。
+from exec_spec import BASE_EXECUTION_VERSION as EXECUTION_VERSION  # noqa: E402
 
 # 兼容旧代码里的 `VERSION`（沿用它的地方多为"给记录打版本标签"，现在等价于选股版本）。
 VERSION = SELECTION_VERSION
@@ -134,6 +137,20 @@ def short_window(bars, dates):
     }
 
 
+def atr_pct(by_date, dates, n=14):
+    """近 n 个交易日的平均真实波幅 / 最新收盘（小数，0.035 = 3.5%）。窗口缺一天返回 None——不用残缺窗口去定止损。
+    真实波幅 = max(高-低, |高-昨收|, |低-昨收|)。比值与是否前复权无关。"""
+    window = dates[-(n + 1):]
+    if len(window) < n + 1 or any(d not in by_date for d in window):
+        return None
+    trs = []
+    for prev, day in zip(window, window[1:]):
+        high, low, prev_close = float(by_date[day]['high']), float(by_date[day]['low']), float(by_date[prev]['close'])
+        trs.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
+    close = float(by_date[window[-1]]['close'])
+    return statistics.mean(trs) / close if close > 0 else None
+
+
 def stock_features(stocks, series, benchmark, cutoff):
     """Base features() plus short-horizon fields, keyed by symbol. Freshness
     for the breakout track needs YESTERDAY's volume_ratio_5d too, computed
@@ -157,8 +174,10 @@ def stock_features(stocks, series, benchmark, cutoff):
         yesterday = short_window(bars, prior_dates)
         if today is None or yesterday is None:
             continue
+        by_date = {b['date']: b for b in bars}
         out[code] = {'symbol': code, 'name': s['name'], 'industry': s['industry'],
-                      **f, **today, 'prior_volume_ratio_5d': yesterday['volume_ratio_5d']}
+                      **f, **today, 'prior_volume_ratio_5d': yesterday['volume_ratio_5d'],
+                      'atr14': atr_pct(by_date, today_dates)}
     # 流动性分位在整个"有效窗口"总体上算，而不是只在候选里算——后者永远是相对候选的
     # 排名，起不到"排除全市场最薄的票"的作用。总体比 alpha_model.screen() 的略小
     # （short_window 额外要求今昨两个窗口都完整），分位线本身同为 20。

@@ -19,7 +19,7 @@ import proposals as pr
 import webapp
 import webapp_views
 
-EV = {'n': 40, 'cohorts': 20, 'execution_version': 'exec-0.2', 'summary': '突破止损被扫后又涨回的比例偏高'}
+EV = {'n': 40, 'cohorts': 20, 'execution_version': 'exec-0.3', 'summary': '突破止损被扫后又涨回的比例偏高'}
 PASSWORD = 'pw-for-tests'
 AUTH = 'Basic ' + base64.b64encode(('x:' + PASSWORD).encode()).decode()
 
@@ -28,7 +28,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
 
-    def submit(self, param='exit.stop_pct', new=0.02, track='breakout', evidence=EV, **kw):
+    def submit(self, param='exit.stop_atr_mult', new=1.25, track='breakout', evidence=EV, **kw):
         return pr.submit(track, param, new, kw.pop('rationale', '理由'), evidence, directory=self.dir, **kw)
 
     def store(self):
@@ -38,7 +38,7 @@ class Base(unittest.TestCase):
 class SubmitTests(Base):
     def test_a_valid_proposal_is_only_queued_and_changes_nothing(self):
         p = self.submit()
-        self.assertEqual((p['status'], p['old'], p['new']), ('pending', 0.025, 0.02))
+        self.assertEqual((p['status'], p['old'], p['new']), ('pending', 1.5, 1.25))
         self.assertEqual(pr.active(self.dir), (0, {}))
 
     def test_every_red_line_is_refused_and_recorded(self):
@@ -55,19 +55,19 @@ class SubmitTests(Base):
 
     def test_bounds_step_noop_and_unknown_track(self):
         self.assertIn('绝对边界', self.submit(new=0.5)['reason'])
-        self.assertIn('步长', self.submit(new=0.035)['reason'])          # 0.025 → 0.035 超过 0.005
-        self.assertIn('相同', self.submit(new=0.025)['reason'])
+        self.assertIn('步长', self.submit(new=1.9)['reason'])          # 1.5 → 1.9 超过步长 0.25
+        self.assertIn('相同', self.submit(new=1.5)['reason'])
         self.assertIn('未知 track', self.submit(track='mystery')['reason'])
 
     def test_non_finite_and_non_numeric_values_are_refused(self):
-        for bad in (float('nan'), math.inf, -math.inf, True, '0.02', None, [0.02]):
+        for bad in (float('nan'), math.inf, -math.inf, True, '1.25', None, [1.25]):
             p = self.submit(new=bad)
             self.assertEqual(p['status'], 'refused', repr(bad))
             self.assertIsNone(p['new'])
 
     def test_integer_parameter_must_be_an_integer(self):
         self.assertEqual(self.submit(param='exit.hold_sessions', new=2.5)['status'], 'refused')
-        self.assertEqual(self.submit(param='exit.hold_sessions', new=2)['status'], 'pending')
+        self.assertEqual(self.submit(param='exit.hold_sessions', new=4)['status'], 'pending')
 
     def test_parameter_not_defined_for_the_track_is_refused(self):
         p = self.submit(param='entry.min_pct', new=0.0025, track='pullback')      # 回调 track 没有确认下沿
@@ -76,13 +76,13 @@ class SubmitTests(Base):
 
     def test_result_must_remain_self_consistent(self):
         store = {'seq': 0, 'proposals': [], 'revisions': [
-            {'track': 'breakout', 'parameter': 'exit.target_pct', 'new': 0.03}]}
-        problem, _ = pr.check_change(store, 'breakout', 'exit.stop_pct', 0.03)      # 止盈 3% 不能不大于止损 3%
+            {'track': 'breakout', 'parameter': 'exit.target_r', 'new': 1.0}]}
+        problem, _ = pr.check_change(store, 'breakout', 'exit.stop_atr_mult', 1.75)      # R=1.0：止盈 = 止损，止盈必须大于止损
         self.assertIn('不自洽', problem)
 
     def test_a_newer_pending_proposal_for_the_same_knob_supersedes_the_older(self):
-        a = self.submit(new=0.02)
-        b = self.submit(new=0.0225)
+        a = self.submit(new=1.25)
+        b = self.submit(new=1.75)
         by_id = {p['id']: p for p in self.store()['proposals']}
         self.assertEqual((by_id[a['id']]['status'], by_id[b['id']]['status']), ('stale', 'pending'))
         self.assertIn(b['id'], by_id[a['id']]['reason'])
@@ -115,9 +115,9 @@ class EvidenceGateTests(Base):
     def test_after_a_revision_old_version_evidence_no_longer_counts(self):
         p = self.submit()
         pr.approve(p['id'], directory=self.dir)
-        again = self.submit(param='exit.target_pct', new=0.06, evidence=EV)       # 证据还是 exec-0.2 的
+        again = self.submit(param='exit.target_r', new=1.75, evidence=EV)       # 证据还是 exec-0.3 的
         self.assertEqual(again['status'], 'insufficient')
-        ok = self.submit(param='exit.target_pct', new=0.06, evidence={**EV, 'execution_version': 'exec-0.2.r1'})
+        ok = self.submit(param='exit.target_r', new=1.75, evidence={**EV, 'execution_version': 'exec-0.3.r1'})
         self.assertEqual(ok['status'], 'pending')
 
 
@@ -125,11 +125,11 @@ class ApproveTests(Base):
     def test_approval_appends_a_revision_and_changes_the_effective_spec(self):
         p = self.submit()
         rev = pr.approve(p['id'], '同意', directory=self.dir)
-        self.assertEqual((rev['revision'], rev['old'], rev['new']), (1, 0.025, 0.02))
+        self.assertEqual((rev['revision'], rev['old'], rev['new']), (1, 1.5, 1.25))
         n, overrides = pr.active(self.dir)
-        self.assertEqual((n, overrides), (1, {'breakout': {'exit.stop_pct': 0.02}}))
-        self.assertEqual(pr.current_spec(self.store(), 'breakout')['exit']['stop_pct'], 0.02)
-        self.assertEqual(pr.current_spec(self.store(), 'pullback')['exit']['stop_pct'], 0.03)     # 别的 track 不受影响
+        self.assertEqual((n, overrides), (1, {'breakout': {'exit.stop_atr_mult': 1.25}}))
+        self.assertEqual(pr.current_spec(self.store(), 'breakout')['exit']['stop_atr_mult'], 1.25)
+        self.assertEqual(pr.current_spec(self.store(), 'pullback')['exit']['stop_atr_mult'], 1.5)     # 别的 track 不受影响
         stored = self.store()['proposals'][0]
         self.assertEqual((stored['status'], stored['applied_revision'], stored['decision_note']), ('approved', 1, '同意'))
 
@@ -146,13 +146,13 @@ class ApproveTests(Base):
             pr.approve('p9999', directory=self.dir)
 
     def test_a_proposal_made_before_another_revision_goes_stale_instead_of_applying(self):
-        a = self.submit(param='exit.stop_pct', new=0.02)
-        b = self.submit(param='exit.target_pct', new=0.06)
+        a = self.submit(param='exit.stop_atr_mult', new=1.25)
+        b = self.submit(param='exit.target_r', new=1.75)
         pr.approve(b['id'], directory=self.dir)
         with self.assertRaises(pr.ProposalError) as ctx:
             pr.approve(a['id'], directory=self.dir)
         self.assertIn('旧修订', str(ctx.exception))
-        self.assertEqual(pr.active(self.dir)[1], {'breakout': {'exit.target_pct': 0.06}})
+        self.assertEqual(pr.active(self.dir)[1], {'breakout': {'exit.target_r': 1.75}})
         self.assertEqual({p['id']: p['status'] for p in self.store()['proposals']}[a['id']], 'stale')
 
     def test_approval_rechecks_evidence_against_the_stored_record(self):
@@ -173,7 +173,7 @@ class ApproveTests(Base):
         Path(pr.path(self.dir)).write_text(json.dumps(store))
         with self.assertRaises(pr.ProposalError):
             pr.approve(p['id'], directory=self.dir)
-        q = self.submit(param='exit.target_pct', new=0.06)
+        q = self.submit(param='exit.target_r', new=1.75)
         store = self.store()
         store['proposals'][-1]['parameter'] = 'capital'      # 手改成红线
         Path(pr.path(self.dir)).write_text(json.dumps(store))
@@ -189,16 +189,18 @@ class ApproveTests(Base):
 
     def test_successive_revisions_replay_in_order(self):
         pr.approve(self.submit()['id'], directory=self.dir)
-        ev1 = {**EV, 'execution_version': 'exec-0.2.r1'}
-        pr.approve(self.submit(param='exit.stop_pct', new=0.0175, evidence=ev1)['id'], directory=self.dir)
-        self.assertEqual(pr.active(self.dir), (2, {'breakout': {'exit.stop_pct': 0.0175}}))
-        self.assertEqual(exec_spec.execution_version(2), 'exec-0.2.r2')
+        ev1 = {**EV, 'execution_version': 'exec-0.3.r1'}
+        pr.approve(self.submit(param='exit.stop_atr_mult', new=1.0, evidence=ev1)['id'], directory=self.dir)
+        self.assertEqual(pr.active(self.dir), (2, {'breakout': {'exit.stop_atr_mult': 1.0}}))
+        self.assertEqual(exec_spec.execution_version(2), 'exec-0.3.r2')
 
     def test_preview_shows_the_breakeven_effect(self):
         p = self.submit()
         eff = pr.preview(self.store(), p)
-        self.assertEqual(eff['breakeven_before'], 29.6)
-        self.assertLess(eff['breakeven_after'], eff['breakeven_before'])
+        self.assertAlmostEqual(eff['breakeven_before'], 42.35, delta=0.1)          # 典型 ATR、R=1.5
+        # 止损收紧、R 不变：成本占比更大，盈亏平衡胜率反而略升——这正是预览要让人看到的取舍
+        self.assertAlmostEqual(eff['breakeven_after'], 42.9, delta=0.1)
+        self.assertGreater(eff['breakeven_after'], eff['breakeven_before'])
 
 
 class StorageTests(Base):
@@ -218,7 +220,7 @@ class StorageTests(Base):
 
     def test_concurrent_submissions_do_not_lose_updates(self):
         def work(i):
-            pr.submit('breakout', 'exit.target_pct', 0.06, 'r%d' % i, EV, directory=self.dir)
+            pr.submit('breakout', 'exit.target_r', 1.75, 'r%d' % i, EV, directory=self.dir)
         threads = [threading.Thread(target=work, args=(i,)) for i in range(20)]
         [t.start() for t in threads]
         [t.join() for t in threads]
@@ -233,7 +235,7 @@ class StorageTests(Base):
         with patch.object(pr, 'MAX_RECORDS', 5):
             for i in range(12):
                 self.submit(param='exit.nope', new=1)                 # refused 记录堆积
-            pending = self.submit(param='exit.target_pct', new=0.06, evidence={**EV, 'execution_version': 'exec-0.2.r1'})
+            pending = self.submit(param='exit.target_r', new=1.75, evidence={**EV, 'execution_version': 'exec-0.3.r1'})
         ids = {p['id'] for p in self.store()['proposals']}
         self.assertIn(first['id'], ids)
         self.assertIn(pending['id'], ids)
@@ -244,10 +246,10 @@ class StorageTests(Base):
 class SpecOverrideTests(unittest.TestCase):
     def test_overrides_apply_without_mutating_the_base_specs(self):
         before = copy.deepcopy(exec_spec.SPECS)
-        spec = exec_spec.build_spec('breakout', {'exit.stop_pct': 0.02}, 3)
-        self.assertEqual((spec['exit']['stop_pct'], spec['revision']), (0.02, 3))
+        spec = exec_spec.build_spec('breakout', {'exit.stop_atr_mult': 2.0}, 3, 0.03)
+        self.assertEqual((spec['exit']['stop_atr_mult'], spec['exit']['stop_pct'], spec['revision']), (2.0, 0.06, 3))
         self.assertEqual(exec_spec.SPECS, before)
-        self.assertEqual(exec_spec.build_spec('breakout')['exit']['stop_pct'], 0.025)
+        self.assertEqual(exec_spec.build_spec('breakout', atr_pct=0.03)['exit']['stop_pct'], 0.045)
         self.assertEqual(exec_spec.build_spec('breakout')['revision'], 0)
 
     def test_unknown_override_is_rejected(self):
@@ -267,31 +269,31 @@ class SpecOverrideTests(unittest.TestCase):
                     self.assertTrue(d['floor'] <= v <= d['ceiling'], (track, name, v))
 
     def test_execution_version_strings(self):
-        self.assertEqual(exec_spec.execution_version(0), 'exec-0.2')
-        self.assertEqual(exec_spec.execution_version(1), 'exec-0.2.r1')
+        self.assertEqual(exec_spec.execution_version(0), 'exec-0.3')
+        self.assertEqual(exec_spec.execution_version(1), 'exec-0.3.r1')
 
 
 class EngineWiringTests(Base):
     def test_run_tags_the_report_with_the_revision_it_was_given(self):
         empty = Path(tempfile.mkdtemp())
-        r = alpha_engine.run(empty, '20260919000000-1', (2, {'breakout': {'exit.stop_pct': 0.02}}))
-        self.assertEqual(r['execution_version'], 'exec-0.2.r2')
-        self.assertEqual(alpha_engine.run(empty, '20260919000000-2')['execution_version'], 'exec-0.2')
+        r = alpha_engine.run(empty, '20260919000000-1', (2, {'breakout': {'exit.stop_atr_mult': 1.25}}))
+        self.assertEqual(r['execution_version'], 'exec-0.3.r2')
+        self.assertEqual(alpha_engine.run(empty, '20260919000000-2')['execution_version'], 'exec-0.3')
 
     def test_frozen_forecast_fields_carry_the_approved_revision_only_for_its_track(self):
-        rev = (1, {'breakout': {'exit.stop_pct': 0.02}})
-        b, p = alpha_engine.exec_fields('breakout', rev), alpha_engine.exec_fields('pullback', rev)
+        rev = (1, {'breakout': {'exit.stop_atr_mult': 2.0}})
+        b, p = alpha_engine.exec_fields('breakout', rev, 0.03), alpha_engine.exec_fields('pullback', rev, 0.03)
         self.assertEqual((b['execution_version'], b['exec_spec']['revision'], b['exec_spec']['exit']['stop_pct']),
-                         ('exec-0.2.r1', 1, 0.02))
-        self.assertEqual((p['execution_version'], p['exec_spec']['exit']['stop_pct']), ('exec-0.2.r1', 0.03))
-        base = alpha_engine.exec_fields('breakout')
+                         ('exec-0.3.r1', 1, 0.06))
+        self.assertEqual((p['execution_version'], p['exec_spec']['exit']['stop_pct']), ('exec-0.3.r1', 0.045))
+        base = alpha_engine.exec_fields('breakout', None, 0.03)
         self.assertEqual((base['execution_version'], base['exec_spec']['revision'], base['exec_spec']['exit']['stop_pct']),
-                         ('exec-0.2', 0, 0.025))
+                         ('exec-0.3', 0, 0.045))
 
     def test_a_frozen_spec_is_a_copy_later_revisions_cannot_reach(self):
-        f = alpha_engine.exec_fields('breakout', (1, {'breakout': {'exit.stop_pct': 0.02}}))
-        alpha_engine.exec_fields('breakout', (2, {'breakout': {'exit.stop_pct': 0.0175}}))
-        self.assertEqual(f['exec_spec']['exit']['stop_pct'], 0.02)
+        f = alpha_engine.exec_fields('breakout', (1, {'breakout': {'exit.stop_atr_mult': 2.0}}), 0.03)
+        alpha_engine.exec_fields('breakout', (2, {'breakout': {'exit.stop_atr_mult': 1.0}}), 0.03)
+        self.assertEqual(f['exec_spec']['exit']['stop_pct'], 0.06)
 
     def test_library_run_never_reads_the_proposals_file(self):
         """cron 先跑全量测试：库若自己读文件，服务器上一批准提议，'没有修订'的断言就变样。"""
@@ -299,7 +301,7 @@ class EngineWiringTests(Base):
         pr.approve(p['id'], directory=self.dir)
         with patch.dict(os.environ, {'PRIVATE_DATA_DIR': self.dir}):
             r = alpha_engine.run(Path(tempfile.mkdtemp()), '20260919000000-3')
-        self.assertEqual(r['execution_version'], 'exec-0.2')
+        self.assertEqual(r['execution_version'], 'exec-0.3')
 
 
 class WebTests(Base):
@@ -344,11 +346,11 @@ class WebTests(Base):
         self.assertNotIn('<script>alert(1)</script>', page)        # 提议方文字必须转义
         self.assertIn('&lt;script&gt;', page)
         self.assertIn('未经验证', page)
-        self.assertIn('29.6% → 25.7%', page)
+        self.assertIn('42.3% → 42.9%', page)
         status, page = self.request('POST', '/proposals/approve', {'id': p['id'], 'note': '好'})
         self.assertEqual(status, 200)
         self.assertIn('已批准', page)
-        self.assertIn('exec-0.2.r1', page)
+        self.assertIn('exec-0.3.r1', page)
         self.assertEqual(pr.active(self.dir)[0], 1)
 
     def test_reject_from_the_page(self):
@@ -359,7 +361,7 @@ class WebTests(Base):
 
     def test_refused_and_insufficient_items_show_in_history_but_have_no_buttons(self):
         r = self.submit(param='capital', new=1)
-        i = self.submit(evidence={**EV, 'n': 3}, track='pullback', param='exit.target_pct', new=0.04)
+        i = self.submit(evidence={**EV, 'n': 3}, track='pullback', param='exit.target_r', new=1.75)
         _, page = self.request('GET', '/proposals')
         self.assertIn('被代码拒收', page)
         self.assertIn('证据不足', page)

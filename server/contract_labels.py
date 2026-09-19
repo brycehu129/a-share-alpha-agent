@@ -11,7 +11,7 @@
    则回答"**条件是不是太严了**"。
 
 **这些是研究标签，不是实际成交结果**：没有资金约束、没有名额限制、没有真实滑点和封板，
-也没有"错过窗口"。实际的模拟成交在盘中引擎的账本里（exec-0.2 账户），两者分开统计。
+也没有"错过窗口"。实际的模拟成交在盘中引擎的账本里（盘中条件执行账户），两者分开统计。
 
 **为什么必须坦白"日线的局限"**：入场/退出规则是盘中触发的，而这里只有日线 OHLC——一根 K 线
 里先碰止损还是先碰止盈，日线无法回答（conditional_exec 的头号纪律就是"绝不假装日线能
@@ -46,7 +46,7 @@ LIMITATIONS = [
     '入场先后无法确定（当天既上穿确认线又跌破作废线）的记为 ambiguous，不进统计。',
     '不模拟 09:30–14:00 入场时段、涨停附近不买、持仓名额、账户回撤暂停：这些日线检验不了。',
     '盘中触发的成交价取触发价位，真实成交是观测价、不会更好；成本按往返 %.2f%% 统一扣除。' % ROUND_TRIP_COST_PCT,
-    '这是研究标签，不是实际成交；实际模拟成交见 exec-0.2 账户。',
+    '这是研究标签，不是实际成交；实际模拟成交见盘中条件执行账户。',
 ]
 
 
@@ -146,13 +146,19 @@ def _net(fill, price):
 
 
 def _exit_pair(exit_spec, fill, fill_kind, bar0, later, ma20):
-    """(悲观, 乐观) 两个退出；任一还没走完就返回 None。"""
+    """(悲观, 乐观) 两个退出；任一还没走完就返回 None。
+
+    两种推演对应"日线说不清的先后"的两种可能：同日先止损/先止盈、入场当天的高点算不算入场之后。
+    **哪个更悲观不由推演模式决定，而由结果决定**——乐观推演里"先武装保本"会让单子更早在保本价离场，净收益反而可能更低。
+    所以这里按净收益排序：低的叫 pess，高的叫 opt，区间才是真正的上下界。"""
     out = {}
     for mode in ('pess', 'opt'):
         result = simulate_exit(exit_spec, fill, fill_kind, bar0, later, ma20, mode)
         if result is None:
             return None
         out[mode] = {**result, 'price': round(result['price'], 4), 'net_pct': _net(fill, result['price'])}
+    if out['opt']['net_pct'] < out['pess']['net_pct']:
+        out['pess'], out['opt'] = out['opt'], out['pess']
     out['ambiguous'] = (out['pess']['reason'], out['pess']['price']) != (out['opt']['reason'], out['opt']['price'])
     return out
 

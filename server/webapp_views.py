@@ -387,6 +387,12 @@ def _fmt_param(name, value):
         return '—'
     if name == 'exit.hold_sessions':
         return '%d 个交易日' % value
+    if name.endswith('_mult'):
+        return '%.2f×' % value
+    if name == 'exit.target_r':
+        return 'R=%.2f' % value
+    if name == 'exit.breakeven_arm_frac':
+        return '止盈幅度的 %.0f%%' % (value * 100)
     return '%.2f%%' % (value * 100)
 
 
@@ -399,9 +405,11 @@ def render_proposals_page(store, message='', error=False):
 
     spec_rows = []
     for track in ('breakout', 'pullback'):
-        current = pr.current_spec(store, track)
-        base = exec_spec.build_spec(track)
+        current = pr.current_template(store, track)
+        base = exec_spec.SPECS[track]
         for name, d in exec_spec.TUNABLE_PARAMS.items():
+            if track not in d['tracks']:
+                continue
             value = exec_spec.get_param(current, name)
             if value is None:
                 continue
@@ -423,7 +431,7 @@ def render_proposals_page(store, message='', error=False):
         cards.append(
             '<div class="panel"><p><strong>%s</strong> · %s · %s：<strong>%s → %s</strong> '
             '<span class="muted">（%s，%s 提交）</span></p>'
-            '<p class="muted">盈亏平衡胜率 %.1f%% → %.1f%%（越低越容易赚钱）</p>'
+            '<p class="muted">盈亏平衡胜率 %.1f%% → %.1f%%（按典型 ATR 估算；越低，需要的胜率越低）</p>'
             '<p>提议方的理由（<em>未经验证的陈述，不是结论</em>）：%s</p>'
             '<p class="muted">证据：n=%s，日期组=%s，来自执行版本 %s。%s</p>'
             '<form method="post" action="/proposals/approve" style="display:inline">'
@@ -441,7 +449,7 @@ def render_proposals_page(store, message='', error=False):
                html.escape(p['id']), html.escape(p['id'])))
     if not cards:
         cards = ['<div class="panel"><p class="muted">没有待确认的提议。参数样本要满足 n≥30、日期组≥15 才有资格被提议；'
-                 '候选池的第一批验收结果周一晚才开始产生，预计数周后才会攒够。</p></div>']
+                 '前瞻验收要等计划冻结后走完最长持有期，预计数周后才会攒够。</p></div>']
 
     done = [p for p in reversed(store['proposals']) if p['status'] != pr.PENDING][:30]
     history = ''.join(
@@ -455,18 +463,18 @@ def render_proposals_page(store, message='', error=False):
         % (r['revision'], html.escape(r['approved_at'][:16].replace('T', ' ')), html.escape(r['track']),
            html.escape(r['parameter']), html.escape(str(r['old'])), html.escape(str(r['new'])),
            html.escape(r.get('note') or ''))
-        for r in reversed(store['revisions'])) or '<tr><td colspan="5" class="muted">尚无修订：使用 exec-0.2 原始规格</td></tr>'
+        for r in reversed(store['revisions'])) or '<tr><td colspan="5" class="muted">尚无修订：使用 exec-0.3 原始规格</td></tr>'
 
     body = (
         '<h1>策略参数提议</h1>' + note +
         '<p class="muted">AI 或规则只能在这里<strong>提议</strong>；你批准后才生效。风控红线（本金、持仓数、单只上限、单笔风险、回撤线、成本假设）'
-        '不可提议，代码直接拒收。批准后从下一次日线流程（工作日 15:35）起新冻结的计划用新规格，执行版本变为 %s；'
+        '不可提议，代码直接拒收。批准后从下一次盘前选股（工作日 08:40）起新冻结的计划用新规格，执行版本变为 %s；'
         '已冻结的计划和已有验收记录不变，新旧样本分开统计。</p>'
         '<div class="panel"><h2>当前生效规格 · 修订 %d（%s）</h2><table><tr><th>track</th><th>参数</th><th>当前值</th>'
-        '<th>允许范围</th><th>单次步长</th></tr>%s</table><p class="muted">盈亏平衡胜率：%s</p></div>'
+        '<th>允许范围</th><th>单次步长</th></tr>%s</table><p class="muted">盈亏平衡胜率（按典型 ATR %.1f%% 估算，每只股票的实际止损/止盈随自己的 ATR 而变）：%s</p></div>'
         '<h2>待确认（%d）</h2>%s'
         '<div class="panel"><h2>处理记录</h2><table><tr><th>编号</th><th>状态</th><th>参数</th><th>改动</th><th>来源</th><th>说明</th></tr>%s</table></div>'
         '<div class="panel"><h2>已批准的修订</h2><table><tr><th>修订</th><th>时间</th><th>参数</th><th>改动</th><th>备注</th></tr>%s</table></div>'
         % (html.escape(exec_spec.execution_version(rev + 1)), rev, html.escape(exec_spec.execution_version(rev)),
-           ''.join(spec_rows), breakevens, len(pending), ''.join(cards), history, revisions))
+           ''.join(spec_rows), exec_spec.NOMINAL_ATR_PCT * 100, breakevens, len(pending), ''.join(cards), history, revisions))
     return page('策略参数提议', '/proposals', body)

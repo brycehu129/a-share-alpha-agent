@@ -2,6 +2,7 @@
 import argparse
 import html
 import json
+import os
 import re
 from collections import Counter
 from datetime import datetime, timedelta, time
@@ -15,7 +16,7 @@ from hotmoney_features import load as load_hotmoney
 from review_pipeline import current_tuning
 import baseline
 import contract_labels
-from exec_spec import EXEC_MODE, build_spec, execution_version
+from exec_spec import EXEC_MODE, breakeven_win_rate, build_spec, entry_zone, execution_version, sizing
 from shortterm_model import (SELECTION_VERSION, ARCHIVE_SIZE, TARGET,
                               SHORT_POLICY as POLICY, screen_short,
                               select_candidates, walk_forward_short)
@@ -58,6 +59,7 @@ def tagged(outcome, f):
     outcome.setdefault('selection_version', selection_version_of(f))
     outcome.setdefault('execution_version', f.get('execution_version') or 'legacy')
     outcome.setdefault('rank', f.get('rank'))
+    outcome.setdefault('archive_only', f.get('archive_only'))
     return outcome
 
 
@@ -106,25 +108,62 @@ def resolve(forecasts, series, benchmark, now, history):
                           'execution_version': f.get('execution_version') or 'legacy',
                           'rank': f.get('rank'),
                           'bucket': f['bucket'], 'regime': f['regime'], 'probability_at_issue': f['probability']['probability'],
+                          'archive_only': bool(f.get('archive_only')),
                           'diagnostic': diagnostic, 'causal_attribution': '待复核，不能仅凭收益判定原因'}
                 immutable(path, record)
                 outcomes.append(record)
     return outcomes
 
 
-def exec_fields(track, exec_revision=None):
+def exec_fields(track, exec_revision=None, atr_pct=None):
     """冻结进每条预测的执行侧字段。exec_revision = (修订号, {track: {参数: 值}})，来自已被人批准的
-    提议（proposals.active()）；不传 = exec-0.2 原始规格。规格在这里深拷贝进记录，此后改常量
-    或批准新修订都不会影响这条记录。"""
+    提议（proposals.active()）；不传 = exec-0.3 原始规格。atr_pct（小数）用来把止损/止盈/追高上限
+    解析成这只股票自己的数字。规格在这里深拷贝进记录，此后改常量或批准新修订都不会影响这条记录。"""
     revision, overrides = exec_revision or (0, {})
     return {'execution_version': execution_version(revision), 'execution_mode': EXEC_MODE,
-            'exec_spec': build_spec(track, overrides.get(track), revision)}
+            'exec_spec': build_spec(track, overrides.get(track), revision, atr_pct)}
 
 
-def run(history, run_id, exec_revision=None, exec_account=None):
+NEWS_CHECK_N = 25          # 排名前多少只做夜间公告核查（要留出被剔除后递补的余量）
+
+
+def closed_limit_up(raw_bars_of_symbol, cutoff, symbol):
+    """截止日收盘是不是涨停（未复权价、按板块涨跌幅限制估算，留 0.15 个百分点容差）。
+    涨停收盘的票次日大概率一开盘就封死、买不到——留档做研究，但不占成交名额。缺前一日数据就判为"不是"（不确定不剔除）。"""
+    bars = raw_bars_of_symbol or []
+    idx = next((i for i, b in enumerate(bars) if b['date'] == cutoff), None)
+    if idx is None or idx == 0:
+        return False
+    prev_close, close = float(bars[idx - 1]['close']), float(bars[idx]['close'])
+    if prev_close <= 0:
+        return False
+    limit = 0.20 if symbol.startswith(('sz30', 'sh688')) else 0.10
+    return close / prev_close - 1 >= limit - 0.0015
+
+
+def plan_levels(spec, reference_price, policy):
+    """买入信号卡片用的具体数字：入场区间、作废价、止损/目标（以参考价为基准估算，实际以成交价计）、最长持有、仓位。"""
+    lo, hi, void = entry_zone(spec['entry'], reference_price)
+    exit_spec = spec['exit']
+    return {'entry_low': None if lo is None else round(lo, 3), 'entry_high': round(hi, 3), 'void_price': round(void, 3),
+            'stop_pct': exit_spec['stop_pct'], 'target_pct': exit_spec['target_pct'],
+            'stop_price_at_reference': round(reference_price * (1 - exit_spec['stop_pct']), 3),
+            'target_price_at_reference': round(reference_price * (1 + exit_spec['target_pct']), 3),
+            'hold_sessions': exit_spec['hold_sessions'], 'atr_pct': spec.get('atr_pct'),
+            'window': spec['entry']['window'], 'sizing': sizing(exit_spec, policy),
+            'breakeven_win_rate_pct': round(breakeven_win_rate(exit_spec), 1)}
+
+
+def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None, freeze=True):
     """exec_revision = (修订号, {track: {参数: 值}})，来自已被人批准的提议（proposals.active()）。
-    不传 = exec-0.2 原始规格。exec_account = conditional_exec.read_ledger() 读到的 exec-0.2 账本（或 None）。
-    本函数不自己读提议文件/账本：由 __main__ 传入，测试因此不受服务器状态影响。"""
+    不传 = exec-0.3 原始规格。exec_account = conditional_exec.read_ledger() 读到的 exec 账本（或 None）。
+    announce_fn(symbols, since, now) -> {symbol: {'status', 'items', ...}}：夜间公告核查（announcements.check_many）；
+    不传 = 不核查（测试/离线），此时计划里不带公告核查结果。
+    freeze=False：只更新验收/估值/证据，**不新冻结计划**（收盘那两轮用：选股改在盘前，见下）。
+    本函数不自己读提议文件/账本/网络：由 __main__ 传入，测试因此不受服务器状态影响。
+
+    **选股时点**：计划在盘前（08:40）用昨收数据 + 昨晚到清晨发布的公告冻结，而不是收盘后（15:35）——
+    收盘后冻结的计划要带着一整夜的未知消息去开盘，而且当天晚些时候才同步的游资/龙虎榜数据也用不上。"""
     exec_version = execution_version((exec_revision or (0, {}))[0])
     now = datetime.now(CST)
     root = history / 'alpha_data'
@@ -133,7 +172,7 @@ def run(history, run_id, exec_revision=None, exec_account=None):
               'generated_at': now.isoformat(), 'status': 'waiting_data',
               'target': TARGET, 'policy': POLICY, 'mid_policy': MID_POLICY, 'issues': [], 'screen': None,
               'candidates': [], 'calibration': None, 'calibration_short': None, 'portfolio': None,
-              'forecasts': [], 'outcomes': [], 'source_hashes': {}, 'evidence': None, 'exec02': None, 'baseline': None}
+              'forecasts': [], 'outcomes': [], 'source_hashes': {}, 'evidence': None, 'exec02': None, 'baseline': None, 'news_check': None, 'new_forecast_ids': []}
     master_path = history / 'tushare_data/stock_basic.json'
     benchmark_path = root / 'series/sh000300.json'
     previous_path, previous = latest(history, 'agent')
@@ -210,9 +249,9 @@ def run(history, run_id, exec_revision=None, exec_account=None):
     except Exception as exc:
         report['evidence'] = None
         report['issues'].append('证据三层（合约模拟/反事实）本轮计算失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
-    # 随机基线：同样是可选研究层，出错只记 issue。抽样在这里冻结（15:35 的截止日数据），标签等日线走完才算。
+    # 随机基线：同样是可选研究层，出错只记 issue。抽样在这里冻结（盘前，用昨收数据），标签等日线走完才算。
     try:
-        report['baseline'] = baseline.run_daily(history, stocks, series, benchmark, cutoff, screened['complete'],
+        report['baseline'] = baseline.run_daily(history, stocks, series, benchmark, cutoff, screened['complete'] and freeze,
                                                 forecasts, outcomes, now, SELECTION_VERSION, immutable, read)
     except Exception as exc:
         report['baseline'] = None
@@ -241,11 +280,30 @@ def run(history, run_id, exec_revision=None, exec_account=None):
     # 见 shortterm_model.select_candidates 的 docstring）。展示排前面的，就是实际
     # 会被留档、被允许成交的那批——两处排序不一致只会让人对不上账。
     ranked_all = select_candidates(screened, max(len(all_short_candidates), 1))
+    # 夜间公告核查：只在真的要冻结计划时做（要联网），只查排名靠前的一批；命中高风险关键词的直接剔除、
+    # 由后面的候选递补——它不占名额，也不进留档（选股规则的一部分，见 select-0.5）。取不到的标"未核验"，不剔除也不当作没事。
+    news = {}
+    if freeze and announce_fn is not None and ranked_all:
+        since = datetime.fromisoformat(cutoff + 'T15:00:00+08:00')
+        try:
+            news = announce_fn([c['symbol'] for c in ranked_all[:NEWS_CHECK_N]], since, now) or {}
+        except Exception as exc:
+            report['issues'].append('夜间公告核查整体失败，本轮所有候选标记为"公告未核验"：%s: %s' % (type(exc).__name__, str(exc)[:100]))
+    for c in ranked_all:
+        c['news'] = news.get(c['symbol'])
+    blocked = [c for c in ranked_all if (c.get('news') or {}).get('status') == 'block']
+    ranked_all = [c for c in ranked_all if (c.get('news') or {}).get('status') != 'block']
+    report['news_check'] = None if not (freeze and announce_fn is not None) else {
+        'since': cutoff + 'T15:00:00+08:00', 'checked': len(news),
+        'clear': sum(v['status'] == 'clear' for v in news.values()), 'flagged': sum(v['status'] == 'flag' for v in news.values()),
+        'unverified': sum(v['status'] == 'unverified' for v in news.values()),
+        'blocked': [{'symbol': c['symbol'], 'name': c['name'], 'strategy_type': c['strategy_type'],
+                     'items': [i for i in c['news']['items'] if i['level'] == 'block'][:3]} for c in blocked]}
     report['candidates'] = ranked_all[:30]
-    # 前 ARCHIVE_SIZE 名全部留档做研究，其中只有前 max_positions 名允许模拟成交。
+    # 前 ARCHIVE_SIZE 名全部留档做研究，其中最多 max_positions 名允许模拟成交（收盘涨停的除外）。
     ranked = ranked_all[:ARCHIVE_SIZE]
     old_state = previous.get('portfolio') if previous else None
-    codes = {c['symbol'] for c in ranked}
+    codes = {c['symbol'] for c in ranked} if freeze else set()
     codes.update(p['symbol'] for p in (old_state or {}).get('positions', []))
     codes.update(f['symbol'] for f in forecasts if f['paper_eligible'] and f['id'] not in (old_state or {}).get('attempted', []))
     # Keep delisted/missing master positions in the valuation path. A missing
@@ -267,14 +325,14 @@ def run(history, run_id, exec_revision=None, exec_account=None):
             prior = ((previous or {}).get('exec02') or {}).get('curve', [])
             report['exec02'] = conditional_exec.account_snapshot(exec_account, now, prior)
         except Exception as exc:
-            report['issues'].append('exec-0.2 账户快照失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
+            report['issues'].append('盘中条件执行账户快照失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
     created = datetime.now(CST)  # Actual freeze time after all requests, not job start.
     # 同一个截止日一天里会被重跑好几次（整点任务 + 每小时的补偿检查）。每次重跑排名都
     # 可能因为数据补齐而略有不同，不设上限的话，同一天留档条数会悄悄超过 ARCHIVE_SIZE，
     # 允许成交的计划也会超过 max_positions。这里按"该选股版本、该截止日"数已有的。
     archived_n, paper_n = cutoff_slots(forecasts, cutoff)
     trade_slots = POLICY['max_positions']
-    for rank, c in enumerate(ranked, start=1):
+    for rank, c in enumerate(ranked if freeze else [], start=1):
         ref = next((b for b in raw_series.get(c['symbol'], []) if b['date'] == cutoff), None)
         identity = SELECTION_VERSION + '-' + cutoff + '-' + c['symbol']
         path = history / 'predictions' / (identity+'.json')
@@ -294,19 +352,31 @@ def run(history, run_id, exec_revision=None, exec_account=None):
         if screened['market_score'] < pause_threshold: plan_reasons.append(f'市场评分低于{pause_threshold}')
         if report['portfolio']['valuation_status'] != 'current': plan_reasons.append('虚拟账户估值暂停')
         if report['portfolio']['paused']: plan_reasons.append('账户回撤风控暂停')
-        archive_only = rank > trade_slots
-        if archive_only:
-            plan_reasons.append('仅研究留档：排名第%d，只有前%d名允许模拟成交' % (rank, trade_slots))
-        elif paper_n >= trade_slots:
-            plan_reasons.append('同一截止日已有%d条允许成交的计划' % trade_slots)
-        can_trade = can_trade and not archive_only and paper_n < trade_slots
+        atr = c.get('atr14')
+        if atr is None:
+            plan_reasons.append('ATR 无法计算，不能定止损：仅研究留档')
+        limit_up = closed_limit_up(raw_series.get(c['symbol']), cutoff, c['symbol'])
+        if limit_up:
+            plan_reasons.append('截止日收盘涨停：次日大概率一开盘就封死、买不到，仅研究留档、不占成交名额')
+        slots_full = paper_n >= trade_slots
+        if slots_full and not limit_up:
+            plan_reasons.append('仅研究留档：前%d个可成交名额已被排名更靠前的计划占用' % trade_slots)
+        archive_only = limit_up or slots_full or atr is None
+        can_trade = can_trade and not archive_only
+        news_c = c.get('news')
+        if news_c and news_c['status'] == 'unverified':
+            plan_reasons.append('夜间公告未核验（%s）：请自行看一眼公告' % (news_c.get('error') or '接口不可用'))
+        elif news_c and news_c['status'] == 'flag':
+            plan_reasons.append('夜间有需要留意的公告（未达到剔除标准），见 news')
+        spec_fields = exec_fields(c['strategy_type'], exec_revision, atr)
+        levels = plan_levels(spec_fields['exec_spec'], float(ref['close']), POLICY)
         forecast = {'id': identity, 'version': SELECTION_VERSION, 'selection_version': SELECTION_VERSION,
             'rank': rank, 'rank_pct': c.get('rank_pct'),
             'archive_only': archive_only, 'created_at': created.isoformat(), 'as_of': cutoff,
             'plan_reasons': plan_reasons,
             # 条件触发入场；规格在这里原样冻结进记录，执行器只读记录里的这份，以后改常量
             # 不会悄悄改变已冻结计划的行为。仅研究留档的计划也带规格——合约模拟标签要用。
-            **exec_fields(c['strategy_type'], exec_revision),
+            **spec_fields, 'plan_levels': levels, 'news': news_c,
             'eligible_from': eligible_from(created), 'symbol': c['symbol'], 'name': c['name'], 'industry': c['industry'],
             'score': c['score'], 'strategy_type': c['strategy_type'], 'bucket': c['strategy_type'],
             'regime': screened['regime'], 'probability': c['probability'], 'hotmoney': c.get('hotmoney'),
@@ -315,6 +385,7 @@ def run(history, run_id, exec_revision=None, exec_account=None):
             'limitations': calibration_short['limitations'], 'forecast_type': '研究假设，非已验证买入建议'}
         immutable(path, forecast)
         forecasts.append(forecast)
+        report['new_forecast_ids'].append(identity)
         archived_n += 1
         paper_n += int(can_trade)
     report['forecasts'] = sorted(forecasts, key=lambda f: f['created_at'], reverse=True)
@@ -357,7 +428,7 @@ def render(r):
     if p:
         lines += ['> **注意：下面这个账户是 exec-0.1**，只承载 0.3 版留下的 16 条旧计划（09:30–09:35 窗口按报价成交），已冻结。'
                   '`select-0.4` 起的新计划由盘中引擎按 **exec-0.2** 条件触发执行——独立的 10 万虚拟本金、独立账本，'
-                  '见下面的「exec-0.2 虚拟账户」一节。两个账户的成交与胜率不得混算。', '']
+                  '见下面的「盘中条件执行虚拟账户」一节。两个账户的成交与胜率不得混算。', '']
         trade_rate = str(p['trade_win_rate'])+'%' if p.get('trade_win_rate') is not None else '暂无已平仓样本'
         pol = r['policy']
         lines += ['## 虚拟账户', '', f'估值日期 {p["last_date"]} · 状态 {p["valuation_status"]} · 总资产 {p["equity"]} · 现金 {p["cash"]} · 持仓 {len(p["positions"])}只',
@@ -371,6 +442,16 @@ def render(r):
                   f'最多{pol["max_positions"]}只、单只{pol["max_weight"]*100:.0f}%、计划单笔风险{pol["risk_per_trade"]*100:.0f}%、'
                   f'止损{pol["stop_pct"]*100:.0f}%/止盈{pol["target_pct"]*100:.0f}%/最长持有{pol["hold_sessions"]}个交易日；'
                   f'回撤{pol["drawdown_pause"]*100:.0f}%暂停加仓并排队退出。除权变化或持仓缺价暂停整个账本推进，等待可核验数据。', '']
+    nc = r.get('news_check')
+    if nc:
+        lines += ['## 夜间公告核查（选股前）', '',
+                  '核查范围：截止日 15:00 之后发布的公告（东方财富，非官方接口；只有公告、没有新闻，关键词分类很粗）。'
+                  '查了 %d 只：无高风险 %d、需留意 %d、**未核验 %d**（取不到，不等于没事）、剔除 %d。' % (
+                      nc['checked'], nc['clear'], nc['flagged'], nc['unverified'], len(nc['blocked'])), '']
+        for b in nc['blocked']:
+            lines.append('- 已剔除 %s %s（%s）：%s' % (safe(b['name']), b['symbol'], TRACK_LABEL.get(b['strategy_type'], b['strategy_type']),
+                                                     '；'.join(safe(i['reason'] + '：' + i['title']) for i in b['items'][:2])))
+        lines.append('')
     if r.get('exec02'):
         import conditional_exec
         lines += conditional_exec.render_account(r['exec02'])
@@ -391,11 +472,15 @@ def render(r):
     return '\n'.join(lines)
 
 
-if __name__ == '__main__':
+def main(argv=None, now=None):
+    """命令行入口（cron_daily_agent.sh 调用）。拆成函数是为了能测：这段代码曾经因为漏了 import os 而
+    只有真跑才会崩——而它在必需的流程里。"""
     p = argparse.ArgumentParser()
     p.add_argument('--history', type=Path, required=True)
     p.add_argument('--run-id', required=True)
-    a = p.parse_args()
+    p.add_argument('--freeze', dest='freeze', action='store_true', default=None, help='强制冻结新计划（手动补跑用）')
+    p.add_argument('--no-freeze', dest='freeze', action='store_false', help='不冻结新计划，只更新验收/估值/证据')
+    a = p.parse_args(argv)
     if not re.fullmatch(r'\d+-\d+', a.run_id):
         raise ValueError('Invalid ID')
     path = a.history / 'agent' / (a.run_id+'.json')
@@ -407,12 +492,31 @@ if __name__ == '__main__':
         import conditional_exec
         exec_account = conditional_exec.read_ledger()
     except Exception as exc:                                  # 账本读不了不该拖垮候选生成；run() 里没有它就不出这一节
-        print('exec-0.2 账本读取失败，本次报告不含该账户：%s: %s' % (type(exc).__name__, exc))
-    # 人批准过的参数修订、exec-0.2 账本都在这里读取后传入（库代码不读，测试因此不受服务器状态影响）
-    report = run(a.history, a.run_id, proposals.active(), exec_account)
+        print('exec 账本读取失败，本次报告不含该账户：%s: %s' % (type(exc).__name__, exc))
+    # 收盘那两轮（15:35 / 18:20）只更新验收、估值和证据，不冻结新计划：计划改在盘前（08:40）用昨收数据 + 夜间公告冻结。
+    freeze = a.freeze
+    if freeze is None:
+        # 默认规则：收盘那两轮不冻结；盘前 09:20 之后也不冻结——那之后冻结的计划当天已不能成交（执行器 09:20 截止），
+        # 而它们的固定标签会从"后天"开始算，等于混进了一批错位的样本。
+        freeze = os.environ.get('REPORT_SLOT') != 'close' and (now or datetime.now(CST)).time() < time(9, 20)
+    import announcements
+    # 人批准过的参数修订、exec 账本、公告核查都在这里读取/联网后传入（库代码不读，测试因此不受服务器状态影响）
+    report = run(a.history, a.run_id, proposals.active(), exec_account, announcements.check_many, freeze)
     from expire_plans import reconcile
     reconcile(a.history, report, datetime.now(CST))
     immutable(path, report)
     path.with_suffix('.md').write_text(render(report))
     (path.parent/'README.md').write_text(render(report))
-    print('Alpha engine:', report['status'], 'forecasts:', len(report['forecasts']))
+    print('Alpha engine:', report['status'], 'forecasts:', len(report['forecasts']), 'new:', len(report['new_forecast_ids']),
+          '（冻结计划）' if freeze else '（本轮不冻结）')
+    if freeze and report['new_forecast_ids']:
+        try:
+            import signal_cards
+            print('买入计划推送：', signal_cards.push(report))
+        except Exception as exc:                              # 推送失败绝不能让必需的选股流程失败
+            print('买入计划推送失败：%s: %s' % (type(exc).__name__, exc))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

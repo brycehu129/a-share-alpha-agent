@@ -9,7 +9,8 @@ import conditional_exec as ce
 import exec_spec
 import intraday_engine as ie
 from collect_quotes import CST
-from exec_spec import EXEC_MODE, build_spec, breakeven_win_rate, entry_zone
+from exec_spec import EXEC_MODE, breakeven_win_rate, entry_zone
+from spec_fixtures import build_spec      # 执行器测试用固定数字的冻结规格，见 spec_fixtures.py
 from shortterm_model import SHORT_POLICY
 
 DATES = ['2026-09-17', '2026-09-18', '2026-09-21', '2026-09-22', '2026-09-23',
@@ -87,25 +88,90 @@ class Harness:
 # ---------------------------------------------------------------------------
 
 class SpecTests(unittest.TestCase):
-    def test_breakeven_win_rates_pin_the_risk_reward_structure(self):
-        """改止损止盈时不能无意破坏盈亏比：突破 29.6%，回调 41.4%（与旧的统一 −3%/+5% 相同）。"""
-        self.assertAlmostEqual(breakeven_win_rate(exec_spec.SPECS['breakout']['exit']), 29.6, delta=0.05)
-        self.assertAlmostEqual(breakeven_win_rate(exec_spec.SPECS['pullback']['exit']), 41.4, delta=0.05)
+    """exec-0.3：止损/止盈/追高上限按这只股票自己的 ATR 解析。"""
+
+    def test_levels_follow_the_stocks_own_volatility(self):
+        spec = exec_spec.build_spec('breakout', atr_pct=0.035)
+        x, e = spec['exit'], spec['entry']
+        self.assertAlmostEqual(x['stop_pct'], 0.0525, places=4)            # 1.5 × 3.5%
+        self.assertAlmostEqual(x['target_pct'], 0.07875, places=4)         # 止损 × R(1.5)
+        self.assertAlmostEqual(x['breakeven_arm_pct'], 0.0394, places=4)   # 止盈幅度的一半
+        self.assertEqual((e['max_pct'], e['void_pct']), (0.03, -0.0525))   # 追高上限取 max(3%, 0.8×ATR)；作废线=止损幅度
+        self.assertEqual((spec['atr_pct'], spec['levels'], x['hold_sessions']), (0.035, 'atr', 5))
+        calm, wild = exec_spec.build_spec('breakout', atr_pct=0.02), exec_spec.build_spec('breakout', atr_pct=0.06)
+        self.assertLess(calm['exit']['stop_pct'], spec['exit']['stop_pct'])
+        self.assertGreater(wild['exit']['stop_pct'], spec['exit']['stop_pct'])
+        self.assertGreater(wild['entry']['max_pct'], spec['entry']['max_pct'])   # 波动大的票允许多一点追高空间
+
+    def test_stop_is_clamped_between_the_floor_and_the_ceiling(self):
+        self.assertEqual(exec_spec.build_spec('breakout', atr_pct=0.01)['exit']['stop_pct'], 0.03)     # 不会窄到噪声里
+        wild = exec_spec.build_spec('breakout', atr_pct=0.20)
+        self.assertEqual(wild['exit']['stop_pct'], 0.08)                                                # 也不会宽得离谱
+        self.assertEqual(wild['exit']['target_pct'], 0.12)                                              # 目标封顶
+        self.assertLessEqual(wild['entry']['max_pct'], 0.05)
+
+    def test_missing_or_garbage_atr_falls_back_to_a_marked_nominal_value(self):
+        for bad in (None, 0, -1, float('nan'), 'x'):
+            spec = exec_spec.build_spec('pullback', atr_pct=bad)
+            self.assertEqual((spec['levels'], spec['atr_pct']), ('nominal', None), bad)
+            self.assertAlmostEqual(spec['exit']['stop_pct'], 0.0525, places=4)
+
+    def test_breakeven_win_rate_is_pinned_for_the_nominal_structure(self):
+        """改参数时不能无意破坏盈亏比结构：典型 ATR、R=1.5 → 约 42.4%。"""
+        for track in exec_spec.TRADED_TRACKS:
+            self.assertAlmostEqual(breakeven_win_rate(exec_spec.build_spec(track)['exit']), 42.35, delta=0.1)
 
     def test_unknown_track_is_an_error_not_a_default_spec(self):
         with self.assertRaises(KeyError):
-            build_spec('mystery')
+            exec_spec.build_spec('mystery')
 
-    def test_build_spec_returns_an_independent_copy(self):
-        a = build_spec('breakout')
+    def test_build_spec_returns_an_independent_copy_and_never_mutates_the_template(self):
+        before = copy.deepcopy(exec_spec.SPECS)
+        a = exec_spec.build_spec('breakout', atr_pct=0.05)
         a['exit']['stop_pct'] = 0.99
-        self.assertEqual(exec_spec.SPECS['breakout']['exit']['stop_pct'], 0.025)
+        self.assertEqual(exec_spec.SPECS, before)
+        self.assertIsNone(exec_spec.SPECS['breakout']['exit']['stop_pct'])
 
     def test_entry_zones(self):
-        lo, hi, void = entry_zone(exec_spec.SPECS['breakout']['entry'], 10.0)
-        self.assertEqual((round(lo, 4), round(hi, 4), round(void, 4)), (10.05, 10.3, 9.7))
-        lo, hi, void = entry_zone(exec_spec.SPECS['pullback']['entry'], 10.0)
-        self.assertEqual((lo, round(hi, 4), round(void, 4)), (None, 10.1, 9.7))
+        spec = exec_spec.build_spec('breakout', atr_pct=0.035)
+        lo, hi, void = entry_zone(spec['entry'], 10.0)
+        self.assertEqual((round(lo, 4), round(hi, 4), round(void, 4)), (10.05, 10.3, 9.475))
+        lo, hi, void = entry_zone(exec_spec.build_spec('pullback', atr_pct=0.035)['entry'], 10.0)
+        self.assertEqual((lo, round(hi, 4), round(void, 4)), (None, 10.1, 9.475))
+
+    def test_sizing_says_which_limit_actually_binds(self):
+        policy = SHORT_POLICY
+        tight = exec_spec.sizing(exec_spec.build_spec('breakout', atr_pct=0.035)['exit'], policy)
+        self.assertEqual((tight['position_pct'], tight['binding']), (30.0, 'weight_cap'))       # 单只上限先到
+        self.assertAlmostEqual(tight['max_loss_pct'], 30 * 0.0525, places=2)
+        wide = exec_spec.sizing(exec_spec.build_spec('breakout', atr_pct=0.06)['exit'], policy)
+        self.assertEqual((wide['binding'], wide['position_pct']), ('risk_budget', 25.0))        # 止损 8%：2% ÷ 8% = 25%
+        self.assertAlmostEqual(wide['max_loss_pct'], 2.0, places=2)                             # 这时单笔风险才真起作用
+
+    def test_specs_are_self_consistent_and_broken_ones_are_caught(self):
+        for track in exec_spec.TRADED_TRACKS:
+            for atr in (None, 0.015, 0.035, 0.08):
+                self.assertEqual(exec_spec.check_spec(exec_spec.build_spec(track, atr_pct=atr)), [], (track, atr))
+        broken = exec_spec.build_spec('breakout', {'exit.target_r': 1.0}, 0, 0.035)
+        broken['exit']['target_pct'] = broken['exit']['stop_pct']
+        self.assertTrue(any('止盈' in p for p in exec_spec.check_spec(broken)))
+
+    def test_neutral_exit_has_no_track_specific_rules(self):
+        x = exec_spec.neutral_exit(0.035)
+        self.assertFalse(x['day1_close_rule'])
+        self.assertEqual((x['stop_pct'], x['hold_sessions']), (0.0525, 5))
+
+    def test_every_default_is_inside_its_own_bounds(self):
+        for track in exec_spec.TRADED_TRACKS:
+            template = exec_spec.SPECS[track]
+            for name, d in exec_spec.TUNABLE_PARAMS.items():
+                if track in d['tracks']:
+                    v = exec_spec.get_param(template, name)
+                    self.assertTrue(d['floor'] <= v <= d['ceiling'], (track, name, v))
+
+    def test_version_strings(self):
+        self.assertEqual(exec_spec.execution_version(0), 'exec-0.3')
+        self.assertEqual(exec_spec.execution_version(2), 'exec-0.3.r2')
 
 
 class AdmitTests(unittest.TestCase):
@@ -248,7 +314,8 @@ class FrozenSpecTests(unittest.TestCase):
         h = Harness()
         original = copy.deepcopy(exec_spec.SPECS)
         try:
-            exec_spec.SPECS['breakout']['exit']['stop_pct'] = 0.10
+            exec_spec.SPECS['breakout']['exit']['stop_atr_mult'] = 3.0
+            exec_spec.SPECS['breakout']['exit']['stop_min_pct'] = 0.10
             h.tick(quote(last=10.20))
         finally:
             exec_spec.SPECS.clear(); exec_spec.SPECS.update(original)
@@ -514,6 +581,123 @@ class LegacyPathsMustNotConsumeConditionalPlansTests(unittest.TestCase):
         expire_plans.expire(state, [legacy, cond], DATES, at(D1, 15, 35))
         self.assertEqual(state['attempted'], ['legacy'])          # 旧的照旧被记为错过
         self.assertNotIn('cond', state['attempted'])
+
+class PremarketPlanLoadingTests(unittest.TestCase):
+    """计划改在盘前（08:40）冻结，可能在引擎 09:00 启动之后才出现：找到了才算加载完成。"""
+
+    def harness(self):
+        h = Harness([])
+        return h
+
+    def plan_files(self, created='2026-09-21T08:50:00+08:00'):
+        return [forecast(created=created, as_of='2026-09-18', eligible='2026-09-21')]
+
+    def test_plans_that_appear_after_the_engine_started_are_still_picked_up(self):
+        h = self.harness()
+        h.ex.prepare(at(D1, 9, 5))
+        self.assertEqual(h.ledger['plans'], {})
+        self.assertIsNone(h.ledger['plans_loaded_for'])                       # 没找到：不标记"已加载"，下一轮再找
+        h.forecasts = self.plan_files()
+        h.ex.prepare(at(D1, 9, 12))
+        self.assertEqual(len(h.ledger['plans']), 1)
+        self.assertEqual(h.ledger['plans_loaded_for'], D1)
+        h.tick(quote(last=10.20, day=D1, h=9, m=40))                          # 09:30 之后照常可以成交
+        self.assertEqual(len(h.ledger['positions']), 1)
+
+    def test_it_stops_waiting_at_the_deadline_and_never_loads_a_late_plan(self):
+        h = self.harness()
+        h.ex.prepare(at(D1, 9, 26))
+        self.assertEqual(h.ledger['plans_loaded_for'], D1)                    # 09:25 之后不再等
+        h.forecasts = self.plan_files()
+        h.ex.prepare(at(D1, 9, 40))
+        self.assertEqual(h.ledger['plans'], {})
+
+    def test_a_plan_frozen_after_0920_is_refused_as_before(self):
+        h = Harness(self.plan_files(created='2026-09-21T09:22:00+08:00'))
+        h.ex.prepare(at(D1, 9, 24))
+        plan = next(iter(h.ledger['plans'].values()))
+        self.assertEqual(plan['status'], 'skipped')
+        self.assertIn('09:20', plan['reason'])
+
+    def test_files_of_research_only_plans_still_count_as_found(self):
+        """只做研究留档的计划不会成为活跃计划，但说明选股已经跑完了——不该再等。"""
+        h = Harness([forecast(paper=False, created='2026-09-21T08:50:00+08:00', as_of='2026-09-18', eligible='2026-09-21')])
+        h.ex.prepare(at(D1, 9, 5))
+        self.assertEqual(h.ledger['plans_loaded_for'], D1)
+
+
+class FrozenWindowTests(unittest.TestCase):
+    def test_entry_window_comes_from_the_frozen_spec(self):
+        f = forecast()
+        f['exec_spec']['entry']['window'] = ['09:30', '14:30']
+        h = Harness([f])
+        h.tick(quote(last=10.02, h=14, m=10))                                  # 旧规格 14:00 已过期；新规格仍有效
+        self.assertEqual(next(iter(h.ledger['plans'].values()))['status'], 'watching')
+        h.tick(quote(last=10.20, h=14, m=30))
+        self.assertEqual(next(iter(h.ledger['plans'].values()))['status'], 'expired')
+
+
+class OperationLogTests(unittest.TestCase):
+    """用户要求：每次操作都要记录，并能在看板上查看。"""
+
+    def run_trade(self):
+        h = Harness()
+        h.tick(quote(last=10.20, day=D1, h=10, m=0))                           # 买入
+        h.new_day()
+        h.tick(quote(last=10.95, day=D2, h=9, m=40, prev_close=10.5))          # 止盈
+        return h
+
+    def test_buy_carries_the_levels_it_was_bought_with(self):
+        h = Harness()
+        h.tick(quote(last=10.20, day=D1, h=10, m=0))
+        buy = next(t for t in h.ledger['trades'] if t['side'] == 'buy')
+        pos = h.ledger['positions'][0]
+        self.assertEqual((buy['stop_price'], buy['target_price']), (pos['stop_base'], pos['target_price']))
+        self.assertEqual((buy['stop_pct'], buy['target_pct'], buy['hold_sessions']), (0.025, 0.07, 3))
+
+    def test_sell_records_how_the_trade_went(self):
+        h = self.run_trade()
+        sell = next(t for t in h.ledger['trades'] if t['side'] == 'sell')
+        self.assertEqual((sell['reason'], sell['entry_day']), ('target', D1))
+        self.assertIn('peak_price', sell)
+        self.assertIn('breakeven_armed', sell)
+
+    def test_timeline_has_every_operation_newest_first(self):
+        h = self.run_trade()
+        ops = ce.operations(h.ledger)
+        types = [o['type'] for o in ops]
+        self.assertEqual(types[-1], 'buy')                                    # 最早的是买入
+        self.assertEqual(sorted(types[:-1]), ['breakeven_armed', 'sell'])    # 同一轮里先武装保本、再触及目标离场
+        self.assertIn('止盈', next(o for o in ops if o['type'] == 'sell')['detail'])
+        self.assertIn('止损', ops[-1]['detail'])
+        self.assertEqual([o['at'] for o in ops], sorted([o['at'] for o in ops], reverse=True))
+
+    def test_plan_outcomes_without_a_trade_are_logged_with_their_reason(self):
+        h = Harness()
+        h.tick(quote(last=9.50, day=D1, h=10, m=0))                            # 直接跌破作废线
+        ops = ce.operations(h.ledger)
+        self.assertEqual([o['type'] for o in ops], ['plan_voided'])
+        self.assertIn('跌破作废线', ops[0]['detail'])
+
+    def test_breakeven_arming_is_an_operation_while_holding_and_after_exit(self):
+        h = Harness()
+        h.tick(quote(last=10.20, day=D1, h=10, m=0))
+        h.tick(quote(last=10.55, day=D1, h=10, m=5))                           # 浮盈超过 3%：启动保本
+        self.assertIn('breakeven_armed', [o['type'] for o in ce.operations(h.ledger)])
+        h.new_day()
+        h.tick(quote(last=10.10, day=D2, h=9, m=40, prev_close=10.55))         # 回落到保本价以下 → 保本止损离场
+        types = [o['type'] for o in ce.operations(h.ledger)]
+        self.assertEqual(types.count('breakeven_armed'), 1)                    # 离场后不丢、也不重复
+        self.assertIn('sell', types)
+
+    def test_snapshot_exposes_the_timeline_and_survives_sparse_old_records(self):
+        h = self.run_trade()
+        acc = ce.account_snapshot(h.ledger, at(D2, 15, 35))
+        self.assertEqual(acc['operations'][0]['type'], 'sell')
+        sparse = ce.new_ledger(at(D1, 9, 0))
+        sparse['trades'] = [{'side': 'sell', 'symbol': 'x', 'date': D1}, {'side': 'buy', 'symbol': 'x', 'date': D1}]
+        self.assertEqual(len(ce.operations(sparse)), 2)                        # 缺字段的旧记录不能让快照崩溃
+
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ import contract_labels as cl
 import dashboard_export
 import dashboard_page
 from decision_view import decisions
-from exec_spec import build_spec
+from spec_fixtures import build_spec
 from test_contract_labels import outcome, record
 
 NOW = datetime.fromisoformat('2026-09-22T15:35:00+08:00')
@@ -131,7 +131,7 @@ class EngineTests(unittest.TestCase):
         recs = [record(i) for i in range(3)]
         r['evidence'] = cl.summarize(recs, [outcome(i) for i in range(3)], 'select-0.4', 'exec-0.2')
         text = alpha_engine.render(r)
-        self.assertIn('## exec-0.2 虚拟账户', text)
+        self.assertIn('## 盘中条件执行虚拟账户', text)
         self.assertIn('## 证据三层', text)
         self.assertIn('研究标签', text)
         self.assertNotIn('暂未并入本报告', text)

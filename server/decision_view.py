@@ -106,6 +106,9 @@ def decisions(agent):
             'stop_price':stop,'target_price':target,
             'shares':(cpos or pos or {}).get('shares'),'entry_price':entry,
             'execution_mode':(f or {}).get('execution_mode'),
+            'plan_levels':(f or {}).get('plan_levels'),'news':((f or {}).get('news') or {}).get('status'),
+            'news_items':((f or {}).get('news') or {}).get('items',[])[:2],
+            'archive_only':(f or {}).get('archive_only'),
             'hold_sessions':hold,'max_weight_pct':policy['max_weight']*100,
             'ledger':ledger[-10:]})
     return result

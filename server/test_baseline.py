@@ -66,7 +66,7 @@ class LabelDrawTests(unittest.TestCase):
         series, bench = market(self.dates, {'a': (10, 0.02), 'b': (10, -0.02)})
         cutoff = self.dates[10]
         r = bl.label_draw(['a', 'b'], cutoff, series, bench)
-        self.assertEqual((r['entry_day'], r['end_day']), (self.dates[11], self.dates[14]))
+        self.assertEqual((r['entry_day'], r['end_day']), (self.dates[11], self.dates[11 + bl.MATURITY]))   # 要等最长持有期走完
         self.assertEqual((r['n_drawn'], r['n_labeled'], r['wins']), (2, 2, 1))
         self.assertEqual(r['win_rate_pct'], 50.0)
         # a：入场日开盘 → 第3个间隔收盘，扣 0.5%
@@ -77,9 +77,33 @@ class LabelDrawTests(unittest.TestCase):
         expect_b = (b_close / b_open - 1) * 100 - 0.5
         self.assertAlmostEqual(r['mean_return_pct'], statistics.mean([expect_a, expect_b]), places=3)
 
+    def test_barrier_label_uses_each_stocks_own_atr_and_the_same_exit_rules(self):
+        """屏障标签：次日开盘买入，止损/止盈按这只股票自己的 ATR 定。稳步上涨的票会在到期前先摸到目标；下跌的票先摸到止损。"""
+        series, bench = market(self.dates, {'up': (10, 0.03), 'down': (10, -0.03)})
+        r = bl.label_draw(['up', 'down'], self.dates[18], series, bench)
+        self.assertEqual(r['barrier_n'], 2)
+        self.assertGreater(r['barrier_net_opt'], -100)
+        up = bl.barrier_outcome({b['date']: b for b in series['up']}, self.dates[18], self.dates)
+        down = bl.barrier_outcome({b['date']: b for b in series['down']}, self.dates[18], self.dates)
+        self.assertEqual(up['pess']['reason'], 'target')
+        self.assertGreater(up['pess']['net_pct'], 0)
+        self.assertEqual(down['pess']['reason'], 'stop')
+        self.assertLess(down['pess']['net_pct'], 0)
+
+    def test_barrier_label_needs_a_full_atr_window_and_the_full_holding_period(self):
+        series, bench = market(self.dates, {'a': (10, 0.01)})
+        bars = {b['date']: b for b in series['a']}
+        self.assertIsNone(bl.barrier_outcome(bars, self.dates[10], self.dates))           # 截止日前不足 15 个交易日：没有 ATR
+        self.assertIsNotNone(bl.barrier_outcome(bars, self.dates[18], self.dates))
+        self.assertIsNone(bl.barrier_outcome(bars, self.dates[-3], self.dates))           # 持有期还没走完
+        holes = dict(bars)
+        del holes[self.dates[20]]
+        self.assertIsNone(bl.barrier_outcome(holes, self.dates[18], self.dates))         # 中间缺一天：不跳过去算
+
     def test_unmatured_windows_return_none_not_a_partial_result(self):
         series, bench = market(self.dates, {'a': (10, 0.01)})
         self.assertIsNone(bl.label_draw(['a'], self.dates[-3], series, bench))
+        self.assertIsNone(bl.label_draw(['a'], self.dates[-1 - bl.MATURITY], series, bench))     # 固定标签走完了，但屏障的持有期还没
         self.assertIsNone(bl.label_draw(['a'], self.dates[-1], series, bench))
 
     def test_symbols_without_data_are_counted_as_unlabeled_not_as_losses(self):
@@ -124,13 +148,22 @@ class PairedTests(unittest.TestCase):
         self.assertLess(abs((r['high'] - r['low']) - plain) / plain, 0.35)
 
 
+def group(win, ret, exc, n, barrier=None):
+    """一天的汇总。屏障标签（主指标）默认取和超额相同的数，让下面的断言能用同一套数字表达；
+    barrier 传 None 表示这一天没有屏障标签（数据不够）。"""
+    row = {'n_labeled': n, 'win_rate_pct': win, 'mean_return_pct': ret, 'mean_excess_pp': exc}
+    b = exc if barrier is None else barrier
+    row.update(barrier_n=n, barrier_net_pess=b, barrier_net_opt=b + 0.5, barrier_stop_pct=40.0, barrier_target_pct=10.0,
+               barrier_expiry_pct=50.0)
+    return row
+
+
 def base_day(win, ret, exc, n=30):
-    return {'n_labeled': n, 'win_rate_pct': win, 'mean_return_pct': ret, 'mean_excess_pp': exc}
+    return group(win, ret, exc, n)
 
 
 def strat_day(win, ret, exc, n=10):
-    return {'top10': {'n_labeled': n, 'win_rate_pct': win, 'mean_return_pct': ret, 'mean_excess_pp': exc},
-            'top3': {'n_labeled': 3, 'win_rate_pct': win, 'mean_return_pct': ret, 'mean_excess_pp': exc}}
+    return {'top10': group(win, ret, exc, n), 'top3': group(win, ret, exc, 3 if n else 0)}
 
 
 class SummarizeTests(unittest.TestCase):
@@ -190,6 +223,66 @@ class SummarizeTests(unittest.TestCase):
         self.assertIsNone(bl.summarize(base, strat, 'forward')['baselines']['strong_industry']['vs']['top10']['strategy'])
 
 
+class TradableTierTests(unittest.TestCase):
+    def test_tradable_tier_follows_archive_only_not_rank_once_it_is_recorded(self):
+        """收盘涨停的票只留档不成交，可成交名额顺延给排名更靠后的——所以"可成交那几条"不再等于"排名前 3"。"""
+        forecasts = [{'id': 'p%d' % i, 'as_of': '2026-09-18'} for i in range(5)]
+        outs = [{'prediction_id': 'p%d' % i, 'horizon': 3, 'selection_version': 'select-0.5', 'rank': i + 1,
+                 'archive_only': i in (0, 4), 'win': True, 'return_pct': float(i), 'excess_pp': 0.0} for i in range(5)]
+        day = bl.strategy_by_cutoff(outs, forecasts, 'select-0.5')['2026-09-18']
+        self.assertEqual(day['top10']['n_labeled'], 5)
+        self.assertEqual(day['top3']['n_labeled'], 3)                                     # 排名 2、3、4 可成交；1（涨停）和 5（名额满）不算
+        self.assertEqual(day['top3']['mean_return_pct'], 2.0)
+
+
+class BarrierSideTests(unittest.TestCase):
+    """策略前 10 名和随机抽样必须套同一把尺子（同一套中性 ATR 出场规则），主指标才有意义。"""
+
+    def setUp(self):
+        self.dates = weekdays(40)
+        self.series, self.bench = market(self.dates, {'up': (10, 0.03), 'down': (10, -0.03), 'flat': (10, 0.0)})
+        self.cutoff = self.dates[20]
+
+    def forecast(self, fid, symbol, rank, archive_only=False):
+        return {'id': fid, 'symbol': symbol, 'as_of': self.cutoff, 'rank': rank, 'archive_only': archive_only,
+                'selection_version': 'select-0.4'}
+
+    def test_strategy_days_carry_barrier_results_computed_like_the_random_draws(self):
+        fcs = [self.forecast('f1', 'up', 1), self.forecast('f2', 'down', 2), self.forecast('f3', 'flat', 3, archive_only=True)]
+        day = bl.strategy_by_cutoff([], fcs, 'select-0.4', self.series, self.bench)[self.cutoff]
+        self.assertEqual(day['top10']['barrier_n'], 3)
+        self.assertEqual(day['top3']['barrier_n'], 2)                                        # 仅留档的不算"可成交"
+        random_like = bl.label_draw(['up', 'down', 'flat'], self.cutoff, self.series, self.bench)
+        self.assertEqual(day['top10']['barrier_net_pess'], random_like['barrier_net_pess'])  # 同一批票、同一把尺子：结果必须一致
+        self.assertEqual(day['top10']['barrier_stop_pct'], random_like['barrier_stop_pct'])
+
+    def test_barrier_needs_series_and_ignores_other_versions(self):
+        fcs = [self.forecast('f1', 'up', 1), {**self.forecast('f2', 'down', 2), 'selection_version': 'select-0.3'}]
+        without = bl.strategy_by_cutoff([], fcs, 'select-0.4')
+        self.assertEqual(without, {})                                                        # 不传 series：没有屏障结果，也不瞎造
+        day = bl.strategy_by_cutoff([], fcs, 'select-0.4', self.series, self.bench)[self.cutoff]
+        self.assertEqual(day['top10']['barrier_n'], 1)
+
+    def test_primary_metric_is_the_barrier_difference_not_the_fixed_label_excess(self):
+        days = weekdays(20)
+        base = {(d, 'strong_industry'): {**group(40.0, 0.0, -1.0, 30, barrier=0.0)} for d in days}
+        wob = [0.05, -0.05, 0.03, -0.03] * 5
+        strat = {d: {'top10': group(50.0, 1.0, 3.0 + w, 10, barrier=2.0 + w), 'top3': group(50.0, 1.0, 3.0, 3, barrier=2.0)}
+                 for d, w in zip(days, wob)}
+        s = bl.summarize(base, strat, 'forward')
+        self.assertAlmostEqual(s['primary_result']['mean'], 2.0, places=2)                   # 屏障 2.0 − 0.0，而不是超额 3.0 − (−1.0) = 4.0
+        self.assertEqual(s['primary_result']['verdict'], 'better')
+        fixed = s['baselines']['strong_industry']['vs']['top10']['mean_excess_pp']
+        self.assertAlmostEqual(fixed['mean'], 4.0, places=2)                                 # 固定标签的差值也在，只是次要
+
+    def test_informational_baselines_pair_only_with_the_top10(self):
+        days = weekdays(20)
+        base = {(d, n): group(40.0, 0.0, 0.0, 30) for d in days for n in bl.NAMES}
+        s = bl.summarize(base, {d: strat_day(50.0, 1.0, 1.0) for d in days}, 'forward')
+        self.assertEqual(sorted(s['baselines']['weak_industry']['vs']), ['top10'])
+        self.assertEqual(sorted(s['baselines']['universe']['vs']), ['top10', 'top3'])
+
+
 class StrategySideTests(unittest.TestCase):
     def test_grouping_version_horizon_and_rank(self):
         forecasts = [{'id': 'p%d' % i, 'as_of': '2026-09-18'} for i in range(6)]
@@ -202,7 +295,7 @@ class StrategySideTests(unittest.TestCase):
         outs.append({'prediction_id': 'p1', 'horizon': 3, 'selection_version': 'select-0.4', 'rank': None,
                      'win': True, 'return_pct': 99.0, 'excess_pp': 99.0})           # 没有排名：不并入
         day = bl.strategy_by_cutoff(outs, forecasts, 'select-0.4')['2026-09-18']
-        self.assertEqual((day['top10']['n_labeled'], day['top3']['n_labeled']), (5, 3))
+        self.assertEqual((day['top10']['n_labeled'], day['top3']['n_labeled']), (5, 3))       # 旧记录没有 archive_only：按排名前 3 算
         self.assertEqual(day['top10']['mean_return_pct'], 2.0)
         self.assertEqual(day['top3']['mean_return_pct'], 1.0)
 
@@ -231,7 +324,7 @@ class RunDailyTests(unittest.TestCase):
         self.stocks, self.series, self.bench, self.dates = synthetic_world()
 
     def run_daily(self, cutoff_index, complete=True, series=None, benchmark=None):
-        bench = benchmark or self.bench[:cutoff_index + 1 + 8]
+        bench = benchmark or self.bench[:cutoff_index + 1 + 8]        # 比最长持有期多留几天
         return bl.run_daily(self.history, self.stocks, series or self.series, bench, self.dates[cutoff_index], complete,
                             [], [], NOW, 'select-0.4', immutable, read)
 
@@ -242,7 +335,10 @@ class RunDailyTests(unittest.TestCase):
         self.run_daily(30)
         frozen = self.frozen()
         self.assertEqual(sorted(frozen), ['select-0.4-%s-strong_industry.json' % self.dates[30],
-                                          'select-0.4-%s-universe.json' % self.dates[30]])
+                                          'select-0.4-%s-universe.json' % self.dates[30],
+                                          'select-0.4-%s-weak_industry.json' % self.dates[30]])      # 只有两个行业：没有"中间行业"，空池不冻结
+        weak = frozen['select-0.4-%s-weak_industry.json' % self.dates[30]]
+        self.assertTrue(all(s.startswith('sh61') for s in weak['symbols']), weak['symbols'])        # 最弱行业 B
         strong = frozen['select-0.4-%s-strong_industry.json' % self.dates[30]]
         universe = frozen['select-0.4-%s-universe.json' % self.dates[30]]
         self.assertEqual(len(universe['symbols']), 30)
@@ -259,13 +355,13 @@ class RunDailyTests(unittest.TestCase):
     def test_results_appear_only_when_the_window_has_played_out(self):
         early = bl.run_daily(self.history, self.stocks, self.series, self.bench[:32], self.dates[30], True, [], [], NOW,
                              'select-0.4', immutable, read)
-        self.assertEqual((early['frozen'], early['resolved']), (2, 0))          # 只走了 1 个间隔：还不能验收
+        self.assertEqual((early['frozen'], early['resolved']), (3, 0))          # 只走了 1 个间隔：还不能验收
         late = self.run_daily(30)                                               # 走完了
-        self.assertEqual((late['frozen'], late['resolved']), (2, 2))
+        self.assertEqual((late['frozen'], late['resolved']), (3, 3))
         out = sorted((self.history / 'baseline_outcomes').glob('*.json'))
-        self.assertEqual(len(out), 2)
+        self.assertEqual(len(out), 3)
         recs = {read(p)['name']: read(p) for p in out}
-        self.assertEqual((recs['universe']['entry_day'], recs['universe']['end_day']), (self.dates[31], self.dates[34]))
+        self.assertEqual((recs['universe']['entry_day'], recs['universe']['end_day']), (self.dates[31], self.dates[31 + bl.MATURITY]))
         self.assertEqual((recs['universe']['n_labeled'], recs['strong_industry']['n_labeled']), (30, 20))   # 强势行业只有 20 只，全取
 
     def test_resolved_results_are_frozen_too(self):
@@ -281,6 +377,43 @@ class RunDailyTests(unittest.TestCase):
         b = s['baselines']['strong_industry']
         self.assertEqual((b['days'], b['labeled']), (1, 20))                    # 强势行业池只有 20 只：全取
         self.assertIsNone(b['base_rate'])                                       # 1 个日期组 < 15
+
+
+def multi_industry_world(n_dates=45, n_industries=12, per=6):
+    dates = weekdays(n_dates)
+    stocks, prices = [], {}
+    rng = random.Random(3)
+    for k in range(n_industries):
+        drift = 0.007 - k * 0.001                                     # 行业 0 最强，行业 11 最弱
+        for i in range(per):
+            code = '6%02d%03d' % (k, i)
+            stocks.append({'ts_code': code + '.SH', 'name': 'S' + code, 'industry': 'I%02d' % k, 'list_status': 'L',
+                           'exchange': 'SSE', 'list_date': '20100101'})
+            prices['sh' + code] = (10 + rng.random(), drift + rng.uniform(-0.002, 0.002))
+    series, benchmark = market(dates, prices)
+    for bars in series.values():
+        for j, b in enumerate(bars):
+            b['volume_raw'] = str(1000 + (j * 37) % 200 + rng.randint(0, 100))
+    return stocks, series, benchmark, dates
+
+
+class IndustryBucketTests(unittest.TestCase):
+    def test_strong_mid_and_weak_pools_partition_the_universe(self):
+        stocks, series, bench, dates = multi_industry_world()
+        sets, env = bl.candidate_sets(stocks, series, bench, dates[30])
+        universe, strong, mid, weak = (set(sets[k]) for k in ('universe', 'strong_industry', 'mid_industry', 'weak_industry'))
+        self.assertTrue(strong and mid and weak)
+        self.assertEqual(strong | mid | weak, universe)
+        self.assertFalse(strong & mid or strong & weak or mid & weak)
+        industry = {'sh' + s['ts_code'][:6]: s['industry'] for s in stocks}
+        self.assertTrue(all(industry[c] in ('I00', 'I01', 'I02') for c in strong))          # 涨得最快的几个行业（行业间有噪声，邻近的可能换位）
+        self.assertTrue(all(industry[c] in ('I09', 'I10', 'I11') for c in weak))            # 涨得最慢的几个行业
+        self.assertGreaterEqual(len(mid), 6 * 6)
+
+    def test_extra_baselines_are_informational_and_only_pair_with_the_top10(self):
+        self.assertEqual(bl.TIERS_FOR['mid_industry'], ('top10',))
+        self.assertEqual(bl.TIERS_FOR['weak_industry'], ('top10',))
+        self.assertEqual(bl.PRIMARY[:2], ('top10', 'strong_industry'))                       # 主指标不受它们影响
 
 
 class BackfillTests(unittest.TestCase):
@@ -299,7 +432,7 @@ class BackfillTests(unittest.TestCase):
         rec = read(files[0])
         self.assertEqual(rec['kind'], 'backfill')
         self.assertIn('幸存者', rec['limitations'])
-        self.assertEqual(sorted(rec['baselines']), ['strong_industry', 'universe'])
+        self.assertEqual(sorted(rec['baselines']), ['mid_industry', 'strong_industry', 'universe', 'weak_industry'])
         self.assertIn('strategy', rec)
         self.assertEqual(self.go(3), 0)                                          # 已存在的跳过
         self.assertEqual(self.go(5), 2)                                          # 只补新增的两天
