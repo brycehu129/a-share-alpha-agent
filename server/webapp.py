@@ -33,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import exec_spec
 import llm_settings
 import portfolio_book
 import webapp_views
@@ -323,6 +324,11 @@ class Handler(BaseHTTPRequestHandler):
             day = (_qs(self.path.partition("?")[2]).get("day") or [None])[0]
             self._send_html(200, sentinel_view.render_sentinel_page(day))
             return
+        if self.path in ("/proposals", "/proposals/"):
+            if not self._require_auth():
+                return
+            self._send_html(200, self._proposals_page())
+            return
         if self.path in ("/postclose", "/postclose/"):
             if not self._require_auth():
                 return
@@ -354,6 +360,35 @@ class Handler(BaseHTTPRequestHandler):
         except OSError as exc:
             message, error = "写入账本失败：%s" % exc, True
         self._send_html(200, self._book_page(message, error))
+
+    def _proposals_page(self, message="", error=False):
+        import proposals
+        try:
+            store = proposals.load()
+        except proposals.ProposalError as exc:
+            return webapp_views.page("策略参数提议", "/proposals",
+                                     '<h1>策略参数提议</h1><p class="notice error">%s</p>' % html.escape(str(exc)))
+        return webapp_views.render_proposals_page(store, message, error)
+
+    def _handle_proposals_post(self, form):
+        import proposals
+        try:
+            if self.path == "/proposals/approve":
+                rev = proposals.approve(form.get("id", ""), form.get("note", ""))
+                message, error = ("已批准 %s：%s.%s %s → %s。从下一次日线流程起新冻结的计划生效（执行版本 %s）。" % (
+                    rev["proposal_id"], rev["track"], rev["parameter"], rev["old"], rev["new"],
+                    exec_spec.execution_version(rev["revision"]))), False
+            elif self.path == "/proposals/reject":
+                proposals.reject(form.get("id", ""), form.get("note", ""))
+                message, error = "已驳回。", False
+            else:
+                self._send_html(404, "not found")
+                return
+        except proposals.ProposalError as exc:
+            message, error = str(exc), True
+        except OSError as exc:
+            message, error = "写入失败：%s" % type(exc).__name__, True
+        self._send_html(200, self._proposals_page(message, error))
 
     def _handle_llm_post(self, form):
         llm = {}
@@ -398,6 +433,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/llm/"):
             self._handle_llm_post(self._read_form())
+            return
+        if self.path.startswith("/proposals/"):
+            self._handle_proposals_post(self._read_form())
             return
         if self.path.startswith("/book/"):
             if self.path not in ("/book/holding", "/book/watch",

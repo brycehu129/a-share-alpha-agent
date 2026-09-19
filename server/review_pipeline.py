@@ -1,4 +1,4 @@
-"""Post-market review: classify misses, propose bounded auto-tuning, log blind spots.
+"""Post-market review: classify misses, SUGGEST bounded tuning (never applied here), log blind spots.
 
 Reads outcomes/predictions already produced by alpha_engine.py / shortterm_model.py
 (never re-labels an outcome). Every matured outcome belongs to exactly one track:
@@ -22,8 +22,10 @@ outcome, regardless of track:
 
 Tuning is deliberately narrow: exactly three parameters, each capped per
 adjustment, each gated behind the same sample bar alpha_model.estimate() uses
-(n>=30, date-cohorts>=15), and every adjustment is written to an immutable
-audit record before the live pointer is updated. Position sizing, risk-per-trade
+(n>=30, date-cohorts>=15). **Nothing is applied by this module**: it only reports
+suggestions in the review report (see proposals.py for the human-confirm queue;
+per the "AI proposes, human confirms" decision it may never change parameters on its
+own). Position sizing, risk-per-trade
 and drawdown pause/stop are never touched here. 'market_score_pause' is a gate
 shared by all three tracks (shortterm_model.screen_short() reuses it), so its
 evidence pools outcomes from every track; 'overheat_coef' and 'industry_weight'
@@ -199,7 +201,7 @@ def run(history, run_id):
 
     report = {'id': run_id, 'version': VERSION, 'generated_at': now.isoformat(),
               'reviewed_n': len(fresh), 'outcome_ids': [oid for oid, _, _, _ in fresh],
-              'by_track': {}, 'blind_spots': [], 'by_reason': {}, 'proposals': [], 'applied': None,
+              'by_track': {}, 'blind_spots': [], 'by_reason': {}, 'proposals': [], 'applied': None,   # applied 恒为 None：本模块从不自行生效
               'status': 'no_new_outcomes'}
     if not fresh:
         immutable(history / 'tuning' / 'reviews' / (run_id + '.json'), report)
@@ -234,21 +236,11 @@ def run(history, run_id):
     proposals = propose_adjustments(by_reason_pooled, by_reason_mid, current)
     report['proposals'] = proposals
 
-    if proposals:
-        new_values = dict(current)
-        for adj in proposals:
-            new_values[adj['parameter']] = adj['new']
-        version_n = (state['version_n'] + 1) if state else 1
-        new_state = {'version_n': version_n, 'updated_at': now.isoformat(), 'source_review': run_id,
-                     'values': new_values, 'proposals_applied': proposals}
-        # active.json is a live pointer (overwritten by design); the full
-        # version history stays immutable under tuning/history/.
-        save(history / 'tuning' / 'active.json', new_state)
-        immutable(history / 'tuning' / 'history' / (run_id + '.json'), new_state)
-        report['applied'] = new_state
-        report['status'] = 'tuned'
-    else:
-        report['status'] = 'reviewed_no_adjustment'
+    # 只提议，不生效。以前这里会直接写 tuning/active.json——那等于 AI/规则自动改策略，
+    # 和"提议 + 人确认"的决定相违。现在 proposals 只留在复盘报告里供人查看；
+    # 选股层参数（本模块的三个旋钮）要生效，需要先接入人工确认通道并同步 bump selection_version
+    # （否则新旧参数的样本会混池），那是单独的一步，这里不偷跑。
+    report['status'] = 'proposed' if proposals else 'reviewed_no_adjustment'
 
     immutable(history / 'tuning' / 'reviews' / (run_id + '.json'), report)
     return report
@@ -271,7 +263,7 @@ def render(r):
             lines.append(f'- {k}: n={v["n"]}, 日期组={v["cohorts"]}, 胜率={v["win_rate_pct"]}%, 平均超额={v["mean_excess_pp"]}pp')
         lines.append('')
     if r['proposals']:
-        lines += ['## 本轮参数调整（已生效，供下一轮使用）', '']
+        lines += ['## 本轮参数调整建议（**未生效**，仅供参考；参数只有经人确认才会改）', '']
         for p in r['proposals']:
             lines.append(f'- {p["parameter"]}: {p["old"]} → {p["new"]}。{p["logic"]}')
         lines.append('')
@@ -286,7 +278,7 @@ def render(r):
                           f'（{b["entry_day"]}→{b["end_day"]}）：超额{b["excess_pp"]}pp，MFE {b["mfe_pct"]}%，MAE {b["mae_pct"]}%')
         lines.append('')
     lines.append('本模块只调整已约定的三个数值参数（行业/个股权重、过热惩罚系数、市场评分暂停阈值），'
-                  '从不改动仓位/风险上限；每次调整均留档可查，是否引入新数据源始终由人工决定。')
+                  '从不改动仓位/风险上限，也从不自行生效——只给出建议；是否引入新数据源始终由人工决定。')
     return '\n'.join(lines) + '\n'
 
 
@@ -297,4 +289,4 @@ if __name__ == '__main__':
     a = p.parse_args()
     report = run(a.history, a.run_id)
     (a.history / 'tuning' / 'reviews' / (a.run_id + '.md')).write_text(render(report))
-    print('Review:', report['status'], 'proposals:', len(report['proposals']), 'blind spots:', len(report['blind_spots']))
+    print('Review:', report['status'], '（建议未生效）proposals:', len(report['proposals']), 'blind spots:', len(report['blind_spots']))

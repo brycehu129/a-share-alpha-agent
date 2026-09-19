@@ -13,8 +13,8 @@ from collect_quotes import CST
 from dashboard_export import latest
 from hotmoney_features import load as load_hotmoney
 from review_pipeline import current_tuning
-from exec_spec import EXEC_MODE, build_spec
-from shortterm_model import (SELECTION_VERSION, EXECUTION_VERSION, ARCHIVE_SIZE, TARGET,
+from exec_spec import EXEC_MODE, build_spec, execution_version
+from shortterm_model import (SELECTION_VERSION, ARCHIVE_SIZE, TARGET,
                               SHORT_POLICY as POLICY, screen_short,
                               select_candidates, walk_forward_short)
 from tushare_sync import read, save, sha
@@ -110,11 +110,23 @@ def resolve(forecasts, series, benchmark, now, history):
     return outcomes
 
 
-def run(history, run_id):
+def exec_fields(track, exec_revision=None):
+    """冻结进每条预测的执行侧字段。exec_revision = (修订号, {track: {参数: 值}})，来自已被人批准的
+    提议（proposals.active()）；不传 = exec-0.2 原始规格。规格在这里深拷贝进记录，此后改常量
+    或批准新修订都不会影响这条记录。"""
+    revision, overrides = exec_revision or (0, {})
+    return {'execution_version': execution_version(revision), 'execution_mode': EXEC_MODE,
+            'exec_spec': build_spec(track, overrides.get(track), revision)}
+
+
+def run(history, run_id, exec_revision=None):
+    """exec_revision = (修订号, {track: {参数: 值}})，来自已被人批准的提议（proposals.active()）。
+    不传 = exec-0.2 原始规格。本函数不自己读提议文件：由 __main__ 传入，测试因此不受服务器状态影响。"""
+    exec_version = execution_version((exec_revision or (0, {}))[0])
     now = datetime.now(CST)
     root = history / 'alpha_data'
     report = {'id': run_id, 'version': SELECTION_VERSION, 'selection_version': SELECTION_VERSION,
-              'execution_version': EXECUTION_VERSION, 'archive_size': ARCHIVE_SIZE,
+              'execution_version': exec_version, 'archive_size': ARCHIVE_SIZE,
               'generated_at': now.isoformat(), 'status': 'waiting_data',
               'target': TARGET, 'policy': POLICY, 'mid_policy': MID_POLICY, 'issues': [], 'screen': None,
               'candidates': [], 'calibration': None, 'calibration_short': None, 'portfolio': None,
@@ -263,12 +275,12 @@ def run(history, run_id):
             plan_reasons.append('同一截止日已有%d条允许成交的计划' % trade_slots)
         can_trade = can_trade and not archive_only and paper_n < trade_slots
         forecast = {'id': identity, 'version': SELECTION_VERSION, 'selection_version': SELECTION_VERSION,
-            'execution_version': EXECUTION_VERSION, 'rank': rank, 'rank_pct': c.get('rank_pct'),
+            'rank': rank, 'rank_pct': c.get('rank_pct'),
             'archive_only': archive_only, 'created_at': created.isoformat(), 'as_of': cutoff,
             'plan_reasons': plan_reasons,
             # 条件触发入场；规格在这里原样冻结进记录，执行器只读记录里的这份，以后改常量
             # 不会悄悄改变已冻结计划的行为。仅研究留档的计划也带规格——合约模拟标签要用。
-            'execution_mode': EXEC_MODE, 'exec_spec': build_spec(c['strategy_type']),
+            **exec_fields(c['strategy_type'], exec_revision),
             'eligible_from': eligible_from(created), 'symbol': c['symbol'], 'name': c['name'], 'industry': c['industry'],
             'score': c['score'], 'strategy_type': c['strategy_type'], 'bucket': c['strategy_type'],
             'regime': screened['regime'], 'probability': c['probability'], 'hotmoney': c.get('hotmoney'),
@@ -356,7 +368,8 @@ if __name__ == '__main__':
     path = a.history / 'agent' / (a.run_id+'.json')
     if path.exists():
         raise ValueError('Report already archived')
-    report = run(a.history, a.run_id)
+    import proposals
+    report = run(a.history, a.run_id, proposals.active())     # 人批准过的参数修订在这里传入
     from expire_plans import reconcile
     reconcile(a.history, report, datetime.now(CST))
     immutable(path, report)

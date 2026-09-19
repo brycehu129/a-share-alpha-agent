@@ -67,7 +67,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
 @media (max-width:600px){ body{padding:16px 12px 40px;} table{font-size:12px;} }
 """
 
-NAV_ITEMS = [('/dashboard', '看板'), ('/sentinel', '哨兵'), ('/postclose', '盘后分析'), ('/book', '持仓与自选'), ('/', '推送配置')]
+NAV_ITEMS = [('/dashboard', '看板'), ('/sentinel', '哨兵'), ('/proposals', '提议'), ('/postclose', '盘后分析'), ('/book', '持仓与自选'), ('/', '推送配置')]
 
 
 def nav(active):
@@ -375,3 +375,98 @@ def render_postclose_page(report, state, message='', error=False):
 def _report_markdown(report):
     import postclose_report
     return postclose_report.render(report)
+
+
+# --- 策略参数提议页 -----------------------------------------------------------
+
+PROPOSAL_TRACK_LABEL = {'breakout': '突破', 'pullback': '回调反弹'}
+
+
+def _fmt_param(name, value):
+    if value is None:
+        return '—'
+    if name == 'exit.hold_sessions':
+        return '%d 个交易日' % value
+    return '%.2f%%' % (value * 100)
+
+
+def render_proposals_page(store, message='', error=False):
+    """store 来自 proposals.load()。所有提议方给的文字（理由、证据摘要）都当不可信文本转义。"""
+    import exec_spec
+    import proposals as pr
+    rev, _ = pr.effective(store)
+    note = ('<p class="notice%s">%s</p>' % (' error' if error else '', html.escape(message)) if message else '')
+
+    spec_rows = []
+    for track in ('breakout', 'pullback'):
+        current = pr.current_spec(store, track)
+        base = exec_spec.build_spec(track)
+        for name, d in exec_spec.TUNABLE_PARAMS.items():
+            value = exec_spec.get_param(current, name)
+            if value is None:
+                continue
+            changed = value != exec_spec.get_param(base, name)
+            spec_rows.append(
+                '<tr><td>%s</td><td>%s</td><td class="num"><strong>%s</strong>%s</td><td class="num muted">%s ~ %s</td>'
+                '<td class="num muted">±%s</td></tr>'
+                % (PROPOSAL_TRACK_LABEL[track], html.escape(d['label']), _fmt_param(name, value),
+                   ' <span class="muted">（原 %s）</span>' % _fmt_param(name, exec_spec.get_param(base, name)) if changed else '',
+                   _fmt_param(name, d['floor']), _fmt_param(name, d['ceiling']), _fmt_param(name, d['step_cap'])))
+    breakevens = ' · '.join('%s %.1f%%' % (PROPOSAL_TRACK_LABEL[t], exec_spec.breakeven_win_rate(pr.current_spec(store, t)['exit']))
+                            for t in ('breakout', 'pullback'))
+
+    pending = [p for p in store['proposals'] if p['status'] == pr.PENDING]
+    cards = []
+    for p in reversed(pending):
+        ev = p['evidence'] or {}
+        eff = pr.preview(store, p)
+        cards.append(
+            '<div class="panel"><p><strong>%s</strong> · %s · %s：<strong>%s → %s</strong> '
+            '<span class="muted">（%s，%s 提交）</span></p>'
+            '<p class="muted">盈亏平衡胜率 %.1f%% → %.1f%%（越低越容易赚钱）</p>'
+            '<p>提议方的理由（<em>未经验证的陈述，不是结论</em>）：%s</p>'
+            '<p class="muted">证据：n=%s，日期组=%s，来自执行版本 %s。%s</p>'
+            '<form method="post" action="/proposals/approve" style="display:inline">'
+            '<input type="hidden" name="id" value="%s"><input type="text" name="note" placeholder="备注（可选）">'
+            '<button type="submit">批准</button></form> '
+            '<form method="post" action="/proposals/reject" style="display:inline">'
+            '<input type="hidden" name="id" value="%s"><button class="danger" type="submit">驳回</button></form></div>'
+            % (html.escape(p['id']), PROPOSAL_TRACK_LABEL.get(p['track'], html.escape(p['track'])),
+               html.escape(exec_spec.TUNABLE_PARAMS[p['parameter']]['label']),
+               _fmt_param(p['parameter'], p['old']), _fmt_param(p['parameter'], p['new']),
+               html.escape(p['source']), html.escape(p['created_at'][:16].replace('T', ' ')),
+               eff['breakeven_before'], eff['breakeven_after'], html.escape(p['rationale'] or '（未填）'),
+               html.escape(str(ev.get('n'))), html.escape(str(ev.get('cohorts'))),
+               html.escape(str(ev.get('execution_version'))), html.escape(ev.get('summary') or ''),
+               html.escape(p['id']), html.escape(p['id'])))
+    if not cards:
+        cards = ['<div class="panel"><p class="muted">没有待确认的提议。参数样本要满足 n≥30、日期组≥15 才有资格被提议；'
+                 '候选池的第一批验收结果周一晚才开始产生，预计数周后才会攒够。</p></div>']
+
+    done = [p for p in reversed(store['proposals']) if p['status'] != pr.PENDING][:30]
+    history = ''.join(
+        '<tr><td>%s</td><td>%s</td><td>%s.%s</td><td class="num">%s → %s</td><td>%s</td><td class="muted">%s</td></tr>'
+        % (html.escape(p['id']), pr.STATUS_LABEL.get(p['status'], html.escape(p['status'])),
+           html.escape(p['track']), html.escape(p['parameter']), html.escape(str(p['old'])), html.escape(str(p['new'])),
+           html.escape(p['source']), html.escape(p.get('reason') or p.get('decision_note') or ''))
+        for p in done) or '<tr><td colspan="6" class="muted">暂无</td></tr>'
+    revisions = ''.join(
+        '<tr><td>r%d</td><td>%s</td><td>%s.%s</td><td class="num">%s → %s</td><td class="muted">%s</td></tr>'
+        % (r['revision'], html.escape(r['approved_at'][:16].replace('T', ' ')), html.escape(r['track']),
+           html.escape(r['parameter']), html.escape(str(r['old'])), html.escape(str(r['new'])),
+           html.escape(r.get('note') or ''))
+        for r in reversed(store['revisions'])) or '<tr><td colspan="5" class="muted">尚无修订：使用 exec-0.2 原始规格</td></tr>'
+
+    body = (
+        '<h1>策略参数提议</h1>' + note +
+        '<p class="muted">AI 或规则只能在这里<strong>提议</strong>；你批准后才生效。风控红线（本金、持仓数、单只上限、单笔风险、回撤线、成本假设）'
+        '不可提议，代码直接拒收。批准后从下一次日线流程（工作日 15:35）起新冻结的计划用新规格，执行版本变为 %s；'
+        '已冻结的计划和已有验收记录不变，新旧样本分开统计。</p>'
+        '<div class="panel"><h2>当前生效规格 · 修订 %d（%s）</h2><table><tr><th>track</th><th>参数</th><th>当前值</th>'
+        '<th>允许范围</th><th>单次步长</th></tr>%s</table><p class="muted">盈亏平衡胜率：%s</p></div>'
+        '<h2>待确认（%d）</h2>%s'
+        '<div class="panel"><h2>处理记录</h2><table><tr><th>编号</th><th>状态</th><th>参数</th><th>改动</th><th>来源</th><th>说明</th></tr>%s</table></div>'
+        '<div class="panel"><h2>已批准的修订</h2><table><tr><th>修订</th><th>时间</th><th>参数</th><th>改动</th><th>备注</th></tr>%s</table></div>'
+        % (html.escape(exec_spec.execution_version(rev + 1)), rev, html.escape(exec_spec.execution_version(rev)),
+           ''.join(spec_rows), breakevens, len(pending), ''.join(cards), history, revisions))
+    return page('策略参数提议', '/proposals', body)
