@@ -6,8 +6,8 @@
 
 账本存 server/data/private/intraday/ledger-exec-0.2.json（引擎同目录，单写者，原子写）。
 不放进 git 是因为盘中每分钟都可能变，而 .history 由几个持有流水线锁的任务顺序写；
-让一个不取锁的每分钟进程去写 git 会和它们互相踩。代价是账本没有异地备份，且暂时
-不会出现在 dashboard 里——每日报告并入是后续步骤。
+让一个不取锁的每分钟进程去写 git 会和它们互相踩。每天 15:35 由 alpha_engine 读取账本、
+生成只读快照并入日报和看板（account_snapshot）；账本本身仍没有异地备份。
 
 四条纪律（和 intraday_engine / opening_observer 一脉相承）：
 
@@ -447,6 +447,90 @@ def summary(ledger):
     return {'equity': ledger['equity'], 'cash': ledger['cash'], 'positions': len(ledger['positions']),
             'closed': len(sells), 'wins': sum(t['pnl'] > 0 for t in sells), 'plans': plans,
             'paused': ledger['paused'], 'drawdown_pct': ledger.get('drawdown_pct', 0)}
+
+
+TRADE_RATE_GATE = 30      # 已平仓不足这个数只给计数，不给胜率百分比（几笔的胜率没有含义）
+
+
+def read_ledger(directory=None):
+    """程序入口用：读账本原样返回；不存在返回 None，损坏则抛错（由调用方决定怎么报）。"""
+    path = ledger_path(directory)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
+def account_snapshot(ledger, now, prior_curve=()):
+    """账本的只读快照，并入每日报告/看板。不含任何私密信息（虚拟账户，不是你的真实持仓）。
+
+    净值曲线：接着上一份报告里的曲线追加今天一个点（同一天重跑则覆盖），不去改账本本身。"""
+    capital = ledger['capital']
+    sells = [t for t in ledger['trades'] if t['side'] == 'sell']
+    wins = sum(t['pnl'] > 0 for t in sells)
+    positions = []
+    for p in ledger['positions']:
+        stop = max(p['stop_base'], p['breakeven_price']) if p['breakeven_armed'] else p['stop_base']
+        positions.append({'id': p['id'], 'symbol': p['symbol'], 'name': p.get('name'), 'track': p.get('track'),
+                          'shares': p['shares'], 'entry_day': p['entry_day'], 'entry_price': p['entry_price'],
+                          'mark': p['mark'], 'mark_at': p.get('mark_at'), 'stop': round(stop, 4),
+                          'target': p['target_price'], 'breakeven_armed': p['breakeven_armed'],
+                          'unrealized_pct': round((p['mark'] / p['entry_price'] - 1) * 100, 3)})
+    plans = sorted(ledger['plans'].values(), key=lambda x: (x['day'], x['id']))[-40:]
+    counts = {}
+    for plan in ledger['plans'].values():
+        counts[plan['status']] = counts.get(plan['status'], 0) + 1
+    today = now.date().isoformat()
+    curve = [c for c in prior_curve if c['date'] != today] + [
+        {'date': today, 'equity': ledger['equity'], 'nav': round(ledger['equity'] / capital, 6)}]
+    return {'ledger_version': ledger['ledger_version'], 'capital': capital, 'equity': ledger['equity'],
+            'cash': ledger['cash'], 'nav': round(ledger['equity'] / capital, 6), 'peak': ledger['peak'],
+            'drawdown_pct': ledger.get('drawdown_pct', 0), 'paused': ledger['paused'],
+            'positions': positions,
+            'trades': ledger['trades'][-30:],
+            'trade_stats': {'closed': len(sells), 'wins': wins,
+                            'win_rate_pct': round(wins / len(sells) * 100, 1) if len(sells) >= TRADE_RATE_GATE else None},
+            'plans': [{k: pl.get(k) for k in ('id', 'symbol', 'name', 'track', 'rank', 'day', 'status', 'reason', 'last_note')}
+                      for pl in plans],
+            'plan_counts': counts, 'issues': ledger['issues'][-5:], 'snapshot_at': now.isoformat(),
+            'curve': curve[-250:]}
+
+
+PLAN_STATUS_LABEL = {'watching': '观察中', 'filled': '已成交', 'expired': '已过期', 'voided': '已作废', 'skipped': '已跳过'}
+EXIT_LABEL = {'stop': '止损', 'breakeven_stop': '保本止损', 'target': '止盈', 'time_stop_day1': '首日收盘不及入场价',
+              'hold_expiry': '持有到期', 'drawdown_pause': '回撤暂停'}
+
+
+def render_account(acc):
+    """报告里的 Markdown 段落。"""
+    lines = ['## exec-0.2 虚拟账户（盘中条件执行）', '',
+             '`select-0.4` 起的新计划由盘中引擎按条件触发执行——独立的 10 万虚拟本金、独立账本，与上面 exec-0.1 那个账户'
+             '互不相干，**两个账户的成交与胜率不得混算**。这是虚拟账户，不是你的真实持仓。', '',
+             '快照时间 %s · 总资产 %.2f · 现金 %.2f · 净值 %.4f · 回撤 %.2f%%%s' % (
+                 acc['snapshot_at'][:16].replace('T', ' '), acc['equity'], acc['cash'], acc['nav'], acc['drawdown_pct'],
+                 ' · **风控暂停中**（不开新仓）' if acc['paused'] else '')]
+    ts = acc['trade_stats']
+    lines.append('已平仓 %d 笔，其中盈利 %d 笔；%s' % (
+        ts['closed'], ts['wins'], '胜率 %.1f%%' % ts['win_rate_pct'] if ts['win_rate_pct'] is not None
+        else '胜率暂不显示（已平仓不足 %d 笔，几笔的比例没有含义）' % TRADE_RATE_GATE))
+    if acc['plan_counts']:
+        lines.append('计划状态：' + '，'.join('%s %d' % (PLAN_STATUS_LABEL.get(k, k), v) for k, v in sorted(acc['plan_counts'].items())))
+    lines.append('')
+    if acc['positions']:
+        lines += ['| 持仓 | 入场 | 现价 | 浮盈 | 止损 | 目标 | 保本已武装 |', '|---|---:|---:|---:|---:|---:|---|']
+        for p in acc['positions']:
+            lines.append('| %s %s（%d股）| %s @ %.2f | %.2f | %+.2f%% | %.2f | %.2f | %s |' % (
+                p.get('name') or '', p['symbol'], p['shares'], p['entry_day'], p['entry_price'], p['mark'],
+                p['unrealized_pct'], p['stop'], p['target'], '是' if p['breakeven_armed'] else '否'))
+        lines.append('')
+    else:
+        lines += ['当前无持仓。', '']
+    sells = [t for t in acc['trades'] if t['side'] == 'sell'][-8:]
+    if sells:
+        lines += ['近期平仓：'] + ['- %s %s @ %.2f，%s，盈亏 %+.2f（%+.2f%%）' % (
+            t['date'], t['symbol'], t['price'], EXIT_LABEL.get(t['reason'], t['reason']), t['pnl'], t['return_pct'])
+            for t in sells] + ['']
+    lines += ['- ' + i for i in acc['issues']] + ([''] if acc['issues'] else [])
+    return lines
 
 
 def attach(history, directory=None, **kwargs):

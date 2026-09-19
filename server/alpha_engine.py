@@ -13,6 +13,7 @@ from collect_quotes import CST
 from dashboard_export import latest
 from hotmoney_features import load as load_hotmoney
 from review_pipeline import current_tuning
+import contract_labels
 from exec_spec import EXEC_MODE, build_spec, execution_version
 from shortterm_model import (SELECTION_VERSION, ARCHIVE_SIZE, TARGET,
                               SHORT_POLICY as POLICY, screen_short,
@@ -119,9 +120,10 @@ def exec_fields(track, exec_revision=None):
             'exec_spec': build_spec(track, overrides.get(track), revision)}
 
 
-def run(history, run_id, exec_revision=None):
+def run(history, run_id, exec_revision=None, exec_account=None):
     """exec_revision = (修订号, {track: {参数: 值}})，来自已被人批准的提议（proposals.active()）。
-    不传 = exec-0.2 原始规格。本函数不自己读提议文件：由 __main__ 传入，测试因此不受服务器状态影响。"""
+    不传 = exec-0.2 原始规格。exec_account = conditional_exec.read_ledger() 读到的 exec-0.2 账本（或 None）。
+    本函数不自己读提议文件/账本：由 __main__ 传入，测试因此不受服务器状态影响。"""
     exec_version = execution_version((exec_revision or (0, {}))[0])
     now = datetime.now(CST)
     root = history / 'alpha_data'
@@ -130,7 +132,7 @@ def run(history, run_id, exec_revision=None):
               'generated_at': now.isoformat(), 'status': 'waiting_data',
               'target': TARGET, 'policy': POLICY, 'mid_policy': MID_POLICY, 'issues': [], 'screen': None,
               'candidates': [], 'calibration': None, 'calibration_short': None, 'portfolio': None,
-              'forecasts': [], 'outcomes': [], 'source_hashes': {}}
+              'forecasts': [], 'outcomes': [], 'source_hashes': {}, 'evidence': None, 'exec02': None}
     master_path = history / 'tushare_data/stock_basic.json'
     benchmark_path = root / 'series/sh000300.json'
     previous_path, previous = latest(history, 'agent')
@@ -199,6 +201,14 @@ def run(history, run_id, exec_revision=None):
     forecasts = [read(p) for p in sorted((history / 'predictions').glob('*.json'))]
     outcomes = resolve(forecasts, series, benchmark, now, history)
     live_mid = [o for o in outcomes if o['horizon'] == 10]
+    # 三层证据里的后两层（合约模拟/反事实）。这是**可选的研究层**：出任何问题都只记一条 issue，
+    # 绝不能让必需的候选生成跟着失败。
+    try:
+        contract_records = contract_labels.resolve_all(forecasts, series, benchmark, now, history, immutable, read)
+        report['evidence'] = contract_labels.summarize(contract_records, outcomes, SELECTION_VERSION, exec_version)
+    except Exception as exc:
+        report['evidence'] = None
+        report['issues'].append('证据三层（合约模拟/反事实）本轮计算失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
     # 3天窗口的验收按**选股版本**再切一刀，不能只看 horizon：0.3 和 0.4 窗口相同，
     # 但筛选规则不同，混进一个池子算出的胜率哪个版本都不代表。
     live_short, legacy_short = split_short_pools(outcomes)
@@ -242,6 +252,14 @@ def run(history, run_id, exec_revision=None):
     old_state = old_state or initial(cutoff, float(benchmark[-1]['close']), policy=POLICY)
     report['portfolio'] = advance(old_state, forecasts, raw_series, series, benchmark, cutoff, execute=False, policy=POLICY)
     report['issues'].extend(report['portfolio']['issues'])
+    report['exec02'] = None
+    if exec_account is not None:
+        try:
+            import conditional_exec
+            prior = ((previous or {}).get('exec02') or {}).get('curve', [])
+            report['exec02'] = conditional_exec.account_snapshot(exec_account, now, prior)
+        except Exception as exc:
+            report['issues'].append('exec-0.2 账户快照失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
     created = datetime.now(CST)  # Actual freeze time after all requests, not job start.
     # 同一个截止日一天里会被重跑好几次（整点任务 + 每小时的补偿检查）。每次重跑排名都
     # 可能因为数据补齐而略有不同，不设上限的话，同一天留档条数会悄悄超过 ARCHIVE_SIZE，
@@ -330,8 +348,8 @@ def render(r):
     p = r['portfolio']
     if p:
         lines += ['> **注意：下面这个账户是 exec-0.1**，只承载 0.3 版留下的 16 条旧计划（09:30–09:35 窗口按报价成交），已冻结。'
-                  '`select-0.4` 起的新计划由盘中引擎按 **exec-0.2** 条件触发执行——独立的 10 万虚拟本金、独立账本'
-                  '（服务器本地 `server/data/private/intraday/`），暂未并入本报告。两个账户的成交与胜率不得混算。', '']
+                  '`select-0.4` 起的新计划由盘中引擎按 **exec-0.2** 条件触发执行——独立的 10 万虚拟本金、独立账本，'
+                  '见下面的「exec-0.2 虚拟账户」一节。两个账户的成交与胜率不得混算。', '']
         trade_rate = str(p['trade_win_rate'])+'%' if p.get('trade_win_rate') is not None else '暂无已平仓样本'
         pol = r['policy']
         lines += ['## 虚拟账户', '', f'估值日期 {p["last_date"]} · 状态 {p["valuation_status"]} · 总资产 {p["equity"]} · 现金 {p["cash"]} · 持仓 {len(p["positions"])}只',
@@ -345,6 +363,11 @@ def render(r):
                   f'最多{pol["max_positions"]}只、单只{pol["max_weight"]*100:.0f}%、计划单笔风险{pol["risk_per_trade"]*100:.0f}%、'
                   f'止损{pol["stop_pct"]*100:.0f}%/止盈{pol["target_pct"]*100:.0f}%/最长持有{pol["hold_sessions"]}个交易日；'
                   f'回撤{pol["drawdown_pause"]*100:.0f}%暂停加仓并排队退出。除权变化或持仓缺价暂停整个账本推进，等待可核验数据。', '']
+    if r.get('exec02'):
+        import conditional_exec
+        lines += conditional_exec.render_account(r['exec02'])
+    if r.get('evidence'):
+        lines += contract_labels.render(r['evidence'])
     lines += ['## 预测验收', '', f'冻结预测 {len(r["forecasts"])} 条；已验收记录 {len(r["outcomes"])} 条。预测标签与实际虚拟成交盈亏分开统计。', '',
               '验收等待真实交易日自然到期；跳过成交不删除预测。错误归因先展示可计算结果，因果判断留待复核，不编造责任百分比。', '']
     cs = r.get('calibration_short') or {}
@@ -369,7 +392,14 @@ if __name__ == '__main__':
     if path.exists():
         raise ValueError('Report already archived')
     import proposals
-    report = run(a.history, a.run_id, proposals.active())     # 人批准过的参数修订在这里传入
+    exec_account = None
+    try:
+        import conditional_exec
+        exec_account = conditional_exec.read_ledger()
+    except Exception as exc:                                  # 账本读不了不该拖垮候选生成；run() 里没有它就不出这一节
+        print('exec-0.2 账本读取失败，本次报告不含该账户：%s: %s' % (type(exc).__name__, exc))
+    # 人批准过的参数修订、exec-0.2 账本都在这里读取后传入（库代码不读，测试因此不受服务器状态影响）
+    report = run(a.history, a.run_id, proposals.active(), exec_account)
     from expire_plans import reconcile
     reconcile(a.history, report, datetime.now(CST))
     immutable(path, report)
