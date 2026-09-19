@@ -91,6 +91,16 @@ CLAUDE_MODEL=claude-opus-5                      # 可选
 `SENTINEL_MODEL` 的模型 id 必须符合当前后端的写法（OpenRouter 用 `anthropic/claude-sonnet-5`，直连用 `claude-sonnet-5`）。
 其他可选：`OPENROUTER_SITE_URL`（归因用的站点 URL）、`OPENROUTER_BASE_URL`（代理或测试用）。
 
+**也可以在后台页面配置（推荐）**：`/` 的“推送配置”页有“大模型（OpenRouter）”一栏，可填 OpenRouter key、主模型、哨兵模型，
+带“测试连接”按钮（等价于下面的 `check`）和“清除”。规矩：
+
+- key 存 `server/data/private/llm_settings.json`（0600，不进 git）。**只写不读**：页面只显示末 4 位，输入框永远为空，错误提示不回显你提交的内容。
+- **优先级：页面保存的 > `/etc/alpha-shadow.env`**。页面保存后立即生效（不用重启服务），页面会标出当前生效的来源；点“清除”后自动回落到环境变量。只管 OpenRouter 的三项（`OPENROUTER_API_KEY` / `OPENROUTER_MODEL` / `SENTINEL_MODEL`），直连 Anthropic 的 key 仍只走环境变量；若服务器设了 `LLM_PROVIDER=anthropic`，页面会提示 OpenRouter key 不会被用到。
+- **只有程序入口读这个文件**（`llm_settings.apply()`：webapp、`sentinel.py`、`postclose_report.py`、`claude_client.py check`）。库代码只看环境变量——cron 每次先跑全量测试，库若自己读文件，服务器上一存了 key，“没配 key”的测试就会变样，连带中止日线流程。新增调用大模型的入口时记得也调用它。
+- **防跨站伪造（CSRF）**：所有 POST 校验 `Sec-Fetch-Site` / `Origin`，跨站请求返回 403。这一层同时保护 /book、/config、/postclose/run——后台用 Basic Auth，浏览器会替任何网页自动带上凭证，没有这层的话，你打开的任意网页都能替你改 key（换成对方的，之后你的持仓和止损位就流到对方账户的调用日志里）。
+- 后台是自签名 HTTPS，浏览器会有证书警告；不要在不信任的网络下提交 key。key 一旦怀疑泄露，去 OpenRouter 撤销重发，这里点“清除”再填新的。
+- 顺带修了一个隐患：`postclose_report.py --no-ai` 以前只去掉 Anthropic 的 key，配了 OpenRouter 时会照样调用并花钱。
+
 **上线前先自检**（一次极小的真实请求，花费约几分钱；没配好会明确报错，而不是等周一盘中哨兵触发时才发现研判一直静默失败）：
 
 ```

@@ -27,11 +27,13 @@ import html
 import os
 import ssl
 import sys
+import threading
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 
+import llm_settings
 import portfolio_book
 import webapp_views
 from dashboard_page import render_dashboard_page
@@ -72,7 +74,106 @@ def check_auth(headers, password):
     return hmac.compare_digest(supplied, password)
 
 
-def render_page(message=""):
+MAX_FORM_BYTES = 100_000
+
+
+def same_origin(headers):
+    """防跨站请求伪造（CSRF）。后台用 Basic Auth，浏览器会给这个站点的一切请求自动带上凭证，
+    所以任何一个你顺手打开的网页都能让你的浏览器向这里发 POST——比如把 OpenRouter key 换成
+    对方自己的，之后你的持仓、成本价、止损位就全流向对方账户的调用日志。
+
+    浏览器对跨站 POST 一定会带 Sec-Fetch-Site 或 Origin；两个都没有的只可能是 curl 这类
+    非浏览器客户端（它们没法被"借用"你的登录态），放行。"""
+    site = headers.get("Sec-Fetch-Site")
+    if site is not None:
+        return site in ("same-origin", "none")
+    origin = headers.get("Origin")
+    if origin is not None:
+        return origin != "null" and urlsplit(origin).netloc == headers.get("Host", "")
+    return True
+
+
+_llm_check_lock = threading.Lock()
+SOURCE_LABEL = {"page": "页面保存", "env": "环境变量（/etc/alpha-shadow.env）", "none": "未设置"}
+
+
+def run_llm_check(timeout=90):
+    """测试连接：发一次极小的真实请求（约几分钱）。返回 (成功?, 说明行列表)。
+    同一时刻只放一个进去——连点两下没有意义，还会花两份钱。"""
+    if not _llm_check_lock.acquire(blocking=False):
+        return False, ["已有一次测试正在进行，请稍候。"]
+    try:
+        import claude_client
+        llm_settings.apply()
+        return claude_client.check()
+    except Exception as exc:  # 页面必须能显示失败原因，而不是 500
+        import claude_client
+        return False, ["测试异常：" + claude_client._redact("%s: %s" % (type(exc).__name__, exc))]
+    finally:
+        _llm_check_lock.release()
+
+
+def render_llm_panel(message="", error=False, check_lines=None, check_ok=None):
+    import claude_client
+    llm_settings.apply()
+    info = llm_settings.describe()
+    key = info["api_key"]
+    if key["source"] == "none":
+        key_status = '<span class="pill status-wait">未配置</span>'
+    else:
+        key_status = '<span class="pill status-ready">已配置 %s</span> 来源：%s' % (
+            html.escape(key["value"]), SOURCE_LABEL[key["source"]])
+    notes = []
+    if key["env_shadowed"]:
+        notes.append("环境变量里也配了一个 key，已被页面保存的覆盖；点“清除”后会回落到环境变量的那个。")
+    if os.environ.get("LLM_PROVIDER", "").strip().lower() == "anthropic":
+        notes.append("服务器环境变量 LLM_PROVIDER=anthropic，当前后端是直连 Anthropic，"
+                     "这里填的 OpenRouter key 不会被用到。")
+    if info["problem"]:
+        notes.append(info["problem"])
+    notes_html = "".join('<p class="hint warn">%s</p>' % html.escape(n) for n in notes)
+    msg_html = ('<p class="notice%s">%s</p>' % (" error" if error else "", html.escape(message))
+                if message else "")
+    check_html = ""
+    if check_lines:
+        check_html = '<pre class="check %s">%s</pre>' % (
+            "ok" if check_ok else "bad", html.escape("\n".join(check_lines)))
+
+    def model_row(field, label, hint):
+        cur = info[field]
+        shown = "%s（%s）" % (cur["value"], SOURCE_LABEL[cur["source"]]) if cur["value"] else "使用默认值"
+        return ('<label>%s</label><input type="text" name="%s" value="%s" placeholder="%s" autocomplete="off">'
+                '<p class="hint">当前：%s。%s</p>' % (
+                    label, field, html.escape(cur["value"] if cur["source"] == "page" else ""),
+                    html.escape(hint), html.escape(shown), "留空 = 使用默认。"))
+
+    return f"""<div class="panel">
+  <h2>大模型（OpenRouter）</h2>
+  <p>API key：{key_status} · 当前后端：{html.escape(claude_client.provider())}</p>
+  {msg_html}{notes_html}
+  <form method="post" action="/llm/key" autocomplete="off">
+    <label>OpenRouter API key（只写不读：保存后页面只显示末 4 位）</label>
+    <input type="password" name="api_key" placeholder="sk-or-v1-..." autocomplete="new-password" spellcheck="false">
+    <button type="submit">保存 key</button>
+  </form>
+  <form method="post" action="/llm/models">
+    {model_row("model", "主模型（盘后报告）", "anthropic/claude-opus-5")}
+    {model_row("sentinel_model", "哨兵模型（盘中情景，每天最多约 15 次，可选更便宜的）", "anthropic/claude-sonnet-5")}
+    <button type="submit">保存模型</button>
+  </form>
+  <form method="post" action="/llm/check">
+    <button type="submit">测试连接（会发一次真实请求，约几分钱）</button>
+  </form>
+  <form method="post" action="/llm/clear">
+    <button type="submit" class="danger">清除页面保存的 key</button>
+  </form>
+  {check_html}
+  <p class="hint">key 保存在服务器 server/data/private/（权限 0600，不进 git）。
+  网页是自签名 HTTPS，浏览器会有证书警告，属正常；不要在不信任的网络下使用。</p>
+</div>"""
+
+
+def render_page(message="", llm=None):
     config = load_config(config_path())
     masked = mask_webhook_url(config.get("webhook_url"))
     configured = bool(masked)
@@ -107,12 +208,20 @@ h1{{font-size:24px;font-weight:600;margin:0 0 14px;}}
 .pill.status-wait{{background:var(--status-wait-bg);color:var(--status-wait-fg);}}
 .notice{{font-size:13.5px;color:#0a7d32;background:#e8f5ec;border-radius:8px;padding:8px 12px;margin:0 0 14px;}}
 label{{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px;}}
-input[type=text]{{width:100%;padding:9px 10px;box-sizing:border-box;font-family:"JetBrains Mono",ui-monospace,monospace;
+input[type=text],input[type=password]{{width:100%;padding:9px 10px;box-sizing:border-box;font-family:"JetBrains Mono",ui-monospace,monospace;
   font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);}}
-input[type=text]:focus{{outline:2px solid var(--accent);outline-offset:1px;}}
+input[type=text]:focus,input[type=password]:focus{{outline:2px solid var(--accent);outline-offset:1px;}}
 button{{padding:8px 16px;margin-top:10px;margin-right:8px;cursor:pointer;border:1px solid var(--border);
   border-radius:999px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;min-height:36px;}}
 button:hover{{color:var(--accent);border-color:var(--accent);}}
+h2{{font-size:16px;margin:0 0 10px;}}
+.hint{{color:var(--ink-3);font-size:12px;margin:6px 0 12px;}}
+.hint.warn{{color:#8a5a00;}}
+.notice.error{{color:#a1281f;background:#fbeae8;}}
+button.danger{{color:#a1281f;}}
+pre.check{{white-space:pre-wrap;word-break:break-word;font-size:12px;padding:10px 12px;border-radius:8px;margin:12px 0 0;}}
+pre.check.ok{{background:#e8f5ec;color:#0a5a25;}}
+pre.check.bad{{background:#fbeae8;color:#a1281f;}}
 .footer-note{{color:var(--ink-3);font-size:11.5px;margin-top:24px;}}
 </style></head>
 <body>
@@ -130,6 +239,7 @@ button:hover{{color:var(--accent);border-color:var(--accent);}}
     <button type="submit">发送测试消息</button>
   </form>
 </div>
+{render_llm_panel(**(llm or {}))}
 <p class="footer-note">由 GitHub Actions 自动部署（push 到 master 后自动生效）</p>
 </body></html>"""
 
@@ -156,13 +266,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(encoded)
 
     def _read_form(self):
-        length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(length) if length else b""
-        parsed = parse_qs(raw.decode("utf-8"))
+        raw = getattr(self, "_body", b"")
+        parsed = parse_qs(raw.decode("utf-8", "replace"))
         return {k: v[0] for k, v in parsed.items()}
 
     def _book_page(self, message="", error=False):
@@ -245,8 +355,49 @@ class Handler(BaseHTTPRequestHandler):
             message, error = "写入账本失败：%s" % exc, True
         self._send_html(200, self._book_page(message, error))
 
+    def _handle_llm_post(self, form):
+        llm = {}
+        try:
+            if self.path == "/llm/key":
+                llm_settings.save_key(form.get("api_key", ""))
+                llm["message"] = "已保存。点“测试连接”确认 key 可用。"
+            elif self.path == "/llm/models":
+                llm_settings.save_models(form.get("model", ""), form.get("sentinel_model", ""))
+                llm["message"] = "模型已保存。"
+            elif self.path == "/llm/clear":
+                llm_settings.clear_key()
+                llm["message"] = "已清除页面保存的 key。"
+            elif self.path == "/llm/check":
+                ok, lines = run_llm_check()
+                llm.update(check_lines=lines, check_ok=ok)
+            else:
+                self._send_html(404, "not found")
+                return
+        except llm_settings.SettingsError as exc:
+            llm.update(message=str(exc), error=True)
+        except OSError as exc:
+            llm.update(message="写入失败：%s" % type(exc).__name__, error=True)
+        self._send_html(200, render_page(llm=llm))
+
     def do_POST(self):
+        # 先把（有上限的）请求体读掉再决定放不放行：服务端没读完就回 401/403 并关连接，
+        # 客户端会收到 connection reset 而不是那条错误页。
+        try:
+            declared = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            declared = -1
+        if not 0 <= declared <= MAX_FORM_BYTES:
+            self.close_connection = True
+            self._send_html(413, "请求体过大或无效")
+            return
+        self._body = self.rfile.read(declared) if declared else b""
         if not self._require_auth():
+            return
+        if not same_origin(self.headers):
+            self._send_html(403, "拒绝：请求来自其他网站（跨站请求已被拦截）。请直接在本后台页面内操作。")
+            return
+        if self.path.startswith("/llm/"):
+            self._handle_llm_post(self._read_form())
             return
         if self.path.startswith("/book/"):
             if self.path not in ("/book/holding", "/book/watch",
@@ -257,6 +408,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/postclose/run":
             form = self._read_form()
+            llm_settings.apply()      # 后台线程在本进程里调用大模型，要用页面保存的 key
             started, message = webapp_views.start_run(
                 history_dir(), push_enabled=not form.get("no_push"))
             import postclose_report

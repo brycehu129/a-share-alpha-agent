@@ -442,8 +442,13 @@ def main():
     run_id = a.run_id or datetime.now(CST).strftime('%Y%m%d%H%M%S') + '-1'
     if not re.fullmatch(r'\d+-\d+', run_id):
         raise SystemExit('运行编号格式应为 数字-数字')
+    import llm_settings
+    llm_settings.apply()      # 页面保存的 key/模型优先于环境变量
     if a.no_ai:
+        # 两个后端的 key 都要去掉：只去 Anthropic 的话，配了 OpenRouter 时 --no-ai 会照样调用并花钱。
+        # 用 environ 里的值直接删而不再 apply，所以页面保存的 key 也不会被重新放回来。
         os.environ.pop('ANTHROPIC_API_KEY', None)
+        os.environ.pop('OPENROUTER_API_KEY', None)
 
     report = build(a.history, run_id)
     if report['status'] == 'empty':

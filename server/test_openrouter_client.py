@@ -65,6 +65,10 @@ class Base(unittest.TestCase):
                                       'LLM_PROVIDER': 'openrouter'}, clear=False)
         env.start()
         self.addCleanup(env.stop)
+        # cron 每次先 source /etc/alpha-shadow.env 再跑全量测试：那里按文档会配 OPENROUTER_MODEL / SENTINEL_MODEL，
+        # 断言"默认模型"的测试不能被它们影响，否则服务器上一配模型，日线流程就被测试失败连带中止。
+        for name in ('OPENROUTER_MODEL', 'SENTINEL_MODEL', 'OPENROUTER_SITE_URL', 'CLAUDE_MODEL'):
+            os.environ.pop(name, None)
         sleep = patch.object(orc.time, 'sleep')
         sleep.start()
         self.addCleanup(sleep.stop)

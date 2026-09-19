@@ -184,6 +184,8 @@ def main(argv=None):
     p.add_argument('--model', help='覆盖默认模型')
     p.add_argument('--effort', default='low')
     a = p.parse_args(argv)
+    import llm_settings
+    llm_settings.apply()      # 页面保存的 key/模型优先于环境变量；库代码本身只看环境变量
     ok, lines = check(a.model, a.effort)
     print('\n'.join(lines))
     return 0 if ok else 1

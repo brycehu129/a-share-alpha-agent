@@ -418,6 +418,8 @@ def main():
     p.add_argument('--day', default=datetime.now(CST).strftime('%Y-%m-%d'))
     p.add_argument('--no-push', action='store_true')
     a = p.parse_args()
+    import llm_settings
+    llm_settings.apply()      # 页面保存的 key/模型优先于环境变量
     if a.command == 'analyze':
         print(json.dumps(analyze_pending(), ensure_ascii=False, default=str))
         return 0
