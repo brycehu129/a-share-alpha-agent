@@ -13,6 +13,7 @@ from collect_quotes import CST
 from dashboard_export import latest
 from hotmoney_features import load as load_hotmoney
 from review_pipeline import current_tuning
+from exec_spec import EXEC_MODE, build_spec
 from shortterm_model import (SELECTION_VERSION, EXECUTION_VERSION, ARCHIVE_SIZE, TARGET,
                               SHORT_POLICY as POLICY, screen_short,
                               select_candidates, walk_forward_short)
@@ -265,7 +266,9 @@ def run(history, run_id):
             'execution_version': EXECUTION_VERSION, 'rank': rank, 'rank_pct': c.get('rank_pct'),
             'archive_only': archive_only, 'created_at': created.isoformat(), 'as_of': cutoff,
             'plan_reasons': plan_reasons,
-            'execution_mode': 'observed-quote-v1',
+            # 条件触发入场；规格在这里原样冻结进记录，执行器只读记录里的这份，以后改常量
+            # 不会悄悄改变已冻结计划的行为。仅研究留档的计划也带规格——合约模拟标签要用。
+            'execution_mode': EXEC_MODE, 'exec_spec': build_spec(c['strategy_type']),
             'eligible_from': eligible_from(created), 'symbol': c['symbol'], 'name': c['name'], 'industry': c['industry'],
             'score': c['score'], 'strategy_type': c['strategy_type'], 'bucket': c['strategy_type'],
             'regime': screened['regime'], 'probability': c['probability'], 'hotmoney': c.get('hotmoney'),
@@ -314,6 +317,9 @@ def render(r):
                   '概率仅作旁证，不能声称它们是全市场真实胜率最高。', '']
     p = r['portfolio']
     if p:
+        lines += ['> **注意：下面这个账户是 exec-0.1**，只承载 0.3 版留下的 16 条旧计划（09:30–09:35 窗口按报价成交），已冻结。'
+                  '`select-0.4` 起的新计划由盘中引擎按 **exec-0.2** 条件触发执行——独立的 10 万虚拟本金、独立账本'
+                  '（服务器本地 `server/data/private/intraday/`），暂未并入本报告。两个账户的成交与胜率不得混算。', '']
         trade_rate = str(p['trade_win_rate'])+'%' if p.get('trade_win_rate') is not None else '暂无已平仓样本'
         pol = r['policy']
         lines += ['## 虚拟账户', '', f'估值日期 {p["last_date"]} · 状态 {p["valuation_status"]} · 总资产 {p["equity"]} · 现金 {p["cash"]} · 持仓 {len(p["positions"])}只',

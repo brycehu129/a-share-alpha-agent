@@ -43,7 +43,11 @@ from alpha_model import screen as screen_mid
 # 只在对应层的规则真的变了才 bump 对应的号。变了之后旧版本的预测与验收记录原样
 # 冻结留档、不迁移，新样本从零开始计数——所以任何一个号都不要随手改。
 SELECTION_VERSION = 'select-0.4'
-EXECUTION_VERSION = 'exec-0.1'   # 09:30–09:35 观察窗口按报价成交；条件触发版将是 exec-0.2
+# exec-0.1：09:30–09:35 观察窗口按报价成交（统一 ±3% 入场带、统一 −3%/+5%），由 opening_observer 执行，
+#           只承载 0.3 版留下的 16 条旧计划，已冻结。
+# exec-0.2：条件触发入场 + 按 track 分化的止损止盈 + 盘中止损 + 保本止损，由 conditional_exec 在
+#           盘中引擎上执行，规格见 exec_spec.py。新计划一律走这个。
+EXECUTION_VERSION = 'exec-0.2'
 
 # 兼容旧代码里的 `VERSION`（沿用它的地方多为"给记录打版本标签"，现在等价于选股版本）。
 VERSION = SELECTION_VERSION

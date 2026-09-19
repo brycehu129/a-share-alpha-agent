@@ -11,6 +11,10 @@ def expire(state, forecasts, dates, now):
     for f in forecasts:
         if not f.get('paper_eligible') or f['id'] in state['attempted'] or f['id'] in held:
             continue
+        # 条件触发计划的有效时段是 09:30–14:00，由 conditional_exec 自己判过期；
+        # 15:35 的日线流程不能按"09:35 窗口已过"把它记成跳过。
+        if f.get('execution_mode') == 'conditional-intraday-v1':
+            continue
         # Require calendar coverage at the start; never guess holidays.
         if not dates or f['eligible_from'] < dates[0]:
             continue

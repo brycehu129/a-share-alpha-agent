@@ -337,6 +337,10 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
     if not ok:
         summary['forced'] = reason
 
+    # symbols 可以是返回列表的函数：通过时段闸门之后才求值。非交易时段每分钟都会触发，
+    # 那时候去读计划/账本文件纯属浪费。
+    if callable(symbols):
+        symbols = symbols()
     if not symbols:
         summary['skipped'] = '没有需要监控的股票'
         return summary
@@ -355,6 +359,7 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
         state = load_state(directory, now.date().isoformat()) if directory.exists() else new_state(now.date().isoformat())
         snapshot = snapshot_fn(symbols)
         tick = make_tick(now, session, snapshot, state, minute_fn)
+        tick['dry_run'] = dry_run      # 有副作用的评估器（如条件执行器要写账本）必须尊重它
 
         if tick['gap_seconds'] is not None and tick['gap_seconds'] > GAP_SECONDS:
             state['gaps'].append({'from': state['last_tick_at'], 'to': now.isoformat(),
@@ -407,9 +412,19 @@ def main():
     p.add_argument('--dry-run', action='store_true', help='不写状态与日志')
     p.add_argument('--json', action='store_true')
     a = p.parse_args()
-    symbols = [s.strip() for s in a.symbols.split(',') if s.strip()] if a.symbols else default_symbols()
-    if any(not re.fullmatch(r'(sh|sz)\d{6}', s) for s in symbols):
+    explicit = [s.strip() for s in a.symbols.split(',') if s.strip()] if a.symbols else None
+    if explicit and any(not re.fullmatch(r'(sh|sz)\d{6}', s) for s in explicit):
         p.error('只支持沪深个股代码')
+
+    # 挂上条件执行器（exec-0.2）。它需要盯的股票——今天还在观察的计划和所有持仓——在通过
+    # 时段闸门之后才去读，所以 symbols 传的是函数。
+    import conditional_exec
+    executor = conditional_exec.attach(a.history)
+
+    def symbols():
+        base = explicit if explicit is not None else default_symbols()
+        return sorted(set(base) | set(executor.watch_symbols(datetime.now(CST), dry_run=a.dry_run)))
+
     result = run_tick(a.history, symbols, force=a.force_session, dry_run=a.dry_run)
     if a.json:
         print(json.dumps(result, ensure_ascii=False, indent=2, default=str))

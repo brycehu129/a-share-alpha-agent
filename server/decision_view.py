@@ -34,7 +34,10 @@ def decisions(agent):
             state='skipped';reasons=[skip['reason'],'本次入场尝试已结束，不会自动补买。']
         elif f and f.get('paper_eligible'):
             state='waiting_buy';reasons=['冻结记录允许条件式模拟入场；尚无成交记录。']
-            reasons.append('本计划最早允许日期：'+f.get('eligible_from','待核验')+'；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。')
+            if f.get('execution_mode')=='conditional-intraday-v1':
+                reasons.append('本计划最早允许日期：'+f.get('eligible_from','待核验')+'；在该日期起首个交易日的 09:30–14:00 内，现价进入入场区间才成交，当日未触发即过期，不补买。')
+            else:
+                reasons.append('本计划最早允许日期：'+f.get('eligible_from','待核验')+'；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。')
             prior_skip=next((t for t in reversed(portfolio.get('trades',[])) if t.get('symbol')==code and t.get('side')=='skipped' and t.get('prediction_id')!=f['id']),None)
             if prior_skip:
                 reasons.append('上一计划 '+prior_skip['date']+' 已跳过：'+prior_skip['reason'])

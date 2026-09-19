@@ -88,6 +88,9 @@ def run(history, run_id):
             audit.append({'symbol':pos['symbol'],'side':'sell','status':'deferred','reason':str(exc)[:200]})
     for f in sorted(report['forecasts'],key=lambda f:(f['created_at'],f['id'])):
         if not f['paper_eligible'] or f['id'] in state['attempted']:continue
+        # 条件触发计划归 conditional_exec 管，这里绝不能碰：早先这一行之后会把任何非
+        # observed-quote-v1 的计划记成"已尝试并跳过"，新计划在还没机会触发前就被旧链路消费掉了。
+        if f.get('execution_mode')=='conditional-intraday-v1':continue
         due=first_session(f,dates)
         if due is None or due>today or (due==today and now.time()<time(9,30)):continue
         reason=None;evidence={};policy=f.get('policy',DEFAULT_POLICY)
