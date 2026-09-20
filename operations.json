@@ -34,18 +34,21 @@
       "finished_at": "2026-09-18T18:33:50.373298+08:00"
     }
   },
-  "updated_at": "2026-09-21T07:10:26.199005+08:00",
+  "updated_at": "2026-09-21T07:12:28.610500+08:00",
   "latest_run": {
     "id": "20260920231007-1",
     "slot": "prepare",
     "report_date": "2026-09-21",
     "expected_date": "2026-09-18",
     "started_at": "2026-09-21T07:10:26.199005+08:00",
-    "updated_at": "2026-09-21T07:10:26.199005+08:00",
-    "status": "running",
+    "updated_at": "2026-09-21T07:12:28.610500+08:00",
+    "status": "partial",
     "data_date": null,
-    "issues": [],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260920231007"
+    "issues": [
+      "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
+    ],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260920231007",
+    "finished_at": "2026-09-21T07:12:28.610500+08:00"
   },
   "calendar": [
     {
@@ -371,6 +374,21 @@
       ],
       "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/35294476141",
       "finished_at": "2026-09-18T09:21:29.656575+08:00"
+    },
+    "prepare": {
+      "id": "20260920231007-1",
+      "slot": "prepare",
+      "report_date": "2026-09-21",
+      "expected_date": "2026-09-18",
+      "started_at": "2026-09-21T07:10:26.199005+08:00",
+      "updated_at": "2026-09-21T07:12:28.610500+08:00",
+      "status": "partial",
+      "data_date": null,
+      "issues": [
+        "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
+      ],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260920231007",
+      "finished_at": "2026-09-21T07:12:28.610500+08:00"
     }
   }
 }
