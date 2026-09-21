@@ -255,6 +255,33 @@ class SystemTests(Base):
         with patch.dict(os.environ, {'OPENROUTER_API_KEY': '', 'ANTHROPIC_API_KEY': '', 'LLM_PROVIDER': ''}):
             self.assertEqual(hc.check_llm(self.ctx())['level'], hc.WARN)
 
+    def test_each_check_reports_when_its_evidence_was_produced_and_when_it_is_scheduled_to_run(self):
+        """「上次执行」是该项所依据的那次执行/产出的时间，不是检查本身的时间（实时读取的项除外）。"""
+        self.ticks([self.tick('09:58:00'), self.tick('09:59:00')])
+        self.assertEqual(hc.check_engine(self.ctx('10:00:00'))['at'], at('09:59:00').isoformat())
+        self.assertEqual(hc.check_quotes(self.ctx('10:00:00'))['level'], hc.SKIP)          # 样本不足：没有可依据的执行
+        self.assertIsNone(hc.check_quotes(self.ctx('10:00:00'))['at'])
+        (self.history / 'agent').mkdir()
+        (self.history / 'agent' / '20260921073500-1.json').write_text('{}')                # 07:35 UTC = 15:35 北京时间
+        self.assertEqual(datetime.fromisoformat(hc.check_daily_pipeline(self.ctx('17:30:00'))['at']), at('15:35:00'))
+        (self.private / 'postclose').mkdir()
+        (self.private / 'postclose' / 'r.json').write_text(json.dumps({'generated_at': '2026-09-21T16:40:00+08:00', 'ai_meta': {'status': 'ok'}}))
+        self.assertEqual(hc.check_postclose(self.ctx('17:30:00'))['at'], '2026-09-21T16:40:00+08:00')
+        (self.private / 'sentinel').mkdir()
+        (self.private / 'sentinel' / 'reconcile-2026-09-21.json').write_text('{}')
+        self.assertIsNotNone(hc.check_reconcile(self.ctx('16:00:00'))['at'])
+        with patch.object(backup, 'read_status', return_value={'last_success_at': '2026-09-21T17:30:05+08:00'}), \
+                patch.object(backup, 'health', return_value=('ok', '最近成功快照')):
+            self.assertEqual(hc.check_backup(self.ctx())['at'], '2026-09-21T17:30:05+08:00')
+        now = self.ctx('10:00:00')
+        self.assertEqual(hc.check_disk(now)['at'], now.now.isoformat())                    # 实时读取：就是检查那一刻
+        self.assertEqual(hc.check_calendar(now)['at'], now.now.isoformat())
+
+    def test_every_check_gets_a_schedule_and_nothing_is_missing_from_the_table(self):
+        results = hc.run_checks(self.ctx())
+        self.assertTrue(all(r['schedule'] for r in results), [r['key'] for r in results if not r['schedule']])
+        self.assertEqual({r['key'] for r in results} - set(hc.SCHEDULES), set())
+
     def test_a_broken_check_is_reported_instead_of_vanishing(self):
         def bad(ctx):
             raise ValueError('bug')

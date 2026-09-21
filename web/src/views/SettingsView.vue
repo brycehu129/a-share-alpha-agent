@@ -80,6 +80,13 @@ function healthHead(h) {
   return { tag: h.critical ? 'danger' : 'success', label: h.critical ? '有严重问题' : '运行中', text: `最近一次检查 ${age} 分钟前。` }
 }
 const fmtAt = (iso) => String(iso || '').slice(0, 16).replace('T', ' ')
+// 「上次执行」列：当天的只显示时分秒，其它天带上月日；没有依据的执行记录（例如今天不在运行时段）显示 —
+const fmtWhen = (iso) => {
+  const s = String(iso || '')
+  if (!s) return '—'
+  const t = s.slice(11, 19)
+  return s.slice(0, 10) === new Date().toLocaleDateString('sv-SE') ? t : `${s.slice(5, 10)} ${t.slice(0, 5)}`
+}
 </script>
 
 <template>
@@ -209,6 +216,10 @@ const fmtAt = (iso) => String(iso || '').slice(0, 16).replace('T', ' ')
             <el-table-column label="状态" width="90">
               <template #default="{ row }"><el-tag :type="LEVEL_TAG[row.level] || 'info'" size="small">{{ LEVEL_TEXT[row.level] || row.level }}</el-tag></template>
             </el-table-column>
+            <el-table-column label="上次执行" width="130">
+              <template #default="{ row }">{{ fmtWhen(row.at) }}</template>
+            </el-table-column>
+            <el-table-column prop="schedule" label="计划时间" min-width="170" />
             <el-table-column prop="message" label="说明" min-width="260" />
           </el-table>
           <p class="muted">每 5 分钟检查一遍：看的是“该出现的产出有没有出现”（盘中引擎最后一轮、日线报告、盘后 AI 研判、备份、证书、磁盘……），不只是进程有没有退出。问题会推企业微信（warn 要连续两次才推，crit 立即推）。<b>这台机器整个挂了它发不出告警</b>——仓库里的 GitHub Actions 会定期访问 /health/deep，异常时 GitHub 给你发邮件。</p>

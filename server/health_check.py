@@ -87,8 +87,35 @@ def _run(argv, timeout=10):
     return p.returncode, (p.stdout or '') + (p.stderr or '')
 
 
-def check(key, title, level, message=''):
-    return {'key': key, 'title': title, 'level': level, 'message': message}
+def check(key, title, level, message='', at=None):
+    """at：这一项所依据的那次执行/产出的时间（ISO，北京时间）——「上次执行」列。实时读取的项传检查时刻，
+    没有可依据的执行记录就留 None。什么时候该执行（schedule）是静态的，见 SCHEDULES，由 run_checks 补上。"""
+    return {'key': key, 'title': title, 'level': level, 'message': message, 'at': at}
+
+
+# 每项检查所对应的任务「什么时候该跑」，来自 systemd/*.timer；改了 timer 要一起改这里。
+SCHEDULES = {
+    'calendar': '每次检查时实时读取',
+    'engine': '交易日 09:30–15:00 每分钟',
+    'quotes': '随盘中引擎，每分钟一轮',
+    'evaluators': '随盘中引擎，每分钟一轮',
+    'sentinel_queue': '交易日盘中每分钟（第 30 秒）',
+    'sentinel_ai': '交易日盘中每分钟（第 30 秒）',
+    'daily': '工作日 15:35（18:20 与每小时 :17 补跑）',
+    'premarket': '工作日 08:40（09:25 前须冻结计划）',
+    'postclose': '工作日 16:30',
+    'reconcile': '工作日 15:20',
+    'backup': '每天 17:30',
+    'units': '每次检查时实时查询',
+    'disk': '每次检查时实时读取',
+    'cert': '每次检查时实时读取',
+    'webhook': '每次检查时实时读取',
+    'llm': '每次检查时实时读取',
+}
+
+
+def _cst_iso(dt):
+    return dt.astimezone(CST).isoformat()
 
 
 # --- 各项检查 -----------------------------------------------------------------
@@ -124,8 +151,8 @@ def check_calendar(ctx):
     state = ctx.calendar_state()
     if state == 'unknown' and ctx.now.weekday() < 5:
         return check('calendar', '交易日历', WARN, '交易日历读不到（%s）。盘中引擎在这种状态下**不会运行**，报警窗口内不会有任何推送。'
-                     % (ctx.history / 'tushare_data/calendars'))
-    return check('calendar', '交易日历', OK, '今天：%s' % state)
+                     % (ctx.history / 'tushare_data/calendars'), ctx.now.isoformat())
+    return check('calendar', '交易日历', OK, '今天：%s' % state, ctx.now.isoformat())
 
 
 def check_engine(ctx):
@@ -145,8 +172,8 @@ def check_engine(ctx):
     last = datetime.fromisoformat(ticks[-1]['at'])
     age = (ctx.now - last).total_seconds()
     if age > ENGINE_MAX_AGE_S:
-        return check('engine', title, CRIT, '盘中引擎已 %d 分钟没有成功运行（最后一轮 %s）。' % (age // 60, last.strftime('%H:%M:%S')))
-    return check('engine', title, OK, '最后一轮 %d 秒前（今天已 %d 轮）' % (age, len(ticks)))
+        return check('engine', title, CRIT, '盘中引擎已 %d 分钟没有成功运行（最后一轮 %s）。' % (age // 60, last.strftime('%H:%M:%S')), last.isoformat())
+    return check('engine', title, OK, '最后一轮 %d 秒前（今天已 %d 轮）' % (age, len(ticks)), last.isoformat())
 
 
 def check_quotes(ctx):
@@ -158,8 +185,8 @@ def check_quotes(ctx):
         return check('quotes', title, SKIP, '样本不足（%d 轮）' % len(ticks))
     bad = [t for t in ticks if t.get('failures') or t.get('fresh') == 0 or t.get('error')]
     if len(bad) * 2 >= len(ticks):
-        return check('quotes', title, WARN, '最近 %d 轮里有 %d 轮取不到行情或行情不新鲜：盘中信号会不可靠，甚至完全静默。' % (len(ticks), len(bad)))
-    return check('quotes', title, OK, '最近 %d 轮里 %d 轮有异常' % (len(ticks), len(bad)))
+        return check('quotes', title, WARN, '最近 %d 轮里有 %d 轮取不到行情或行情不新鲜：盘中信号会不可靠，甚至完全静默。' % (len(ticks), len(bad)), ticks[-1].get('at'))
+    return check('quotes', title, OK, '最近 %d 轮里 %d 轮有异常' % (len(ticks), len(bad)), ticks[-1].get('at'))
 
 
 def check_evaluators(ctx):
@@ -169,8 +196,8 @@ def check_evaluators(ctx):
     ticks = _ran_ticks(intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today), 10)
     errors = [e for t in ticks for e in (t.get('evaluator_errors') or [])]
     if errors:
-        return check('evaluators', title, WARN, '最近有评估器报错（一个坏了不会影响别的，但它负责的信号已经静默）：%s' % errors[-1][:160])
-    return check('evaluators', title, OK, '无报错')
+        return check('evaluators', title, WARN, '最近有评估器报错（一个坏了不会影响别的，但它负责的信号已经静默）：%s' % errors[-1][:160], ticks[-1].get('at'))
+    return check('evaluators', title, OK, '无报错', ticks[-1].get('at') if ticks else None)
 
 
 def check_sentinel_queue(ctx):
@@ -209,17 +236,26 @@ def check_sentinel_ai(ctx):
     failed = [i for i in recent if i.get('status') == 'ai_failed']
     if not recent:
         return check('sentinel_ai', title, SKIP, '今天还没有研判')
+    last_at = max(i.get('finished_at') or '' for i in recent) or None
     tail = recent[-3:]
     if len(tail) >= 2 and all(i.get('status') == 'ai_failed' for i in tail):
         reason = ((tail[-1].get('meta') or {}).get('status')) or '未知'
         level = CRIT if reason in LLM_FATAL else WARN
         return check('sentinel_ai', title, level, '最近 %d 次 AI 研判都失败了（%s）%s' % (
-            len(tail), reason, '：key 无效/余额不足/模型不存在，重试没有用，请到后台"推送配置"页检查。' if reason in LLM_FATAL else '。'))
-    return check('sentinel_ai', title, OK, '今天 %d 次研判，%d 次失败' % (len(recent), len(failed)))
+            len(tail), reason, '：key 无效/余额不足/模型不存在，重试没有用，请到后台"推送配置"页检查。' if reason in LLM_FATAL else '。'), last_at)
+    return check('sentinel_ai', title, OK, '今天 %d 次研判，%d 次失败' % (len(recent), len(failed)), last_at)
 
 
 def _report_files(directory):
     return sorted(directory.glob('*.json')) if directory.is_dir() else []
+
+
+def _report_time(name):
+    """报告文件名 YYYYMMDDHHMMSS-N 的前 14 位是 UTC 时间戳；认不出来返回 None。"""
+    try:
+        return _cst_iso(datetime.strptime(name[:14], '%Y%m%d%H%M%S').replace(tzinfo=timezone.utc))
+    except ValueError:
+        return None
 
 
 def check_daily_pipeline(ctx):
@@ -230,9 +266,10 @@ def check_daily_pipeline(ctx):
     # 报告文件名是 UTC 时间戳 YYYYMMDDHHMMSS-N。08:40 的盘前那轮也会写报告，不能拿它冒充收盘流程：
     # 收盘流程 15:35 北京时间 = 07:35 UTC，所以要找当天 07:30 UTC 之后的。
     utc_day = ctx.now.astimezone(timezone.utc).strftime('%Y%m%d')
+    latest = _report_time(names[-1]) if names else None
     if any(n[:8] == utc_day and n[8:14] >= '073000' for n in names):
-        return check('daily', title, OK, '今天收盘后的报告已生成')
-    return check('daily', title, CRIT, '今天 15:35/18:20 的收盘流程没有产出报告（agent/ 下没有今天的记录）：今天的验收、估值、证据和基线都没有更新。')
+        return check('daily', title, OK, '今天收盘后的报告已生成', latest)
+    return check('daily', title, CRIT, '今天 15:35/18:20 的收盘流程没有产出报告（agent/ 下没有今天的记录）：今天的验收、估值、证据和基线都没有更新。', latest)
 
 
 def check_premarket_plans(ctx):
@@ -250,11 +287,11 @@ def check_premarket_plans(ctx):
     files = sorted(files, key=cutoff_of, reverse=True)[:12]
     for path in files:
         try:
-            created = (read(path).get('created_at') or '')[:10]
+            created_at = read(path).get('created_at') or ''
         except Exception:
             continue
-        if created == ctx.today:
-            return check('premarket', title, OK, '今天的买入计划已冻结')
+        if created_at[:10] == ctx.today:
+            return check('premarket', title, OK, '今天的买入计划已冻结', created_at)
     return check('premarket', title, CRIT, '今天到现在没有冻结出任何买入计划：盘前选股没有跑完（或选出 0 只）。'
                                             '执行器 09:25 之后不再等计划，今天不会有条件入场。')
 
@@ -270,29 +307,32 @@ def check_postclose(ctx):
             latest = json.loads(files[-1].read_text(encoding='utf-8'))
         except (OSError, ValueError):
             latest = None
-    if not latest or (latest.get('generated_at') or '')[:10] != ctx.today:
-        return check('postclose', title, WARN, '今天的盘后报告没有生成。')
+    generated_at = (latest or {}).get('generated_at') or None
+    if not latest or (generated_at or '')[:10] != ctx.today:
+        return check('postclose', title, WARN, '今天的盘后报告没有生成。', generated_at)
     meta = latest.get('ai_meta') or {}
     if meta.get('status') not in (None, 'ok'):
         return check('postclose', title, WARN, '今天的盘后报告生成了，但**没有 AI 研判**（%s：%s）。'
-                     % (meta.get('status'), str(meta.get('error') or '')[:120]))
-    return check('postclose', title, OK, '已生成，带 AI 研判')
+                     % (meta.get('status'), str(meta.get('error') or '')[:120]), generated_at)
+    return check('postclose', title, OK, '已生成，带 AI 研判', generated_at)
 
 
 def check_reconcile(ctx):
     title = '情景收盘对账（15:20）'
     if ctx.calendar_state() != 'open' or ctx.now.time() < clock_time(15, 45):
         return check('reconcile', title, SKIP, '尚未到检查时间或非交易日')
-    if (ctx.private / 'sentinel' / ('reconcile-%s.json' % ctx.today)).exists():
-        return check('reconcile', title, OK, '今天已对账')
+    done = ctx.private / 'sentinel' / ('reconcile-%s.json' % ctx.today)
+    if done.exists():
+        return check('reconcile', title, OK, '今天已对账', _cst_iso(datetime.fromtimestamp(done.stat().st_mtime, timezone.utc)))
     return check('reconcile', title, WARN, '今天没有情景对账记录：命中率统计会缺一天。')
 
 
 def check_backup(ctx):
     level, text = backup.health()
+    last_ok = backup.read_status().get('last_success_at') or None
     if level == 'warn':
-        return check('backup', '私有数据备份', WARN, text)
-    return check('backup', '私有数据备份', SKIP if level == 'none' else OK, text)
+        return check('backup', '私有数据备份', WARN, text, last_ok)
+    return check('backup', '私有数据备份', SKIP if level == 'none' else OK, text, last_ok)
 
 
 def check_units(ctx):
@@ -303,9 +343,9 @@ def check_units(ctx):
         return check('units', title, SKIP, '本机没有 systemctl（开发环境）')
     failed = [line.split()[0] for line in out.splitlines() if line.strip() and 'alpha-shadow' in line]
     if not failed:
-        return check('units', title, OK, '没有失败单元')
+        return check('units', title, OK, '没有失败单元', ctx.now.isoformat())
     frequent = all(any(u.startswith(f) for f in FREQUENT_UNITS) for u in failed)
-    return check('units', title, WARN if frequent else CRIT, '失败的单元：%s。`journalctl -u <单元名> -n 50` 看原因。' % '、'.join(failed))
+    return check('units', title, WARN if frequent else CRIT, '失败的单元：%s。`journalctl -u <单元名> -n 50` 看原因。' % '、'.join(failed), ctx.now.isoformat())
 
 
 def check_disk(ctx):
@@ -317,10 +357,10 @@ def check_disk(ctx):
     free_pct = usage.free / usage.total * 100
     text = '剩余 %.1f%%（%.1f GB）' % (free_pct, usage.free / 1e9)
     if free_pct < DISK_CRIT_PCT or usage.free < 500e6:
-        return check('disk', title, CRIT, text + '：写文件很快会失败（账本、备份、日志）。')
+        return check('disk', title, CRIT, text + '：写文件很快会失败（账本、备份、日志）。', ctx.now.isoformat())
     if free_pct < DISK_WARN_PCT:
-        return check('disk', title, WARN, text)
-    return check('disk', title, OK, text)
+        return check('disk', title, WARN, text, ctx.now.isoformat())
+    return check('disk', title, OK, text, ctx.now.isoformat())
 
 
 def check_cert(ctx):
@@ -341,17 +381,17 @@ def check_cert(ctx):
     days = (end - ctx.now.replace(tzinfo=None)).days
     text = '还有 %d 天到期（%s）' % (days, end.date())
     if days < CERT_CRIT_DAYS:
-        return check('cert', title, CRIT, text + '：过期后后台页面会打不开。')
+        return check('cert', title, CRIT, text + '：过期后后台页面会打不开。', ctx.now.isoformat())
     if days < CERT_WARN_DAYS:
-        return check('cert', title, WARN, text)
-    return check('cert', title, OK, text)
+        return check('cert', title, WARN, text, ctx.now.isoformat())
+    return check('cert', title, OK, text, ctx.now.isoformat())
 
 
 def check_webhook(ctx):
     title = '企业微信 webhook'
     if not _webhook():
-        return check('webhook', title, WARN, '没有配置 webhook：**所有告警都发不出去**，只能在后台页面看到。')
-    return check('webhook', title, OK, '已配置')
+        return check('webhook', title, WARN, '没有配置 webhook：**所有告警都发不出去**，只能在后台页面看到。', ctx.now.isoformat())
+    return check('webhook', title, OK, '已配置', ctx.now.isoformat())
 
 
 def check_llm(ctx):
@@ -361,8 +401,8 @@ def check_llm(ctx):
     llm_settings.apply()
     ok, why = claude_client.available()
     if not ok:
-        return check('llm', title, WARN, '大模型不可用（%s）：盘后报告和情景研判不会有 AI 部分。' % why)
-    return check('llm', title, OK, '后端 %s 已配置' % claude_client.provider())
+        return check('llm', title, WARN, '大模型不可用（%s）：盘后报告和情景研判不会有 AI 部分。' % why, ctx.now.isoformat())
+    return check('llm', title, OK, '后端 %s 已配置' % claude_client.provider(), ctx.now.isoformat())
 
 
 CHECKS = [check_calendar, check_engine, check_quotes, check_evaluators, check_sentinel_queue, check_sentinel_ai,
@@ -377,6 +417,8 @@ def run_checks(ctx):
             results.append(fn(ctx))
         except Exception as exc:          # 检查本身出 bug：也要让你知道，而不是这一项悄悄消失
             results.append(check(fn.__name__[6:], fn.__name__[6:], WARN, '检查自身出错：%s: %s' % (type(exc).__name__, str(exc)[:120])))
+    for r in results:
+        r['schedule'] = SCHEDULES.get(r['key'], '')
     return results
 
 
