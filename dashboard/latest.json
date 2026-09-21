@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-21T08:19:01.179563+08:00",
+  "exported_at": "2026-09-21T08:47:57.954488+08:00",
   "market": {
     "generated_at": "2026-09-18T15:36:18.194778+08:00",
     "status": "success",
@@ -65,9 +65,9 @@
     }
   },
   "research": {
-    "generated_at": "2026-09-18T18:26:35.859437+08:00",
-    "status": "partial",
-    "factor_cutoff": null,
+    "generated_at": "2026-09-21T08:40:56.395358+08:00",
+    "status": "success",
+    "factor_cutoff": "2026-09-18",
     "industry_provider": "新浪行业",
     "mapping": {
       "universe_count": 5220,
@@ -5305,8 +5305,309 @@
     "source_id": "20260918073511-1",
     "source_generated_at": "2026-09-18T15:36:18.194778+08:00",
     "sample_count": 300,
-    "factor_count": 0,
-    "rankings": [],
+    "factor_count": 293,
+    "rankings": [
+      {
+        "symbol": "sz301046",
+        "name": "能辉科技",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "47.87",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "50.29",
+        "ma20_deviation_pct": "14.81"
+      },
+      {
+        "symbol": "sz301528",
+        "name": "多浦乐",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "33.57",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "35.99",
+        "ma20_deviation_pct": "22.44"
+      },
+      {
+        "symbol": "sz002201",
+        "name": "九鼎新材",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "31.68",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "34.10",
+        "ma20_deviation_pct": "13.01"
+      },
+      {
+        "symbol": "sz301081",
+        "name": "严牌股份",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "31.17",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "33.58",
+        "ma20_deviation_pct": "11.59"
+      },
+      {
+        "symbol": "sz002988",
+        "name": "豪美新材",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "30.53",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "32.94",
+        "ma20_deviation_pct": "14.67"
+      },
+      {
+        "symbol": "sh600103",
+        "name": "青山纸业",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "29.51",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "31.93",
+        "ma20_deviation_pct": "1.39"
+      },
+      {
+        "symbol": "sz003001",
+        "name": "中岩大地",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "28.21",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "30.62",
+        "ma20_deviation_pct": "20.47"
+      },
+      {
+        "symbol": "sh688216",
+        "name": "气派科技",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "27.06",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "29.47",
+        "ma20_deviation_pct": "19.55"
+      },
+      {
+        "symbol": "sz300688",
+        "name": "创业黑马",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "23.36",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "25.77",
+        "ma20_deviation_pct": "15.98"
+      },
+      {
+        "symbol": "sh603978",
+        "name": "深圳新星",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "20.36",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "22.77",
+        "ma20_deviation_pct": "9.52"
+      },
+      {
+        "symbol": "sz300426",
+        "name": "华智数媒",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "18.61",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "21.02",
+        "ma20_deviation_pct": "4.33"
+      },
+      {
+        "symbol": "sh601811",
+        "name": "新华文轩",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "16.81",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "19.22",
+        "ma20_deviation_pct": "17.54"
+      },
+      {
+        "symbol": "sh603613",
+        "name": "国联股份",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "16.61",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "19.03",
+        "ma20_deviation_pct": "9.52"
+      },
+      {
+        "symbol": "sz000712",
+        "name": "锦龙股份",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "16.55",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "18.96",
+        "ma20_deviation_pct": "-9.57"
+      },
+      {
+        "symbol": "sz002976",
+        "name": "瑞玛精密",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "16.50",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "18.91",
+        "ma20_deviation_pct": "8.27"
+      },
+      {
+        "symbol": "sh688603",
+        "name": "天承科技",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "16.38",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "18.79",
+        "ma20_deviation_pct": "8.22"
+      },
+      {
+        "symbol": "sh603499",
+        "name": "翔港科技",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "16.33",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "18.74",
+        "ma20_deviation_pct": "3.75"
+      },
+      {
+        "symbol": "sz000906",
+        "name": "浙商中拓",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "16.04",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "18.45",
+        "ma20_deviation_pct": "2.89"
+      },
+      {
+        "symbol": "sz301500",
+        "name": "飞南资源",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "15.94",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "18.35",
+        "ma20_deviation_pct": "8.03"
+      },
+      {
+        "symbol": "sz002848",
+        "name": "高斯贝尔",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "14.95",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "17.37",
+        "ma20_deviation_pct": "8.24"
+      },
+      {
+        "symbol": "sh688293",
+        "name": "奥浦迈生物",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "14.49",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "16.91",
+        "ma20_deviation_pct": "15.20"
+      },
+      {
+        "symbol": "sz002961",
+        "name": "瑞达期货",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "13.85",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "16.26",
+        "ma20_deviation_pct": "6.21"
+      },
+      {
+        "symbol": "sh600822",
+        "name": "上海物贸",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "13.25",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "15.67",
+        "ma20_deviation_pct": "7.51"
+      },
+      {
+        "symbol": "sh688711",
+        "name": "江苏宏微科技",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "13.20",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "15.62",
+        "ma20_deviation_pct": "16.02"
+      },
+      {
+        "symbol": "sz000981",
+        "name": "山子高科",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "13.21",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "15.62",
+        "ma20_deviation_pct": "9.05"
+      },
+      {
+        "symbol": "sz300613",
+        "name": "富瀚微",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "13.14",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "15.56",
+        "ma20_deviation_pct": "10.71"
+      },
+      {
+        "symbol": "sh601952",
+        "name": "苏垦农发",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "13.03",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "15.45",
+        "ma20_deviation_pct": "1.40"
+      },
+      {
+        "symbol": "sz300562",
+        "name": "乐心股份",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "13.04",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "15.45",
+        "ma20_deviation_pct": "-1.10"
+      },
+      {
+        "symbol": "sz002264",
+        "name": "新 华 都",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "12.90",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "15.32",
+        "ma20_deviation_pct": "5.15"
+      },
+      {
+        "symbol": "sz301119",
+        "name": "正强股份",
+        "end_date": "2026-09-18",
+        "start_date": "2026-08-21",
+        "return20_pct": "12.37",
+        "benchmark20_pct": "-2.41",
+        "excess20_pp": "14.79",
+        "ma20_deviation_pct": "1.80"
+      }
+    ],
     "industries": [
       {
         "name": "发电设备",
@@ -5431,7 +5732,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-21T08:17:31.481057+08:00",
+    "generated_at": "2026-09-21T08:40:28.393120+08:00",
     "status": "partial",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5446,7 +5747,7 @@
     }
   },
   "analysis": {
-    "generated_at": "2026-09-21T08:18:00.703615+08:00",
+    "generated_at": "2026-09-21T08:42:59.634045+08:00",
     "status": "ready",
     "start_date": "20260821",
     "end_date": "20260918",
@@ -5705,42 +6006,44 @@
     },
     {
       "kind": "research",
-      "id": "20260918102524-1",
-      "generated_at": "2026-09-18T18:26:35.859437+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260918102524-1.md"
+      "id": "20260921004006-1",
+      "generated_at": "2026-09-21T08:40:56.395358+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260921004006-1.md"
     },
     {
       "kind": "sync",
-      "id": "20260921001710-1",
-      "generated_at": "2026-09-21T08:17:31.481057+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260921001710-1.md"
+      "id": "20260921004006-1",
+      "generated_at": "2026-09-21T08:40:28.393120+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260921004006-1.md"
     },
     {
       "kind": "analysis",
-      "id": "20260921001710-1",
-      "generated_at": "2026-09-21T08:18:00.703615+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260921001710-1.md"
+      "id": "20260921004006-1",
+      "generated_at": "2026-09-21T08:42:59.634045+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260921004006-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "20260921001710-1",
-      "generated_at": "2026-09-21T08:18:50.984433+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260921001710-1.md"
+      "id": "20260921004006-1",
+      "generated_at": "2026-09-21T08:47:48.326178+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260921004006-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "35442501856-1",
-      "generated_at": "2026-09-19T20:19:35.679400+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/35442501856-1.md"
+      "id": "20260921004006-1",
+      "generated_at": "2026-09-21T08:47:47.807717+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260921004006-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-19T20:19:35.679400+08:00",
-    "version": "alpha-shadow-0.3-shortterm",
-    "status": "ready",
+    "generated_at": "2026-09-21T08:47:47.807717+08:00",
+    "version": "select-0.5",
+    "status": "partial",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
     "issues": [
-      "开盘观察执行记录；当日净值仍需收盘估值。未用当天完整日线决定成交。"
+      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
+      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
+      "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。"
     ],
     "calibration": {
       "walk_forward_n": 0,
@@ -5762,135 +6065,66 @@
         "短线(1-3日)回看同样存在当前名单与行业分类的幸存者/回看偏差",
         "突破/回调两条track各自独立统计校准，不与对方或原T+10版本样本混用",
         "1-3日窗口下单边成本假设占比更高，历史频率不代表已覆盖成本后的可交易胜率",
-        "MA5/近3日涨幅/放量阈值是初始设定值，尚未用本函数的回看结果验证过合理性"
+        "MA5/近3日涨幅/放量阈值是初始设定值，尚未用本函数的回看结果验证过合理性",
+        "回看样本取两条track合并后的前10名（与实盘留档同口径）；每个样本带rank字段，可用来检验排名有没有区分度"
       ],
-      "historical_n": 37,
+      "historical_n": 61,
       "live_n": 0,
+      "legacy_live_n": 0,
+      "selection_version": "select-0.5",
       "live_win_rate_breakout": null,
       "live_win_rate_pullback": null
     },
     "candidates": [
       {
-        "symbol": "sh600520",
-        "name": "三佳科技",
+        "symbol": "sh688061",
+        "name": "灿瑞科技",
         "industry": "半导体",
-        "return20_pct": 6.280388978930307,
-        "return5_pct": 12.23791185280274,
-        "excess20_pp": 8.694600154751376,
-        "deviation_pct": 6.149207826632397,
-        "volume_ratio": 1.7951048916747672,
-        "liquidity_proxy": 2020901.960025,
-        "reference_adjusted": 26.23,
-        "return1_pct": 6.108414239482207,
-        "return2_pct": 4.878048780487809,
-        "return3_pct": 8.120362737015663,
-        "ma5_deviation_pct": 5.9198837021482875,
-        "volume_ratio_5d": 2.329241268993219,
-        "high20_ratio": 1.0019098548510315,
+        "return20_pct": 21.635388739946393,
+        "return5_pct": 8.748801534036431,
+        "excess20_pp": 24.049599915767462,
+        "deviation_pct": 3.3085137873716253,
+        "volume_ratio": 0.7360940451821795,
+        "liquidity_proxy": 1526920.80984,
+        "reference_adjusted": 45.37,
+        "return1_pct": 2.8564951258218008,
+        "return2_pct": -1.9874702959602586,
+        "return3_pct": 5.757575757575761,
+        "ma5_deviation_pct": 2.814539521392301,
+        "volume_ratio_5d": 0.7418119242237684,
+        "high20_ratio": 0.8826848249027237,
         "is_green": true,
-        "prior_volume_ratio_5d": 1.060085556495485,
-        "strategy_type": "breakout",
-        "score": 100,
+        "prior_volume_ratio_5d": 0.9977277388878474,
+        "atr14": 0.07600994993545139,
+        "liquidity_pct": 54.34,
+        "strategy_type": "pullback",
+        "score": 80.11,
+        "raw_score": 80.112,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
+          "20日超额为正",
+          "近2日缩量回调",
+          "未跌破MA20区间",
+          "当日收阳反转确认"
         ],
         "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh600639",
-        "name": "浦东金桥",
-        "industry": "园区开发",
-        "return20_pct": 5.4603854389721596,
-        "return5_pct": 5.5734190782422255,
-        "excess20_pp": 7.874596614793228,
-        "deviation_pct": 3.9907094594594517,
-        "volume_ratio": 2.809073783954486,
-        "liquidity_proxy": 408828.971355,
-        "reference_adjusted": 9.85,
-        "return1_pct": 4.564755838641177,
-        "return2_pct": 5.122732123799367,
-        "return3_pct": 6.027987082884834,
-        "ma5_deviation_pct": 4.210749047820572,
-        "volume_ratio_5d": 3.423943782117932,
-        "high20_ratio": 1.0281837160751566,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.9248174423346814,
-        "strategy_type": "breakout",
-        "score": 100,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
-        ],
-        "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh688683",
-        "name": "莱尔科技",
-        "industry": "元器件",
-        "return20_pct": 5.15532055518837,
-        "return5_pct": 11.531720995443395,
-        "excess20_pp": 7.569531731009437,
-        "deviation_pct": 7.523611603899516,
-        "volume_ratio": 2.251790443990801,
-        "liquidity_proxy": 363961.694575,
-        "reference_adjusted": 31.82,
-        "return1_pct": 4.088976120379462,
-        "return2_pct": 3.479674796747978,
-        "return3_pct": 8.860759493670889,
-        "ma5_deviation_pct": 4.650397947773466,
-        "volume_ratio_5d": 1.9616557033533157,
-        "high20_ratio": 1.0347967479674798,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.8484260021591389,
-        "strategy_type": "breakout",
-        "score": 100,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
-        ],
-        "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 93.75,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       },
       {
@@ -5912,8 +6146,11 @@
         "high20_ratio": 1.0,
         "is_green": true,
         "prior_volume_ratio_5d": 1.238410532026538,
+        "atr14": 0.043813064259160886,
+        "liquidity_pct": 40.72,
         "strategy_type": "breakout",
         "score": 100,
+        "raw_score": 108.5092,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -5923,261 +6160,22 @@
           "MA5偏离受控"
         ],
         "probability": {
-          "n": 8,
+          "n": 5,
           "cohorts": 3,
-          "wins": 4,
+          "wins": 2,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz300787",
-        "name": "海能实业",
-        "industry": "元器件",
-        "return20_pct": 5.976095617529897,
-        "return5_pct": 10.718002081165467,
-        "excess20_pp": 8.390306793350966,
-        "deviation_pct": 5.576503274459221,
-        "volume_ratio": 1.822198983040001,
-        "liquidity_proxy": 459626.57277,
-        "reference_adjusted": 10.64,
-        "return1_pct": 5.450941526263642,
-        "return2_pct": 6.18762475049901,
-        "return3_pct": 9.577754891864053,
-        "ma5_deviation_pct": 5.74438481415227,
-        "volume_ratio_5d": 1.8964427821877097,
-        "high20_ratio": 1.0211132437619963,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.8056979411514825,
-        "strategy_type": "breakout",
-        "score": 100,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
-        ],
-        "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz301336",
-        "name": "趣睡科技",
-        "industry": "家居用品",
-        "return20_pct": 5.735956387769625,
-        "return5_pct": 5.460992907801421,
-        "excess20_pp": 8.150167563590694,
-        "deviation_pct": 6.051421031986592,
-        "volume_ratio": 1.5422116501963936,
-        "liquidity_proxy": 514681.20187,
-        "reference_adjusted": 44.61,
-        "return1_pct": 6.5695174390826505,
-        "return2_pct": 7.831762146482957,
-        "return3_pct": 7.649613899613894,
-        "ma5_deviation_pct": 5.595796051697199,
-        "volume_ratio_5d": 1.9917381454653713,
-        "high20_ratio": 0.9957589285714287,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.8884950623898609,
-        "strategy_type": "breakout",
-        "score": 98.17,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
-        ],
-        "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh600048",
-        "name": "保利发展",
-        "industry": "全国地产",
-        "return20_pct": 2.5048169556840083,
-        "return5_pct": 5.138339920948631,
-        "excess20_pp": 4.919028131505076,
-        "deviation_pct": 3.97732825173458,
-        "volume_ratio": 1.5802761111527646,
-        "liquidity_proxy": 9566608.67417,
-        "reference_adjusted": 5.32,
-        "return1_pct": 5.555555555555558,
-        "return2_pct": 6.18762475049901,
-        "return3_pct": 5.976095617529897,
-        "ma5_deviation_pct": 4.4365920691008975,
-        "volume_ratio_5d": 2.807219838882227,
-        "high20_ratio": 1.0075757575757576,
-        "is_green": true,
-        "prior_volume_ratio_5d": 1.0273428891265046,
-        "strategy_type": "breakout",
-        "score": 97.95,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
-        ],
-        "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sz300698",
-        "name": "万马科技",
-        "industry": "通信设备",
-        "return20_pct": 9.08725371934056,
-        "return5_pct": 4.829984544049459,
-        "excess20_pp": 11.501464895161627,
-        "deviation_pct": 2.741801105809283,
-        "volume_ratio": 1.2968506245833824,
-        "liquidity_proxy": 775039.69398,
-        "reference_adjusted": 27.13,
-        "return1_pct": 4.547206165703277,
-        "return2_pct": 5.318322981366452,
-        "return3_pct": 6.895193065405825,
-        "ma5_deviation_pct": 4.378270236995996,
-        "volume_ratio_5d": 2.3037699688261903,
-        "high20_ratio": 0.9941370465371931,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.9234440856043639,
-        "strategy_type": "breakout",
-        "score": 97.51,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
-        ],
-        "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh600171",
-        "name": "上海贝岭",
-        "industry": "半导体",
-        "return20_pct": 2.383053839364524,
-        "return5_pct": 5.936073059360725,
-        "excess20_pp": 4.797265015185593,
-        "deviation_pct": 2.552768261686378,
-        "volume_ratio": 1.8593997694523623,
-        "liquidity_proxy": 1930024.760355,
-        "reference_adjusted": 23.2,
-        "return1_pct": 2.928127772848277,
-        "return2_pct": 2.3378914865460843,
-        "return3_pct": 5.35876475930972,
-        "ma5_deviation_pct": 3.1019464936450136,
-        "volume_ratio_5d": 2.0697930192980634,
-        "high20_ratio": 0.9969918349806618,
-        "is_green": true,
-        "prior_volume_ratio_5d": 1.1184988886979734,
-        "strategy_type": "breakout",
-        "score": 87.49,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "近3日涨幅≥3.0%",
-          "今日首次放量",
-          "接近20日新高",
-          "MA5偏离受控"
-        ],
-        "probability": {
-          "n": 8,
-          "cohorts": 3,
-          "wins": 4,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        }
-      },
-      {
-        "symbol": "sh688061",
-        "name": "灿瑞科技",
-        "industry": "半导体",
-        "return20_pct": 21.635388739946393,
-        "return5_pct": 8.748801534036431,
-        "excess20_pp": 24.049599915767462,
-        "deviation_pct": 3.3085137873716253,
-        "volume_ratio": 0.7360940451821795,
-        "liquidity_proxy": 1526920.80984,
-        "reference_adjusted": 45.37,
-        "return1_pct": 2.8564951258218008,
-        "return2_pct": -1.9874702959602586,
-        "return3_pct": 5.757575757575761,
-        "ma5_deviation_pct": 2.814539521392301,
-        "volume_ratio_5d": 0.7418119242237684,
-        "high20_ratio": 0.8826848249027237,
-        "is_green": true,
-        "prior_volume_ratio_5d": 0.9977277388878474,
-        "strategy_type": "pullback",
-        "score": 80.11,
-        "hotmoney": null,
-        "reasons": [
-          "行业强度前10%",
-          "20日超额为正",
-          "近2日缩量回调",
-          "未跌破MA20区间",
-          "当日收阳反转确认"
-        ],
-        "probability": {
-          "n": 12,
-          "cohorts": 5,
-          "wins": 3,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 90.0,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       },
       {
@@ -6199,8 +6197,11 @@
         "high20_ratio": 0.9625,
         "is_green": true,
         "prior_volume_ratio_5d": 1.0565020714027642,
+        "atr14": 0.05936920222634508,
+        "liquidity_pct": 97.6,
         "strategy_type": "pullback",
         "score": 71.27,
+        "raw_score": 71.2666,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6210,15 +6211,73 @@
           "当日收阳反转确认"
         ],
         "probability": {
-          "n": 12,
+          "n": 28,
           "cohorts": 5,
-          "wins": 3,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 81.25,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
+        }
+      },
+      {
+        "symbol": "sh600520",
+        "name": "三佳科技",
+        "industry": "半导体",
+        "return20_pct": 6.280388978930307,
+        "return5_pct": 12.23791185280274,
+        "excess20_pp": 8.694600154751376,
+        "deviation_pct": 6.149207826632397,
+        "volume_ratio": 1.7951048916747672,
+        "liquidity_proxy": 2020901.960025,
+        "reference_adjusted": 26.23,
+        "return1_pct": 6.108414239482207,
+        "return2_pct": 4.878048780487809,
+        "return3_pct": 8.120362737015663,
+        "ma5_deviation_pct": 5.9198837021482875,
+        "volume_ratio_5d": 2.329241268993219,
+        "high20_ratio": 1.0019098548510315,
+        "is_green": true,
+        "prior_volume_ratio_5d": 1.060085556495485,
+        "atr14": 0.04702902891999347,
+        "liquidity_pct": 63.28,
+        "strategy_type": "breakout",
+        "score": 100,
+        "raw_score": 103.8942,
+        "hotmoney": null,
+        "reasons": [
+          "行业强度前10%",
+          "近3日涨幅≥3.0%",
+          "今日首次放量",
+          "接近20日新高",
+          "MA5偏离受控"
+        ],
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 70.0,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       },
       {
@@ -6240,8 +6299,11 @@
         "high20_ratio": 0.949402670414617,
         "is_green": true,
         "prior_volume_ratio_5d": 0.5088857006607128,
+        "atr14": 0.04874695992386592,
+        "liquidity_pct": 77.87,
         "strategy_type": "pullback",
         "score": 64.34,
+        "raw_score": 64.3386,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6251,15 +6313,22 @@
           "当日收阳反转确认"
         ],
         "probability": {
-          "n": 12,
+          "n": 28,
           "cohorts": 5,
-          "wins": 3,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 68.75,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       },
       {
@@ -6281,8 +6350,11 @@
         "high20_ratio": 0.9964412811387899,
         "is_green": true,
         "prior_volume_ratio_5d": 0.8883250099910199,
+        "atr14": 0.027704081632653053,
+        "liquidity_pct": 38.62,
         "strategy_type": "pullback",
         "score": 61.89,
+        "raw_score": 61.886,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6292,15 +6364,73 @@
           "当日收阳反转确认"
         ],
         "probability": {
-          "n": 12,
+          "n": 28,
           "cohorts": 5,
-          "wins": 3,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 56.25,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
+        }
+      },
+      {
+        "symbol": "sh600048",
+        "name": "保利发展",
+        "industry": "全国地产",
+        "return20_pct": 2.5048169556840083,
+        "return5_pct": 5.138339920948631,
+        "excess20_pp": 4.919028131505076,
+        "deviation_pct": 3.97732825173458,
+        "volume_ratio": 1.5802761111527646,
+        "liquidity_proxy": 9566608.67417,
+        "reference_adjusted": 5.32,
+        "return1_pct": 5.555555555555558,
+        "return2_pct": 6.18762475049901,
+        "return3_pct": 5.976095617529897,
+        "ma5_deviation_pct": 4.4365920691008975,
+        "volume_ratio_5d": 2.807219838882227,
+        "high20_ratio": 1.0075757575757576,
+        "is_green": true,
+        "prior_volume_ratio_5d": 1.0273428891265046,
+        "atr14": 0.03034371643394198,
+        "liquidity_pct": 91.86,
+        "strategy_type": "breakout",
+        "score": 97.95,
+        "raw_score": 97.9527,
+        "hotmoney": null,
+        "reasons": [
+          "行业强度前10%",
+          "近3日涨幅≥3.0%",
+          "今日首次放量",
+          "接近20日新高",
+          "MA5偏离受控"
+        ],
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 50.0,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       },
       {
@@ -6322,8 +6452,11 @@
         "high20_ratio": 0.9897959183673469,
         "is_green": true,
         "prior_volume_ratio_5d": 0.7431343000391023,
+        "atr14": 0.0191458026509573,
+        "liquidity_pct": 47.22,
         "strategy_type": "pullback",
         "score": 59.44,
+        "raw_score": 59.4446,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6333,15 +6466,33 @@
           "当日收阳反转确认"
         ],
         "probability": {
-          "n": 12,
+          "n": 28,
           "cohorts": 5,
-          "wins": 3,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 43.75,
+        "news": {
+          "status": "flag",
+          "items": [
+            {
+              "time": "2026-09-18T16:51:45+08:00",
+              "title": "南京高科:南京高科关于变更董事长、法定代表人及调整董事会战略委员会主任委员的公告",
+              "level": "flag",
+              "reason": "董事长变更",
+              "columns": [
+                "法定代表人变更",
+                "高管人员任职变动"
+              ]
+            }
+          ],
+          "total_items": 1,
+          "error": null
         }
       },
       {
@@ -6363,8 +6514,11 @@
         "high20_ratio": 0.9751592356687899,
         "is_green": true,
         "prior_volume_ratio_5d": 0.7624464474348478,
+        "atr14": 0.05341179506165783,
+        "liquidity_pct": 52.18,
         "strategy_type": "pullback",
         "score": 59.18,
+        "raw_score": 59.1802,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6374,15 +6528,73 @@
           "当日收阳反转确认"
         ],
         "probability": {
-          "n": 12,
+          "n": 28,
           "cohorts": 5,
-          "wins": 3,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 31.25,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
+        }
+      },
+      {
+        "symbol": "sz300698",
+        "name": "万马科技",
+        "industry": "通信设备",
+        "return20_pct": 9.08725371934056,
+        "return5_pct": 4.829984544049459,
+        "excess20_pp": 11.501464895161627,
+        "deviation_pct": 2.741801105809283,
+        "volume_ratio": 1.2968506245833824,
+        "liquidity_proxy": 775039.69398,
+        "reference_adjusted": 27.13,
+        "return1_pct": 4.547206165703277,
+        "return2_pct": 5.318322981366452,
+        "return3_pct": 6.895193065405825,
+        "ma5_deviation_pct": 4.378270236995996,
+        "volume_ratio_5d": 2.3037699688261903,
+        "high20_ratio": 0.9941370465371931,
+        "is_green": true,
+        "prior_volume_ratio_5d": 0.9234440856043639,
+        "atr14": 0.03122531725554209,
+        "liquidity_pct": 32.57,
+        "strategy_type": "breakout",
+        "score": 97.51,
+        "raw_score": 97.5137,
+        "hotmoney": null,
+        "reasons": [
+          "行业强度前10%",
+          "近3日涨幅≥3.0%",
+          "今日首次放量",
+          "接近20日新高",
+          "MA5偏离受控"
+        ],
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 30.0,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       },
       {
@@ -6404,8 +6616,11 @@
         "high20_ratio": 0.9785969084423306,
         "is_green": true,
         "prior_volume_ratio_5d": 0.6934776300519502,
+        "atr14": 0.02898802291268878,
+        "liquidity_pct": 74.03,
         "strategy_type": "pullback",
         "score": 59.1,
+        "raw_score": 59.1049,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6415,15 +6630,129 @@
           "当日收阳反转确认"
         ],
         "probability": {
-          "n": 12,
+          "n": 28,
           "cohorts": 5,
-          "wins": 3,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 18.75,
+        "news": {
+          "status": "clear",
+          "items": [
+            {
+              "time": "2026-09-18T20:18:07+08:00",
+              "title": "雷科防务:2026年限制性股票激励计划(草案)",
+              "level": "info",
+              "reason": "",
+              "columns": [
+                "股权激励计划"
+              ]
+            },
+            {
+              "time": "2026-09-18T20:18:07+08:00",
+              "title": "雷科防务:2026年限制性股票激励计划(草案)摘要",
+              "level": "info",
+              "reason": "",
+              "columns": [
+                "股权激励计划摘要"
+              ]
+            },
+            {
+              "time": "2026-09-18T20:18:07+08:00",
+              "title": "雷科防务:关于召开2026年第一次临时股东会的通知",
+              "level": "info",
+              "reason": "",
+              "columns": [
+                "召开股东大会通知"
+              ]
+            },
+            {
+              "time": "2026-09-18T20:18:07+08:00",
+              "title": "雷科防务:2026年限制性股票激励计划实施考核管理办法",
+              "level": "info",
+              "reason": "",
+              "columns": [
+                "管理办法/制度"
+              ]
+            },
+            {
+              "time": "2026-09-18T20:18:07+08:00",
+              "title": "雷科防务:北京市万商天勤律师事务所关于北京雷科防务科技股份有限公司2026年限制性股票激励计划(草案)之法律意见书",
+              "level": "info",
+              "reason": "",
+              "columns": [
+                "法律意见书"
+              ]
+            },
+            {
+              "time": "2026-09-18T20:18:07+08:00",
+              "title": "雷科防务:董事会薪酬与考核委员会关于公司2026年限制性股票激励计划相关事项的核查意见",
+              "level": "info",
+              "reason": "",
+              "columns": [
+                "专项说明/独立意见",
+                "保荐/核查意见"
+              ]
+            }
+          ],
+          "total_items": 8,
+          "error": null
+        }
+      },
+      {
+        "symbol": "sh600171",
+        "name": "上海贝岭",
+        "industry": "半导体",
+        "return20_pct": 2.383053839364524,
+        "return5_pct": 5.936073059360725,
+        "excess20_pp": 4.797265015185593,
+        "deviation_pct": 2.552768261686378,
+        "volume_ratio": 1.8593997694523623,
+        "liquidity_proxy": 1930024.760355,
+        "reference_adjusted": 23.2,
+        "return1_pct": 2.928127772848277,
+        "return2_pct": 2.3378914865460843,
+        "return3_pct": 5.35876475930972,
+        "ma5_deviation_pct": 3.1019464936450136,
+        "volume_ratio_5d": 2.0697930192980634,
+        "high20_ratio": 0.9969918349806618,
+        "is_green": true,
+        "prior_volume_ratio_5d": 1.1184988886979734,
+        "atr14": 0.02041256157635469,
+        "liquidity_pct": 61.62,
+        "strategy_type": "breakout",
+        "score": 87.49,
+        "raw_score": 87.4918,
+        "hotmoney": null,
+        "reasons": [
+          "行业强度前10%",
+          "近3日涨幅≥3.0%",
+          "今日首次放量",
+          "接近20日新高",
+          "MA5偏离受控"
+        ],
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 10.0,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       },
       {
@@ -6445,8 +6774,11 @@
         "high20_ratio": 0.9980769230769231,
         "is_green": true,
         "prior_volume_ratio_5d": 0.9763302677825328,
+        "atr14": 0.0351981833195706,
+        "liquidity_pct": 44.41,
         "strategy_type": "pullback",
         "score": 58.12,
+        "raw_score": 58.1241,
         "hotmoney": null,
         "reasons": [
           "行业强度前10%",
@@ -6456,15 +6788,22 @@
           "当日收阳反转确认"
         ],
         "probability": {
-          "n": 12,
+          "n": 28,
           "cohorts": 5,
-          "wins": 3,
+          "wins": 13,
           "probability": null,
           "low": null,
           "high": null,
           "mean_return_pct": null,
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
+        },
+        "rank_pct": 6.25,
+        "news": {
+          "status": "clear",
+          "items": [],
+          "total_items": 0,
+          "error": null
         }
       }
     ],
@@ -6490,7 +6829,7 @@
     },
     "screen": {
       "cutoff": "2026-09-18",
-      "listed": 5223,
+      "listed": 5224,
       "eligible": 4972,
       "valid": 4943,
       "coverage_pct": 99.42,
@@ -6500,17 +6839,18 @@
       "market_score_pause": 40,
       "exclusion_counts": {
         "行业未进入强势前10%": 8450,
-        "MA5偏离超出0-6%区间": 11,
-        "20日超额已超过15.0pp，不算新鲜突破": 142,
-        "今日成交量未明显放大": 322,
-        "近3日涨幅不足": 188,
-        "未接近20日新高": 34,
-        "昨日已放量，非今日首次放量": 11,
-        "近2日未回调": 418,
-        "20日超额未转正，非确认中期强势": 167,
-        "回调未缩量": 55,
-        "偏离MA20超出0-8%区间": 43,
-        "当日未收阳，无反转确认": 26
+        "MA5偏离超出0-6%区间": 9,
+        "20日超额已超过15.0pp，不算新鲜突破": 140,
+        "今日成交量未明显放大": 290,
+        "相对流动性后20%": 158,
+        "近3日涨幅不足": 152,
+        "未接近20日新高": 32,
+        "昨日已放量，非今日首次放量": 10,
+        "近2日未回调": 366,
+        "20日超额未转正，非确认中期强势": 148,
+        "回调未缩量": 54,
+        "偏离MA20超出0-8%区间": 37,
+        "当日未收阳，无反转确认": 25
       }
     },
     "portfolio": {
@@ -6630,6 +6970,246 @@
       "trade_win_rate": null
     },
     "forecasts": [
+      {
+        "id": "select-0.5-2026-09-18-sh688061",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sh688061",
+        "name": "灿瑞科技",
+        "score": 80.11,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 45.37,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sz000797",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sz000797",
+        "name": "中国武夷",
+        "score": 100,
+        "strategy_type": "breakout",
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 2.69,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sz300319",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sz300319",
+        "name": "麦捷科技",
+        "score": 71.27,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 21.56,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sh600520",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sh600520",
+        "name": "三佳科技",
+        "score": 100,
+        "strategy_type": "breakout",
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 26.23,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sh600776",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sh600776",
+        "name": "东方通信",
+        "score": 64.34,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 13.51,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sz002845",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sz002845",
+        "name": "同兴达",
+        "score": 61.89,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 14.0,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sh600048",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sh600048",
+        "name": "保利发展",
+        "score": 97.95,
+        "strategy_type": "breakout",
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 5.32,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sh600064",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sh600064",
+        "name": "南京高科",
+        "score": 59.44,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 7.76,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sz301055",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sz301055",
+        "name": "张小泉",
+        "score": 59.18,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 30.62,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sz300698",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sz300698",
+        "name": "万马科技",
+        "score": 97.51,
+        "strategy_type": "breakout",
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 27.13,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
       {
         "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520",
         "created_at": "2026-09-18T18:24:34.685324+08:00",
@@ -7018,26 +7598,593 @@
     "outcomes": [],
     "decisions": [
       {
-        "symbol": "sh600520",
-        "name": "三佳科技",
-        "strategy_type": "breakout",
-        "state": "waiting_buy",
+        "symbol": "sh688061",
+        "name": "灿瑞科技",
+        "strategy_type": "pullback",
+        "state": "observing",
         "reasons": [
-          "冻结记录允许条件式模拟入场；尚无成交记录。",
-          "本计划最早允许日期：2026-09-19；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。"
+          "数据超过允许时效"
         ],
-        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520",
-        "created_at": "2026-09-18T18:24:34.685324+08:00",
+        "prediction_id": "select-0.5-2026-09-18-sh688061",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
         "as_of": "2026-09-18",
-        "eligible_from": "2026-09-19",
-        "reference_price": 26.23,
-        "entry_low": 25.4431,
-        "entry_high": 27.0169,
+        "eligible_from": "2026-09-21",
+        "reference_price": 45.37,
+        "entry_low": null,
+        "entry_high": 45.8237,
         "stop_price": null,
         "target_price": null,
         "shares": null,
         "entry_price": null,
-        "execution_mode": "observed-quote-v1",
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": null,
+          "entry_high": 45.824,
+          "void_price": 41.74,
+          "stop_pct": 0.08,
+          "target_pct": 0.12,
+          "stop_price_at_reference": 41.74,
+          "target_price_at_reference": 50.814,
+          "hold_sessions": 5,
+          "atr_pct": 0.076,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 25.0,
+            "max_loss_pct": 2.0,
+            "binding": "risk_budget",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 25.0
+          },
+          "breakeven_win_rate_pct": 41.6
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sz000797",
+        "name": "中国武夷",
+        "strategy_type": "breakout",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sz000797",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 2.69,
+        "entry_low": 2.7034,
+        "entry_high": 2.7844,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": 2.703,
+          "entry_high": 2.784,
+          "void_price": 2.513,
+          "stop_pct": 0.0657,
+          "target_pct": 0.0986,
+          "stop_price_at_reference": 2.513,
+          "target_price_at_reference": 2.955,
+          "hold_sessions": 5,
+          "atr_pct": 0.0438,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 30.0,
+            "max_loss_pct": 1.971,
+            "binding": "weight_cap",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 30.44
+          },
+          "breakeven_win_rate_pct": 41.9
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sz300319",
+        "name": "麦捷科技",
+        "strategy_type": "pullback",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sz300319",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 21.56,
+        "entry_low": null,
+        "entry_high": 21.7756,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": null,
+          "entry_high": 21.776,
+          "void_price": 19.835,
+          "stop_pct": 0.08,
+          "target_pct": 0.12,
+          "stop_price_at_reference": 19.835,
+          "target_price_at_reference": 24.147,
+          "hold_sessions": 5,
+          "atr_pct": 0.0594,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 25.0,
+            "max_loss_pct": 2.0,
+            "binding": "risk_budget",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 25.0
+          },
+          "breakeven_win_rate_pct": 41.6
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sh600520",
+        "name": "三佳科技",
+        "strategy_type": "breakout",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sh600520",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 26.23,
+        "entry_low": 26.3611,
+        "entry_high": 27.2162,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": 26.361,
+          "entry_high": 27.216,
+          "void_price": 24.381,
+          "stop_pct": 0.0705,
+          "target_pct": 0.1058,
+          "stop_price_at_reference": 24.381,
+          "target_price_at_reference": 29.005,
+          "hold_sessions": 5,
+          "atr_pct": 0.047,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 28.37,
+            "max_loss_pct": 2.0,
+            "binding": "risk_budget",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 28.37
+          },
+          "breakeven_win_rate_pct": 41.7
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sh600776",
+        "name": "东方通信",
+        "strategy_type": "pullback",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sh600776",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 13.51,
+        "entry_low": null,
+        "entry_high": 13.6451,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": null,
+          "entry_high": 13.645,
+          "void_price": 12.522,
+          "stop_pct": 0.0731,
+          "target_pct": 0.1097,
+          "stop_price_at_reference": 12.522,
+          "target_price_at_reference": 14.992,
+          "hold_sessions": 5,
+          "atr_pct": 0.0487,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 27.36,
+            "max_loss_pct": 2.0,
+            "binding": "risk_budget",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 27.36
+          },
+          "breakeven_win_rate_pct": 41.7
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sz002845",
+        "name": "同兴达",
+        "strategy_type": "pullback",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sz002845",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 14.0,
+        "entry_low": null,
+        "entry_high": 14.14,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": null,
+          "entry_high": 14.14,
+          "void_price": 13.418,
+          "stop_pct": 0.0416,
+          "target_pct": 0.0623,
+          "stop_price_at_reference": 13.418,
+          "target_price_at_reference": 14.872,
+          "hold_sessions": 5,
+          "atr_pct": 0.0277,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 30.0,
+            "max_loss_pct": 1.248,
+            "binding": "weight_cap",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 48.08
+          },
+          "breakeven_win_rate_pct": 43.0
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sh600048",
+        "name": "保利发展",
+        "strategy_type": "breakout",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sh600048",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 5.32,
+        "entry_low": 5.3466,
+        "entry_high": 5.4796,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": 5.347,
+          "entry_high": 5.48,
+          "void_price": 5.078,
+          "stop_pct": 0.0455,
+          "target_pct": 0.0683,
+          "stop_price_at_reference": 5.078,
+          "target_price_at_reference": 5.683,
+          "hold_sessions": 5,
+          "atr_pct": 0.0303,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 30.0,
+            "max_loss_pct": 1.365,
+            "binding": "weight_cap",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 43.96
+          },
+          "breakeven_win_rate_pct": 42.7
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sh600064",
+        "name": "南京高科",
+        "strategy_type": "pullback",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效",
+          "夜间有需要留意的公告（未达到剔除标准），见 news"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sh600064",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 7.76,
+        "entry_low": null,
+        "entry_high": 7.8376,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": null,
+          "entry_high": 7.838,
+          "void_price": 7.527,
+          "stop_pct": 0.03,
+          "target_pct": 0.045,
+          "stop_price_at_reference": 7.527,
+          "target_price_at_reference": 8.109,
+          "hold_sessions": 5,
+          "atr_pct": 0.0191,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 30.0,
+            "max_loss_pct": 0.9,
+            "binding": "weight_cap",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 66.67
+          },
+          "breakeven_win_rate_pct": 44.1
+        },
+        "news": "flag",
+        "news_items": [
+          {
+            "time": "2026-09-18T16:51:45+08:00",
+            "title": "南京高科:南京高科关于变更董事长、法定代表人及调整董事会战略委员会主任委员的公告",
+            "level": "flag",
+            "reason": "董事长变更",
+            "columns": [
+              "法定代表人变更",
+              "高管人员任职变动"
+            ]
+          }
+        ],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sz301055",
+        "name": "张小泉",
+        "strategy_type": "pullback",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sz301055",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 30.62,
+        "entry_low": null,
+        "entry_high": 30.9262,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": null,
+          "entry_high": 30.926,
+          "void_price": 28.17,
+          "stop_pct": 0.08,
+          "target_pct": 0.12,
+          "stop_price_at_reference": 28.17,
+          "target_price_at_reference": 34.294,
+          "hold_sessions": 5,
+          "atr_pct": 0.0534,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 25.0,
+            "max_loss_pct": 2.0,
+            "binding": "risk_budget",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 25.0
+          },
+          "breakeven_win_rate_pct": 41.6
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sz300698",
+        "name": "万马科技",
+        "strategy_type": "breakout",
+        "state": "observing",
+        "reasons": [
+          "数据超过允许时效"
+        ],
+        "prediction_id": "select-0.5-2026-09-18-sz300698",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "reference_price": 27.13,
+        "entry_low": 27.2656,
+        "entry_high": 27.9439,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": "conditional-intraday-v1",
+        "plan_levels": {
+          "entry_low": 27.266,
+          "entry_high": 27.944,
+          "void_price": 25.86,
+          "stop_pct": 0.0468,
+          "target_pct": 0.0703,
+          "stop_price_at_reference": 25.86,
+          "target_price_at_reference": 29.037,
+          "hold_sessions": 5,
+          "atr_pct": 0.0312,
+          "window": [
+            "09:30",
+            "14:30"
+          ],
+          "sizing": {
+            "position_pct": 30.0,
+            "max_loss_pct": 1.404,
+            "binding": "weight_cap",
+            "weight_cap_pct": 30.0,
+            "risk_cap_pct": 42.74
+          },
+          "breakeven_win_rate_pct": 42.6
+        },
+        "news": "clear",
+        "news_items": [],
+        "archive_only": false,
+        "hold_sessions": 5,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sz002413",
+        "name": "雷科防务",
+        "strategy_type": "pullback",
+        "state": "observing",
+        "reasons": [
+          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
+        ],
+        "prediction_id": null,
+        "created_at": null,
+        "as_of": null,
+        "eligible_from": null,
+        "reference_price": null,
+        "entry_low": null,
+        "entry_high": null,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": null,
+        "plan_levels": null,
+        "news": null,
+        "news_items": [],
+        "archive_only": null,
+        "hold_sessions": 3,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sh600171",
+        "name": "上海贝岭",
+        "strategy_type": "breakout",
+        "state": "observing",
+        "reasons": [
+          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
+        ],
+        "prediction_id": null,
+        "created_at": null,
+        "as_of": null,
+        "eligible_from": null,
+        "reference_price": null,
+        "entry_low": null,
+        "entry_high": null,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": null,
+        "plan_levels": null,
+        "news": null,
+        "news_items": [],
+        "archive_only": null,
+        "hold_sessions": 3,
+        "max_weight_pct": 30.0,
+        "ledger": []
+      },
+      {
+        "symbol": "sh688636",
+        "name": "智明达",
+        "strategy_type": "pullback",
+        "state": "observing",
+        "reasons": [
+          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
+        ],
+        "prediction_id": null,
+        "created_at": null,
+        "as_of": null,
+        "eligible_from": null,
+        "reference_price": null,
+        "entry_low": null,
+        "entry_high": null,
+        "stop_price": null,
+        "target_price": null,
+        "shares": null,
+        "entry_price": null,
+        "execution_mode": null,
         "plan_levels": null,
         "news": null,
         "news_items": [],
@@ -7096,398 +8243,6 @@
         "shares": null,
         "entry_price": null,
         "execution_mode": "observed-quote-v1",
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz000797",
-        "name": "中国武夷",
-        "strategy_type": "breakout",
-        "state": "observing",
-        "reasons": [
-          "尚未生成冻结计划，请查看本轮数据和参考价状态。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz300787",
-        "name": "海能实业",
-        "strategy_type": "breakout",
-        "state": "observing",
-        "reasons": [
-          "尚未生成冻结计划，请查看本轮数据和参考价状态。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz301336",
-        "name": "趣睡科技",
-        "strategy_type": "breakout",
-        "state": "observing",
-        "reasons": [
-          "尚未生成冻结计划，请查看本轮数据和参考价状态。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh600048",
-        "name": "保利发展",
-        "strategy_type": "breakout",
-        "state": "observing",
-        "reasons": [
-          "尚未生成冻结计划，请查看本轮数据和参考价状态。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz300698",
-        "name": "万马科技",
-        "strategy_type": "breakout",
-        "state": "observing",
-        "reasons": [
-          "尚未生成冻结计划，请查看本轮数据和参考价状态。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh600171",
-        "name": "上海贝岭",
-        "strategy_type": "breakout",
-        "state": "observing",
-        "reasons": [
-          "尚未生成冻结计划，请查看本轮数据和参考价状态。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh688061",
-        "name": "灿瑞科技",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "尚未生成冻结计划，请查看本轮数据和参考价状态。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz300319",
-        "name": "麦捷科技",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh600776",
-        "name": "东方通信",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz002845",
-        "name": "同兴达",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh600064",
-        "name": "南京高科",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz301055",
-        "name": "张小泉",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sz002413",
-        "name": "雷科防务",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh688636",
-        "name": "智明达",
-        "strategy_type": "pullback",
-        "state": "observing",
-        "reasons": [
-          "目前只有候选前10名留档做研究（其中前3名允许模拟成交），其余保留观察。"
-        ],
-        "prediction_id": null,
-        "created_at": null,
-        "as_of": null,
-        "eligible_from": null,
-        "reference_price": null,
-        "entry_low": null,
-        "entry_high": null,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": null,
         "plan_levels": null,
         "news": null,
         "news_items": [],
@@ -7801,9 +8556,163 @@
       }
     ],
     "exec02": null,
-    "evidence": null,
-    "baseline": null,
-    "forecast_count": 16,
+    "evidence": {
+      "method": "daily-bar-v1",
+      "selection_version": "select-0.5",
+      "execution_version": "exec-0.3",
+      "total_records": 0,
+      "unusable": 0,
+      "other_versions": 0,
+      "gate": {
+        "min_n": 30,
+        "min_cohorts": 15
+      },
+      "groups": {},
+      "recent": [],
+      "all_tracks": {
+        "top3": {
+          "plans": 0,
+          "cohorts": 0,
+          "fixed": {
+            "n": 0,
+            "cohorts": 0,
+            "win_rate_pct": null,
+            "mean_return_pct": null
+          },
+          "contract": {
+            "filled": 0,
+            "not_triggered": 0,
+            "ambiguous_entry": 0,
+            "not_triggered_reasons": {},
+            "fill_rate_pct": null,
+            "exit_ambiguous": 0,
+            "exit_reasons_pess": {},
+            "result": null
+          },
+          "counterfactual": {
+            "n": 0,
+            "result": null,
+            "untriggered_n": 0,
+            "untriggered_result": null
+          }
+        },
+        "rank4_10": {
+          "plans": 0,
+          "cohorts": 0,
+          "fixed": {
+            "n": 0,
+            "cohorts": 0,
+            "win_rate_pct": null,
+            "mean_return_pct": null
+          },
+          "contract": {
+            "filled": 0,
+            "not_triggered": 0,
+            "ambiguous_entry": 0,
+            "not_triggered_reasons": {},
+            "fill_rate_pct": null,
+            "exit_ambiguous": 0,
+            "exit_reasons_pess": {},
+            "result": null
+          },
+          "counterfactual": {
+            "n": 0,
+            "result": null,
+            "untriggered_n": 0,
+            "untriggered_result": null
+          }
+        }
+      },
+      "limitations": [
+        "日线无法确定同一根K线里先碰止损还是止盈：退出同时给悲观（先止损）与乐观（先止盈）两个结果。",
+        "入场先后无法确定（当天既上穿确认线又跌破作废线）的记为 ambiguous，不进统计。",
+        "不模拟 09:30–14:00 入场时段、涨停附近不买、持仓名额、账户回撤暂停：这些日线检验不了。",
+        "盘中触发的成交价取触发价位，真实成交是观测价、不会更好；成本按往返 0.31% 统一扣除。",
+        "这是研究标签，不是实际成交；实际模拟成交见盘中条件执行账户。"
+      ]
+    },
+    "baseline": {
+      "kind": "forward",
+      "primary": {
+        "tier": "top10",
+        "baseline": "strong_industry",
+        "metric": "barrier_net_pess"
+      },
+      "gate": {
+        "min_days": 15,
+        "min_strategy_n": 30
+      },
+      "baselines": {
+        "universe": {
+          "label": "全体合格股票",
+          "days": 0,
+          "labeled": 0,
+          "base_rate": null,
+          "vs": {
+            "top10": {
+              "days": 0,
+              "strategy_n": 0,
+              "strategy": null
+            },
+            "top3": {
+              "days": 0,
+              "strategy_n": 0,
+              "strategy": null
+            }
+          }
+        },
+        "strong_industry": {
+          "label": "强势行业内",
+          "days": 0,
+          "labeled": 0,
+          "base_rate": null,
+          "vs": {
+            "top10": {
+              "days": 0,
+              "strategy_n": 0,
+              "strategy": null
+            },
+            "top3": {
+              "days": 0,
+              "strategy_n": 0,
+              "strategy": null
+            }
+          }
+        },
+        "mid_industry": {
+          "label": "中间行业（对照）",
+          "days": 0,
+          "labeled": 0,
+          "base_rate": null,
+          "vs": {
+            "top10": {
+              "days": 0,
+              "strategy_n": 0,
+              "strategy": null
+            }
+          }
+        },
+        "weak_industry": {
+          "label": "最弱10%行业（对照）",
+          "days": 0,
+          "labeled": 0,
+          "base_rate": null,
+          "vs": {
+            "top10": {
+              "days": 0,
+              "strategy_n": 0,
+              "strategy": null
+            }
+          }
+        }
+      },
+      "primary_result": null,
+      "frozen": 4,
+      "resolved": 0,
+      "selection_version": "select-0.5",
+      "backfill": null
+    },
+    "forecast_count": 26,
     "outcome_count": 0
   }
 }
