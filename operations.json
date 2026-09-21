@@ -6,11 +6,16 @@
       "report_date": "2026-09-21",
       "expected_date": "2026-09-18",
       "started_at": "2026-09-21T09:17:20.259993+08:00",
-      "updated_at": "2026-09-21T09:17:20.259993+08:00",
-      "status": "running",
-      "data_date": null,
-      "issues": [],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260921011702"
+      "updated_at": "2026-09-21T09:25:26.418115+08:00",
+      "status": "ready",
+      "data_date": "2026-09-18",
+      "issues": [
+        "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
+        "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
+        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
+      ],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260921011702",
+      "finished_at": "2026-09-21T09:25:26.418115+08:00"
     },
     "close": {
       "id": "20260918102524-1",
@@ -29,18 +34,23 @@
       "finished_at": "2026-09-18T18:33:50.373298+08:00"
     }
   },
-  "updated_at": "2026-09-21T09:17:20.259993+08:00",
+  "updated_at": "2026-09-21T09:25:26.418115+08:00",
   "latest_run": {
     "id": "20260921011702-1",
     "slot": "premarket",
     "report_date": "2026-09-21",
     "expected_date": "2026-09-18",
     "started_at": "2026-09-21T09:17:20.259993+08:00",
-    "updated_at": "2026-09-21T09:17:20.259993+08:00",
-    "status": "running",
-    "data_date": null,
-    "issues": [],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260921011702"
+    "updated_at": "2026-09-21T09:25:26.418115+08:00",
+    "status": "ready",
+    "data_date": "2026-09-18",
+    "issues": [
+      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
+      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
+      "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
+    ],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260921011702",
+    "finished_at": "2026-09-21T09:25:26.418115+08:00"
   },
   "calendar": [
     {
@@ -351,21 +361,21 @@
       "finished_at": "2026-09-18T18:33:50.373298+08:00"
     },
     "premarket": {
-      "id": "20260921004006-1",
+      "id": "20260921011702-1",
       "slot": "premarket",
       "report_date": "2026-09-21",
       "expected_date": "2026-09-18",
-      "started_at": "2026-09-21T08:40:26.316849+08:00",
-      "updated_at": "2026-09-21T08:48:28.898877+08:00",
-      "status": "partial",
+      "started_at": "2026-09-21T09:17:20.259993+08:00",
+      "updated_at": "2026-09-21T09:25:26.418115+08:00",
+      "status": "ready",
       "data_date": "2026-09-18",
       "issues": [
         "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
         "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
-        "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。"
+        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
       ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260921004006",
-      "finished_at": "2026-09-21T08:48:28.898877+08:00"
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260921011702",
+      "finished_at": "2026-09-21T09:25:26.418115+08:00"
     },
     "prepare": {
       "id": "20260921001710-1",
