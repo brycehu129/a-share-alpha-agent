@@ -1,5 +1,5 @@
 <script setup>
-import { fmtDateTime } from '../../format'
+import { fmtTs } from '../../format'
 import RiseFall from '../RiseFall.vue'
 
 defineProps({ quotes: { type: Array, default: () => [] } })
@@ -11,7 +11,7 @@ defineProps({ quotes: { type: Array, default: () => [] } })
       <div class="index-name">{{ q.name }}</div>
       <div class="index-last num">{{ q.last }}</div>
       <RiseFall class="index-chg" :value="parseFloat(q.change_pct)" />
-      <div class="index-time num">{{ fmtDateTime(q.quote_at).slice(11) }}</div>
+      <div class="index-time num">{{ fmtTs(q.quote_at) }}</div>
     </div>
   </div>
 </template>

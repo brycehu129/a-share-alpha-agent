@@ -1,7 +1,7 @@
 <script setup>
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { get } from '../../api'
-import { fmtAmount, fmtBoards, fmtNum, fmtPct, fmtPrice } from '../../format'
+import { fmtAmount, fmtBoards, fmtNum, fmtPct, fmtPrice, fmtTs } from '../../format'
 import { stockDetail } from '../../composables/useStockDetail'
 import RiseFall from '../RiseFall.vue'
 
@@ -109,7 +109,7 @@ const shortReason = (rs) => rs.map((r) => r.replace(/^有价格涨跌幅限制�
           <div v-if="q" class="price-row">
             <span class="price num" :class="lastPct > 0 ? 'rise' : lastPct < 0 ? 'fall' : 'flat'">{{ fmtPrice(q.last) }}</span>
             <RiseFall :value="lastPct" class="chg" />
-            <span class="muted">行情时间 {{ (q.quote_at || '').slice(5, 16).replace('T', ' ') }}</span>
+            <span class="muted num">行情时间 {{ fmtTs(q.quote_at) }}</span>
             <el-button size="small" :loading="loading" style="margin-left: auto" @click="load(true)">刷新</el-button>
           </div>
           <p v-else-if="errors.quote" class="muted">行情暂无：{{ errors.quote }}</p>
@@ -123,7 +123,7 @@ const shortReason = (rs) => rs.map((r) => r.replace(/^有价格涨跌幅限制�
 
         <!-- 复盘位置：这只股票在今天的涨跌停池、龙虎榜、次日关注里的情况 -->
         <section v-if="ctx && (poolBadges.length || ctx.lhb || ctx.watch)">
-          <h3>盘后复盘 <span class="sub num">{{ ctx.date }}</span></h3>
+          <h3>盘后复盘 <span class="sub num">{{ ctx.date }}<template v-if="ctx.fetched_at"> · 取数 {{ fmtTs(ctx.fetched_at) }}</template></span></h3>
           <div class="badges">
             <div v-for="b in poolBadges" :key="b.k" class="badge"><el-tag :type="b.type" size="small">{{ b.label }}</el-tag><span class="muted">{{ b.extra }}</span></div>
             <div v-if="ctx.lhb" class="badge">
@@ -160,7 +160,7 @@ const shortReason = (rs) => rs.map((r) => r.replace(/^有价格涨跌幅限制�
 
         <!-- 龙虎榜席位 -->
         <section v-if="data.seats !== undefined">
-          <h3>龙虎榜详情 <span class="sub num">{{ ctx && ctx.lhb_date }}</span></h3>
+          <h3>龙虎榜详情 <span class="sub num">{{ ctx && ctx.lhb_date }}<template v-if="ctx && ctx.lhb_fetched_at"> · 取数 {{ fmtTs(ctx.lhb_fetched_at) }}</template></span></h3>
           <p v-if="errors.seats" class="muted">席位暂无：{{ errors.seats }}</p>
           <p v-else-if="!seatGroups.length" class="muted">这只股票在该日龙虎榜上没有席位明细。</p>
           <template v-else>
@@ -196,7 +196,7 @@ const shortReason = (rs) => rs.map((r) => r.replace(/^有价格涨跌幅限制�
           </dl>
           <p v-if="profile.intro" class="muted intro">{{ profile.intro }}<template v-if="profile.intro.length >= 400">…</template></p>
         </section>
-        <p class="muted">行情来自腾讯，龙虎榜/涨跌停/公司资料来自东方财富公开接口。以上是事实数据，不构成投资建议。</p>
+        <p class="muted">详情取数时间 <span class="num">{{ fmtTs(data.fetched_at) }}</span>。行情来自腾讯，龙虎榜/涨跌停/公司资料来自东方财富公开接口。以上是事实数据，不构成投资建议。</p>
       </template>
     </div>
   </el-drawer>

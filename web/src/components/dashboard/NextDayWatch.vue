@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { fmtAmount, fmtBoards, fmtNum, fmtPct } from '../../format'
+import { fmtAmount, fmtBoards, fmtNum, fmtPct, fmtTs } from '../../format'
 import { openStock } from '../../composables/useStockDetail'
 
 // 次日关注：从当日涨停池 + 龙虎榜里用透明规则筛出的强势股，附 AI 点评。分数是规则分数，不是概率；
@@ -25,7 +25,7 @@ const aiReason = computed(() => {
     <template #header>
       <div class="card-title">
         <span>次日关注 <span v-if="watch && watch.date" class="date num">{{ watch.date }}</span></span>
-        <span class="sub">规则打分 + AI 点评 · 非概率，不构成投资建议</span>
+        <span class="sub">规则打分{{ watch ? ' ' + fmtTs(watch.generated_at) : '' }} · AI 点评{{ meta && meta.completed_at ? ' ' + fmtTs(meta.completed_at) : '' }} · 非概率，不构成投资建议</span>
       </div>
     </template>
 

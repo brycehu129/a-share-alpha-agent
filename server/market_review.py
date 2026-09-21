@@ -274,7 +274,7 @@ def fetch_lhb(day, http=None):
     iso = iso_day(day)
     flt = "(TRADE_DATE>='%s')(TRADE_DATE<='%s')" % (iso, iso)
     rows = _datacenter('RPT_DAILYBILLBOARD_DETAILSNEW', 'ALL', flt, 'BILLBOARD_NET_AMT', http)
-    return {'rows': parse_lhb(rows)}
+    return {'rows': parse_lhb(rows), 'fetched_at': _stamp()}
 
 
 def parse_seats(buy_rows, sell_rows):
@@ -341,9 +341,16 @@ def parse_breadth(payload):
             'up_pct': round(up / total * 100, 1) if total else None, 'markets': seen}
 
 
+def _stamp():
+    """取数完成的时刻，精确到秒（北京时间）。页面上每组数据都要标出这个时间。"""
+    return datetime.now(CST).isoformat(timespec='seconds')
+
+
 def fetch_breadth(http=None):
-    return parse_breadth(_push2('ulist.np/get', {'fltt': 1, 'fields': 'f12,f14,f104,f105,f106',
-                                                 'secids': '1.000001,0.399001,0.899050'}, http))
+    out = parse_breadth(_push2('ulist.np/get', {'fltt': 1, 'fields': 'f12,f14,f104,f105,f106',
+                                                'secids': '1.000001,0.399001,0.899050'}, http))
+    out['fetched_at'] = _stamp()
+    return out
 
 
 def _kline_series(payload):
@@ -402,7 +409,10 @@ def turnover_from_quotes(indices, prev):
     today = (sh.get('quote_at') or '')[:10]
     if not today or today != (sz.get('quote_at') or '')[:10]:
         raise ReviewError('沪深指数行情日期不一致，不相加')
-    return _turnover((sh['amount_wan'] + sz['amount_wan']) * 1e4, today, prev[0], prev[1])
+    out = _turnover((sh['amount_wan'] + sz['amount_wan']) * 1e4, today, prev[0], prev[1])
+    # 成交额随指数行情走：时间取沪深两个指数里较早的那个行情时间（保守，不把较新的时间说成整体的）
+    out['quote_at'] = min(sh.get('quote_at') or '', sz.get('quote_at') or '') or None
+    return out
 
 
 def parse_flow(payload):
@@ -417,8 +427,10 @@ def parse_flow(payload):
 
 
 def fetch_flow(http=None):
-    return parse_flow(_push2('stock/fflow/daykline/get', {'lmt': 1, 'klt': 101, 'secid': '1.000001', 'secid2': '0.399001',
-                                                          'fields1': 'f1,f2,f3,f7', 'fields2': 'f51,f52,f53,f54,f55,f56'}, http))
+    out = parse_flow(_push2('stock/fflow/daykline/get', {'lmt': 1, 'klt': 101, 'secid': '1.000001', 'secid2': '0.399001',
+                                                         'fields1': 'f1,f2,f3,f7', 'fields2': 'f51,f52,f53,f54,f55,f56'}, http))
+    out['fetched_at'] = _stamp()
+    return out
 
 
 def fetch_indices(snapshot=None):
@@ -468,7 +480,7 @@ def market_stats(now=None, http=None, snapshot=None, force=False):
     失败只在 errors 里留一句，其它块照常显示。今日成交额取自指数行情，只有「上一交易日成交额」要打东财
     （日 K，一小时缓存一次）。各组并发取，最坏情况的耗时是最慢的那一组，而不是它们相加。"""
     now_ts = time.time()
-    out = {'fetched_at': datetime.now(CST).isoformat(), 'errors': {}}
+    out = {'fetched_at': _stamp(), 'errors': {}}
     day = datetime.now(CST).strftime('%Y%m%d')
     jobs = {
         'indices': lambda: _cached('indices', TTL['indices'], lambda: fetch_indices(snapshot), now_ts, force),
@@ -553,7 +565,7 @@ def live_pools(day, http=None, now_ts=None):
     result = None
     if zt['total'] > 0:
         pools = fetch_pools(day, http, first_zt=zt)
-        result = {'pools': pools, 'errors': pools.pop('errors')}
+        result = {'pools': pools, 'errors': pools.pop('errors'), 'fetched_at': _stamp()}
     with _live_lock:
         _pools_cache[day] = (now_ts, result)
     return result
@@ -563,7 +575,9 @@ def _lhb_block(stored):
     lhb = (stored or {}).get('lhb')
     if not lhb:
         return None
-    return {**lhb, 'trade_date': stored['trade_date'], 'date': stored['date']}
+    # 旧文件的龙虎榜没有自己的取数时间，退回整份复盘的取数时间
+    return {**lhb, 'trade_date': stored['trade_date'], 'date': stored['date'],
+            'fetched_at': lhb.get('fetched_at') or stored.get('fetched_at')}
 
 
 def current_review(now=None, http=None, directory=None):
@@ -580,7 +594,7 @@ def current_review(now=None, http=None, directory=None):
     if now.weekday() < 5 and (now.hour, now.minute) >= (9, 25) and (not stored or stored['trade_date'] < today):
         live = live_pools(today, http)
         if live:
-            out.update(source='live', trade_date=today, date=iso_day(today), fetched_at=now.isoformat(),
+            out.update(source='live', trade_date=today, date=iso_day(today), fetched_at=live['fetched_at'],
                        pools=live['pools'], errors=live['errors'])
     return out
 

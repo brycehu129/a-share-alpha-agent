@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { fmtAmount, fmtPrice } from '../../format'
+import { fmtAmount, fmtPrice, fmtTs } from '../../format'
 import { openStock } from '../../composables/useStockDetail'
 import RiseFall from '../RiseFall.vue'
 
@@ -29,7 +29,7 @@ const stale = computed(() => !!(props.lhb && props.todayLabel && props.lhb.date 
     <template #header>
       <div class="card-title">
         <span>龙虎榜复盘 <span v-if="lhb" class="date num">{{ lhb.date }}</span></span>
-        <span class="sub">每个交易日 16:30 / 17:30 更新</span>
+        <span class="sub">数据时间 <span class="num">{{ lhb ? fmtTs(lhb.fetched_at) : '—' }}</span> · 每个交易日 16:30 / 17:30 更新</span>
       </div>
     </template>
 

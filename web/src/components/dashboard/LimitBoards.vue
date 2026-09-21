@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { fmtTs } from '../../format'
 import { openStock } from '../../composables/useStockDetail'
 import PoolList from './PoolList.vue'
 
@@ -48,7 +49,7 @@ const sourceLabel = computed(() => (props.review && props.review.source === 'liv
     <template #header>
       <div class="card-title">
         <span>涨跌停复盘 <span v-if="date" class="date num">{{ date }}</span></span>
-        <span class="sub">{{ review ? sourceLabel : '' }} · 东方财富涨跌停池，交易所口径</span>
+        <span class="sub">{{ review ? sourceLabel : '' }} · 数据时间 <span class="num">{{ review ? fmtTs(review.fetched_at) : '—' }}</span> · 东方财富涨跌停池，交易所口径</span>
       </div>
     </template>
 

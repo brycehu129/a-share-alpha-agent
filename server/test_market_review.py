@@ -167,7 +167,9 @@ class LhbTests(unittest.TestCase):
 
     def test_fetch_lhb_treats_null_result_as_empty(self):
         http = lambda url: b'{"result":null,"success":false,"message":"no data"}'
-        self.assertEqual(mr.fetch_lhb('20260921', http), {'rows': []})
+        out = mr.fetch_lhb('20260921', http)
+        self.assertEqual(out['rows'], [])
+        self.assertRegex(out['fetched_at'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+08:00$')          # 精确到秒
 
     def test_fetch_seats_rejects_bad_code(self):
         with self.assertRaises(mr.ReviewError):
@@ -268,6 +270,9 @@ class MarketStatsTests(unittest.TestCase):
         self.assertIn('breadth', out['errors'])
         self.assertEqual(out['flow']['main_net'], 1.0)
         self.assertEqual(out['turnover']['trend'], 'expand')          # 3e6 元 vs 昨日 2e1 元（夹具里的数）
+        self.assertEqual(out['turnover']['quote_at'], '2026-09-21T15:00:00+08:00')
+        self.assertRegex(out['flow']['fetched_at'], r'T\d\d:\d\d:\d\d\+08:00$')
+        self.assertRegex(out['fetched_at'], r'T\d\d:\d\d:\d\d\+08:00$')
         self.assertTrue(out['complete'])
         mr._live_cache.clear()
 
@@ -297,6 +302,24 @@ class MarketStatsTests(unittest.TestCase):
         self.assertIsNone(out['breadth'])
         self.assertIn('breadth', out['errors'])
         mr._live_cache.clear()
+
+
+class TimestampTests(unittest.TestCase):
+    def test_lhb_block_falls_back_to_the_review_time_for_old_files(self):
+        stored = {'trade_date': '20260921', 'date': '2026-09-21', 'fetched_at': '2026-09-21T17:30:05+08:00', 'lhb': {'rows': []}}
+        self.assertEqual(mr._lhb_block(stored)['fetched_at'], '2026-09-21T17:30:05+08:00')
+        stored['lhb']['fetched_at'] = '2026-09-21T17:30:41+08:00'
+        self.assertEqual(mr._lhb_block(stored)['fetched_at'], '2026-09-21T17:30:41+08:00')
+
+    def test_live_pools_carry_their_own_fetch_time(self):
+        mr._pools_cache.clear()
+        http = lambda url: json.dumps(pool_payload([zt_row()])).encode()
+        live = mr.live_pools('20260921', http, now_ts=1.0)
+        self.assertRegex(live['fetched_at'], r'T\d\d:\d\d:\d\d\+08:00$')
+        review = mr.current_review(now=datetime(2026, 9, 21, 10, 0, tzinfo=CST), http=http, directory=Path(tempfile.mkdtemp()))
+        self.assertEqual(review['source'], 'live')
+        self.assertRegex(review['fetched_at'], r'T\d\d:\d\d:\d\d\+08:00$')
+        mr._pools_cache.clear()
 
 
 class PersistTests(unittest.TestCase):

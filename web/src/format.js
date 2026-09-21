@@ -53,6 +53,13 @@ export function arrow(dir) {
   return dir === 'rise' ? '▲' : dir === 'fall' ? '▼' : '–'
 }
 
+// 精确到秒的时间戳：'2026-09-21T16:14:00+08:00' / '...16:14:00.123456+08:00' → '2026-09-21 16:14:00'（北京时间）。
+// 页面上每一组数据都用它标出「数据的时间」，缺失是破折号。
+export function fmtTs(iso) {
+  if (!iso) return '—'
+  return String(iso).slice(0, 19).replace('T', ' ')
+}
+
 // 'YYYY-MM-DDTHH:MM:SS+08:00' → 'YYYY-MM-DD HH:MM'
 export function fmtDateTime(iso) {
   if (!iso) return '—'

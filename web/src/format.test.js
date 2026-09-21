@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrow, direction, fmtAmount, fmtBoards, fmtDateTime, fmtFlow, flowLine, fmtMoney, fmtNum, fmtPct, fmtPrice, fmtVolumeTrend, fmtWan, lotSize, shortDate, todayStr } from './format'
+import { arrow, fmtTs, direction, fmtAmount, fmtBoards, fmtDateTime, fmtFlow, flowLine, fmtMoney, fmtNum, fmtPct, fmtPrice, fmtVolumeTrend, fmtWan, lotSize, shortDate, todayStr } from './format'
 
 describe('fmtPct', () => {
   it('positive values get a plus sign', () => expect(fmtPct(1.056)).toBe('+1.06%'))
@@ -135,5 +135,16 @@ describe('fmtBoards / shortDate', () => {
   it('short date', () => {
     expect(shortDate('2026-09-21')).toBe('09-21')
     expect(shortDate(null)).toBe('—')
+  })
+})
+
+describe('fmtTs', () => {
+  it('keeps seconds and drops fraction and timezone', () => {
+    expect(fmtTs('2026-09-21T16:14:00+08:00')).toBe('2026-09-21 16:14:00')
+    expect(fmtTs('2026-09-21T22:48:39.806799+08:00')).toBe('2026-09-21 22:48:39')
+  })
+  it('missing is a dash', () => {
+    expect(fmtTs(null)).toBe('—')
+    expect(fmtTs('')).toBe('—')
   })
 })

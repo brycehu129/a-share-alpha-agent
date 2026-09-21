@@ -117,7 +117,8 @@ def review_context(symbol, review):
     """这只股票在最近一次盘后复盘里的位置：在哪些池子里、龙虎榜行、涨停/炸板细节。"""
     if not review:
         return None
-    ctx = {'date': review.get('date'), 'pools': {}, 'lhb': None, 'lhb_date': (review.get('lhb') or {}).get('date')}
+    ctx = {'date': review.get('date'), 'pools': {}, 'lhb': None, 'lhb_date': (review.get('lhb') or {}).get('date'),
+           'fetched_at': review.get('fetched_at'), 'lhb_fetched_at': (review.get('lhb') or {}).get('fetched_at')}
     for kind, pool in (review.get('pools') or {}).items():
         if not pool:
             continue
@@ -153,7 +154,7 @@ def detail(symbol, review=None, http=None, snapshot=None, force=False):
             out[name] = None
             out['errors'][name] = str(exc)[:200]
     out['review'] = review_context(symbol, review)
-    out['fetched_at'] = datetime.now(CST).isoformat()
+    out['fetched_at'] = datetime.now(CST).isoformat(timespec='seconds')
     with _lock:
         _cache[key] = (now, out)
     return out

@@ -5,7 +5,7 @@ import { Refresh } from '@element-plus/icons-vue'
 import { get } from '../api'
 import { useDashboard } from '../composables/useDashboard'
 import { useLoad } from '../composables/useLoad'
-import { fmtDateTime, todayStr } from '../format'
+import { fmtTs, todayStr } from '../format'
 import IndexStrip from '../components/dashboard/IndexStrip.vue'
 import MarketGauge from '../components/dashboard/MarketGauge.vue'
 import MarketPulse from '../components/dashboard/MarketPulse.vue'
@@ -15,12 +15,12 @@ import LhbBoard from '../components/dashboard/LhbBoard.vue'
 import StockDetailDrawer from '../components/dashboard/StockDetailDrawer.vue'
 import PostcloseSection from '../components/dashboard/PostcloseSection.vue'
 
-// 看板只看市场数据：指数、市场评分、大盘脉搏（涨跌家数/成交额/资金）、次日关注、涨跌停、龙虎榜；
-// 盘后分析是它的第二个 tab。候选池/虚拟账户/证据在「候选池」页。
+// 看板只看市场数据：市场行情（指数、评分、大盘脉搏、次日关注）、涨跌停复盘、龙虎榜、盘后分析四个 tab。候选池/虚拟账户/证据在「候选池」页。
 // tab 写进 URL（?tab=postclose），刷新和旧的 /postclose 链接都能落回原处。
 const route = useRoute()
 const router = useRouter()
-const TABS = ['market', 'postclose']
+const TABS = ['market', 'limit', 'lhb', 'postclose']
+const REFRESHABLE = ['market', 'limit', 'lhb'] // 盘后分析有自己的刷新逻辑
 const tab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'market')
 watch(tab, (t) => router.replace({ query: t === 'market' ? {} : { tab: t } }))
 watch(
@@ -45,7 +45,7 @@ const SESSION = { weekend: '周末休市', pre_open: '盘前', call_auction: '�
 const live = computed(() => (d.value && d.value.live) || null)
 const quoteTime = computed(() => {
   const q = live.value && live.value.indices && live.value.indices.quotes[0]
-  return q ? fmtDateTime(q.quote_at).slice(5) : ''
+  return q ? fmtTs(q.quote_at) : ''
 })
 const liveTag = computed(() => {
   if (!live.value) return { type: 'danger', text: '实时行情暂不可用，指数为日级快照（可能已过期）' }
@@ -64,11 +64,11 @@ const today = todayStr()
 <template>
   <div>
     <div class="page-head">
-      <h1>看板 <span class="eyebrow">A股市场数据 · 指数、大盘脉搏、次日关注、涨跌停、龙虎榜</span></h1>
-      <div v-if="tab === 'market'" class="meta">
-        <el-tag v-if="d" :type="liveTag.type" round>{{ liveTag.text }}</el-tag>
-        <el-tag v-if="failedParts.length" type="warning" effect="plain" round>暂无：{{ failedParts.join('、') }}</el-tag>
-        <span v-if="live">更新于 <span class="num">{{ fmtDateTime(live.fetched_at).slice(11) }}</span></span>
+      <h1>看板 <span class="eyebrow">A股市场数据 · 行情、涨跌停复盘、龙虎榜、盘后分析</span></h1>
+      <div v-if="REFRESHABLE.includes(tab)" class="meta">
+        <el-tag v-if="d && tab === 'market'" :type="liveTag.type" round>{{ liveTag.text }}</el-tag>
+        <el-tag v-if="failedParts.length && tab === 'market'" type="warning" effect="plain" round>暂无：{{ failedParts.join('、') }}</el-tag>
+        <span v-if="live">页面数据更新于 <span class="num">{{ fmtTs(live.fetched_at) }}</span></span>
         <el-button :icon="Refresh" round :loading="loading || reviewLoading" @click="refresh">刷新</el-button>
       </div>
     </div>
@@ -78,7 +78,7 @@ const today = todayStr()
         <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px">
           <el-button size="small" @click="refresh">重试</el-button>
         </el-alert>
-        <el-alert v-if="reviewError" :title="`涨跌停/龙虎榜加载失败：${reviewError}`" type="error" show-icon :closable="false" style="margin-bottom: 16px">
+        <el-alert v-if="reviewError" :title="`次日关注与涨跌停数据加载失败：${reviewError}`" type="error" show-icon :closable="false" style="margin-bottom: 16px">
           <el-button size="small" @click="reloadReview">重试</el-button>
         </el-alert>
 
@@ -95,13 +95,30 @@ const today = todayStr()
               <MarketGauge v-if="screen" :screen="screen" />
               <el-card v-else shadow="never" class="gauge-empty"><span class="muted">市场评分暂无：日级批处理的选股结果还没有生成。</span></el-card>
             </section>
-            <p v-if="screen && screen.cutoff" class="muted score-note">市场评分取自日级批处理，截至 {{ screen.cutoff }} 收盘，不随盘中行情变化。</p>
+            <p v-if="screen && screen.cutoff" class="muted score-note">市场评分取自日级批处理（截至 {{ screen.cutoff }} 收盘，生成于 <span class="num">{{ fmtTs(agent && agent.generated_at) }}</span>），不随盘中行情变化。</p>
 
-            <MarketPulse :live="live" :pools="review && review.pools" :pool-date="review ? review.date : ''" />
+            <MarketPulse :live="live" :pools="review && review.pools" :pool-date="review ? review.date : ''" :pool-time="review ? review.fetched_at : ''" />
             <NextDayWatch :watch="review && review.next_day_watch" />
-            <LimitBoards :review="review" />
-            <LhbBoard :lhb="review && review.lhb" :today-label="today" />
           </div>
+        </div>
+      </el-tab-pane>
+
+      <!-- 涨跌停复盘、龙虎榜各自一个 tab；数据和「市场行情」共用同一份 /api/market/review，切过去不再请求 -->
+      <el-tab-pane label="涨跌停复盘" name="limit" lazy>
+        <el-alert v-if="reviewError" :title="`涨跌停复盘加载失败：${reviewError}`" type="error" show-icon :closable="false" style="margin-bottom: 16px">
+          <el-button size="small" @click="reloadReview">重试</el-button>
+        </el-alert>
+        <div v-loading="reviewLoading && !reviewResp" style="min-height: 240px">
+          <LimitBoards v-if="tab === 'limit'" :review="review" />
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="龙虎榜" name="lhb" lazy>
+        <el-alert v-if="reviewError" :title="`龙虎榜加载失败：${reviewError}`" type="error" show-icon :closable="false" style="margin-bottom: 16px">
+          <el-button size="small" @click="reloadReview">重试</el-button>
+        </el-alert>
+        <div v-loading="reviewLoading && !reviewResp" style="min-height: 240px">
+          <LhbBoard v-if="tab === 'lhb'" :lhb="review && review.lhb" :today-label="today" />
         </div>
       </el-tab-pane>
 

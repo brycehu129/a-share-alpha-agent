@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { fmtAmount, fmtFlow, fmtNum, fmtVolumeTrend, shortDate } from '../../format'
+import { fmtAmount, fmtFlow, fmtNum, fmtTs, fmtVolumeTrend, shortDate } from '../../format'
 import StatTile from '../StatTile.vue'
 
 // 大盘脉搏：涨跌家数、涨跌停/炸板家数、两市成交额（较上一交易日放量/缩量）、大盘主力资金净流入。
@@ -9,6 +9,7 @@ const props = defineProps({
   live: { type: Object, default: null },
   pools: { type: Object, default: null }, // review.pools
   poolDate: { type: String, default: '' },
+  poolTime: { type: String, default: '' }, // 涨跌停池的取数时间（精确到秒）
 })
 
 const breadth = computed(() => (props.live && props.live.breadth) || null)
@@ -87,6 +88,13 @@ const tone = (v) => (v > 0 ? 'rise' : v < 0 ? 'fall' : 'flat')
       <template v-if="errors.turnover">成交额暂无：{{ errors.turnover }}。</template>
       <template v-if="errors.flow">资金流向暂无：{{ errors.flow }}。</template>
     </p>
+    <!-- 每一组数据各自的时间，精确到秒：行情时间是交易所给的，取数时间是我们向数据源请求完成的时刻 -->
+    <ul class="times num">
+      <li>涨跌家数 <b>{{ breadth ? fmtTs(breadth.fetched_at) : '—' }}</b><i v-if="breadth && breadth.stale">（取数失败，沿用上一次）</i></li>
+      <li>成交额 <b>{{ turnover ? fmtTs(turnover.quote_at) : '—' }}</b></li>
+      <li>资金流向 <b>{{ flow ? fmtTs(flow.fetched_at) : '—' }}</b><i v-if="flow && flow.stale">（取数失败，沿用上一次）</i></li>
+      <li>涨跌停池 <b>{{ poolTime ? fmtTs(poolTime) : '—' }}</b></li>
+    </ul>
     <p class="muted note">
       成交额为沪深两市之和（不含北交所）；资金流向为沪深两市合计，主力 = 超大单 + 大单（东方财富口径）；涨跌停家数取自交易所口径的涨跌停池（含 ST），封板率 = 涨停 ÷（涨停 + 炸板）。
     </p>
@@ -100,9 +108,13 @@ const tone = (v) => (v > 0 ? 'rise' : v < 0 ? 'fall' : 'flat')
 .bar .flat-seg { background: var(--el-border-color); }
 .bar .down { background: var(--as-fall); }
 .bar-legend { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 13px; font-weight: 600; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; background: var(--el-border-color-light); border: 1px solid var(--el-border-color-light); border-radius: 8px; overflow: hidden; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--el-border-color-light); border: 1px solid var(--el-border-color-light); border-radius: 8px; overflow: hidden; }
 .trend { font-size: 15px; font-weight: 700; }
 .flow-detail { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 10px; font-size: 13px; color: var(--as-muted); }
 .flow-detail b { font-weight: 700; }
 .note { margin: 10px 0 0; }
+@media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.times { list-style: none; display: flex; flex-wrap: wrap; gap: 2px 18px; margin: 10px 0 0; padding: 0; font-size: 12px; color: var(--as-muted); }
+.times b { font-weight: 600; color: var(--el-text-color-regular); }
+.times i { font-style: normal; color: var(--el-color-warning); }
 </style>
