@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-21T09:24:39.907596+08:00",
+  "exported_at": "2026-09-21T09:31:38.156694+08:00",
   "market": {
     "generated_at": "2026-09-18T15:36:18.194778+08:00",
     "status": "success",
@@ -6030,19 +6030,18 @@
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20260921011702-1",
-      "generated_at": "2026-09-21T09:24:28.936460+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260921011702-1.md"
+      "id": "20260921013101-1",
+      "generated_at": "2026-09-21T09:31:37.858713+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260921013101-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-21T09:24:28.936460+08:00",
+    "generated_at": "2026-09-21T09:31:37.858713+08:00",
     "version": "select-0.5",
     "status": "ready",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
     "issues": [
-      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。"
+      "开盘观察执行记录；当日净值仍需收盘估值。未用当天完整日线决定成交。"
     ],
     "calibration": {
       "walk_forward_n": 0,
@@ -6721,10 +6720,107 @@
       }
     },
     "portfolio": {
-      "cash": 100000,
-      "equity": 100000,
-      "nav": 1.0,
-      "positions": [],
+      "cash": 13284.12,
+      "equity": 99883.12,
+      "nav": 0.998831,
+      "positions": [
+        {
+          "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520",
+          "symbol": "sh600520",
+          "name": "三佳科技",
+          "shares": 1100,
+          "entry_day": "2026-09-21",
+          "entry_price": 26.21,
+          "cost": 28839.94,
+          "exit_signal": null,
+          "mark": 26.18,
+          "value": 28798.0,
+          "policy": {
+            "capital": 100000,
+            "max_positions": 3,
+            "max_weight": 0.3,
+            "risk_per_trade": 0.02,
+            "stop_pct": 0.03,
+            "target_pct": 0.05,
+            "hold_sessions": 3,
+            "entry_gap_min": -0.03,
+            "entry_gap_max": 0.03,
+            "slippage": 0.001,
+            "commission": 0.0003,
+            "minimum_commission": 5,
+            "transfer_fee": 1e-05,
+            "sell_tax": 0.0005,
+            "drawdown_pause": 0.2,
+            "drawdown_hard_stop": 0.5,
+            "label_cost_pct": 0.5,
+            "coverage_required": 0.95
+          }
+        },
+        {
+          "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600639",
+          "symbol": "sh600639",
+          "name": "浦东金桥",
+          "shares": 3000,
+          "entry_day": "2026-09-21",
+          "entry_price": 9.71,
+          "cost": 29139.03,
+          "exit_signal": null,
+          "mark": 9.7,
+          "value": 29100.0,
+          "policy": {
+            "capital": 100000,
+            "max_positions": 3,
+            "max_weight": 0.3,
+            "risk_per_trade": 0.02,
+            "stop_pct": 0.03,
+            "target_pct": 0.05,
+            "hold_sessions": 3,
+            "entry_gap_min": -0.03,
+            "entry_gap_max": 0.03,
+            "slippage": 0.001,
+            "commission": 0.0003,
+            "minimum_commission": 5,
+            "transfer_fee": 1e-05,
+            "sell_tax": 0.0005,
+            "drawdown_pause": 0.2,
+            "drawdown_hard_stop": 0.5,
+            "label_cost_pct": 0.5,
+            "coverage_required": 0.95
+          }
+        },
+        {
+          "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh688683",
+          "symbol": "sh688683",
+          "name": "莱尔科技",
+          "shares": 900,
+          "entry_day": "2026-09-21",
+          "entry_price": 31.92,
+          "cost": 28736.91,
+          "exit_signal": null,
+          "mark": 31.89,
+          "value": 28701.0,
+          "policy": {
+            "capital": 100000,
+            "max_positions": 3,
+            "max_weight": 0.3,
+            "risk_per_trade": 0.02,
+            "stop_pct": 0.03,
+            "target_pct": 0.05,
+            "hold_sessions": 3,
+            "entry_gap_min": -0.03,
+            "entry_gap_max": 0.03,
+            "slippage": 0.001,
+            "commission": 0.0003,
+            "minimum_commission": 5,
+            "transfer_fee": 1e-05,
+            "sell_tax": 0.0005,
+            "drawdown_pause": 0.2,
+            "drawdown_hard_stop": 0.5,
+            "label_cost_pct": 0.5,
+            "coverage_required": 0.95
+          }
+        }
+      ],
       "trades": [
         {
           "id": "alpha-shadow-0.1-2026-09-16-sh600293-skip",
@@ -6797,6 +6893,62 @@
           "side": "skipped",
           "date": "2026-09-18",
           "reason": "未在首个允许交易日09:30–09:35完成入场；窗口已过，不补造成交。"
+        },
+        {
+          "id": "alpha-shadow-0.3-shortterm-2026-09-17-sz300162-skip",
+          "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-17-sz300162",
+          "symbol": "sz300162",
+          "side": "skipped",
+          "date": "2026-09-21",
+          "reason": "计划依据不是上一交易日，不执行过期计划"
+        },
+        {
+          "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520-entry",
+          "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520",
+          "symbol": "sh600520",
+          "side": "buy",
+          "date": "2026-09-21",
+          "price": 26.21,
+          "shares": 1100,
+          "fee": 8.94,
+          "reason": "观察窗口有效报价满足冻结计划",
+          "quote_at": "2026-09-21T09:31:08+08:00",
+          "observed_at": "2026-09-21T09:31:26.394158+08:00",
+          "execution_mode": "observed-quote-v1",
+          "evidence_run": "20260921013101-1",
+          "quote_sha256": "3c4904e1f6721f54e5a8acdedb9f4d433342ce8b9ae3e466eb787db3ef6a153b"
+        },
+        {
+          "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600639-entry",
+          "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600639",
+          "symbol": "sh600639",
+          "side": "buy",
+          "date": "2026-09-21",
+          "price": 9.71,
+          "shares": 3000,
+          "fee": 9.03,
+          "reason": "观察窗口有效报价满足冻结计划",
+          "quote_at": "2026-09-21T09:31:12+08:00",
+          "observed_at": "2026-09-21T09:31:35.835937+08:00",
+          "execution_mode": "observed-quote-v1",
+          "evidence_run": "20260921013101-1",
+          "quote_sha256": "0d5d86156ffbfed74f5f5742aae7595b860ddf3c25ada81a265815e70a274134"
+        },
+        {
+          "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh688683-entry",
+          "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh688683",
+          "symbol": "sh688683",
+          "side": "buy",
+          "date": "2026-09-21",
+          "price": 31.92,
+          "shares": 900,
+          "fee": 8.91,
+          "reason": "观察窗口有效报价满足冻结计划",
+          "quote_at": "2026-09-21T09:31:09+08:00",
+          "observed_at": "2026-09-21T09:31:37.855494+08:00",
+          "execution_mode": "observed-quote-v1",
+          "evidence_run": "20260921013101-1",
+          "quote_sha256": "a665fdb094388535ef7c43f8005068fa5fe6a7c2cb8102b53eec624c9ebe8c72"
         }
       ],
       "attempted": [],
@@ -6831,7 +6983,7 @@
           "benchmark_nav": 1.012888
         }
       ],
-      "valuation_status": "current",
+      "valuation_status": "intraday",
       "issues": [],
       "closed_trades": 0,
       "trade_win_rate": null
@@ -7465,6 +7617,141 @@
     "outcomes": [],
     "decisions": [
       {
+        "symbol": "sh600520",
+        "name": "三佳科技",
+        "strategy_type": "breakout",
+        "state": "holding",
+        "reasons": [
+          "已有模拟买入记录，尚未触发收盘退出条件。"
+        ],
+        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520",
+        "created_at": "2026-09-18T18:24:34.685324+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-19",
+        "reference_price": 26.23,
+        "entry_low": 25.4431,
+        "entry_high": 27.0169,
+        "stop_price": 25.4237,
+        "target_price": 27.5205,
+        "shares": 1100,
+        "entry_price": 26.21,
+        "execution_mode": "observed-quote-v1",
+        "plan_levels": null,
+        "news": null,
+        "news_items": [],
+        "archive_only": null,
+        "hold_sessions": 3,
+        "max_weight_pct": 30.0,
+        "ledger": [
+          {
+            "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520-entry",
+            "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600520",
+            "symbol": "sh600520",
+            "side": "buy",
+            "date": "2026-09-21",
+            "price": 26.21,
+            "shares": 1100,
+            "fee": 8.94,
+            "reason": "观察窗口有效报价满足冻结计划",
+            "quote_at": "2026-09-21T09:31:08+08:00",
+            "observed_at": "2026-09-21T09:31:26.394158+08:00",
+            "execution_mode": "observed-quote-v1",
+            "evidence_run": "20260921013101-1",
+            "quote_sha256": "3c4904e1f6721f54e5a8acdedb9f4d433342ce8b9ae3e466eb787db3ef6a153b"
+          }
+        ]
+      },
+      {
+        "symbol": "sh600639",
+        "name": "浦东金桥",
+        "strategy_type": "breakout",
+        "state": "holding",
+        "reasons": [
+          "已有模拟买入记录，尚未触发收盘退出条件。"
+        ],
+        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600639",
+        "created_at": "2026-09-18T18:24:34.685324+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-19",
+        "reference_price": 9.85,
+        "entry_low": 9.5545,
+        "entry_high": 10.1455,
+        "stop_price": 9.4187,
+        "target_price": 10.1955,
+        "shares": 3000,
+        "entry_price": 9.71,
+        "execution_mode": "observed-quote-v1",
+        "plan_levels": null,
+        "news": null,
+        "news_items": [],
+        "archive_only": null,
+        "hold_sessions": 3,
+        "max_weight_pct": 30.0,
+        "ledger": [
+          {
+            "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600639-entry",
+            "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600639",
+            "symbol": "sh600639",
+            "side": "buy",
+            "date": "2026-09-21",
+            "price": 9.71,
+            "shares": 3000,
+            "fee": 9.03,
+            "reason": "观察窗口有效报价满足冻结计划",
+            "quote_at": "2026-09-21T09:31:12+08:00",
+            "observed_at": "2026-09-21T09:31:35.835937+08:00",
+            "execution_mode": "observed-quote-v1",
+            "evidence_run": "20260921013101-1",
+            "quote_sha256": "0d5d86156ffbfed74f5f5742aae7595b860ddf3c25ada81a265815e70a274134"
+          }
+        ]
+      },
+      {
+        "symbol": "sh688683",
+        "name": "莱尔科技",
+        "strategy_type": "breakout",
+        "state": "holding",
+        "reasons": [
+          "已有模拟买入记录，尚未触发收盘退出条件。"
+        ],
+        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh688683",
+        "created_at": "2026-09-18T18:24:34.685324+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-19",
+        "reference_price": 31.82,
+        "entry_low": 30.8654,
+        "entry_high": 32.7746,
+        "stop_price": 30.9624,
+        "target_price": 33.516,
+        "shares": 900,
+        "entry_price": 31.92,
+        "execution_mode": "observed-quote-v1",
+        "plan_levels": null,
+        "news": null,
+        "news_items": [],
+        "archive_only": null,
+        "hold_sessions": 3,
+        "max_weight_pct": 30.0,
+        "ledger": [
+          {
+            "id": "alpha-shadow-0.3-shortterm-2026-09-18-sh688683-entry",
+            "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh688683",
+            "symbol": "sh688683",
+            "side": "buy",
+            "date": "2026-09-21",
+            "price": 31.92,
+            "shares": 900,
+            "fee": 8.91,
+            "reason": "观察窗口有效报价满足冻结计划",
+            "quote_at": "2026-09-21T09:31:09+08:00",
+            "observed_at": "2026-09-21T09:31:37.855494+08:00",
+            "execution_mode": "observed-quote-v1",
+            "evidence_run": "20260921013101-1",
+            "quote_sha256": "a665fdb094388535ef7c43f8005068fa5fe6a7c2cb8102b53eec624c9ebe8c72"
+          }
+        ]
+      },
+      {
         "symbol": "sh688061",
         "name": "灿瑞科技",
         "strategy_type": "pullback",
@@ -7606,56 +7893,6 @@
             "risk_cap_pct": 25.0
           },
           "breakeven_win_rate_pct": 41.6
-        },
-        "news": "clear",
-        "news_items": [],
-        "archive_only": false,
-        "hold_sessions": 5,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh600520",
-        "name": "三佳科技",
-        "strategy_type": "breakout",
-        "state": "observing",
-        "reasons": [
-          "数据超过允许时效"
-        ],
-        "prediction_id": "select-0.5-2026-09-18-sh600520",
-        "created_at": "2026-09-21T08:47:47.796131+08:00",
-        "as_of": "2026-09-18",
-        "eligible_from": "2026-09-21",
-        "reference_price": 26.23,
-        "entry_low": 26.3611,
-        "entry_high": 27.2162,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": "conditional-intraday-v1",
-        "plan_levels": {
-          "entry_low": 26.361,
-          "entry_high": 27.216,
-          "void_price": 24.381,
-          "stop_pct": 0.0705,
-          "target_pct": 0.1058,
-          "stop_price_at_reference": 24.381,
-          "target_price_at_reference": 29.005,
-          "hold_sessions": 5,
-          "atr_pct": 0.047,
-          "window": [
-            "09:30",
-            "14:30"
-          ],
-          "sizing": {
-            "position_pct": 28.37,
-            "max_loss_pct": 2.0,
-            "binding": "risk_budget",
-            "weight_cap_pct": 30.0,
-            "risk_cap_pct": 28.37
-          },
-          "breakeven_win_rate_pct": 41.7
         },
         "news": "clear",
         "news_items": [],
@@ -8061,71 +8298,13 @@
         "ledger": []
       },
       {
-        "symbol": "sh600639",
-        "name": "浦东金桥",
-        "strategy_type": "breakout",
-        "state": "waiting_buy",
-        "reasons": [
-          "冻结记录允许条件式模拟入场；尚无成交记录。",
-          "本计划最早允许日期：2026-09-19；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。"
-        ],
-        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh600639",
-        "created_at": "2026-09-18T18:24:34.685324+08:00",
-        "as_of": "2026-09-18",
-        "eligible_from": "2026-09-19",
-        "reference_price": 9.85,
-        "entry_low": 9.5545,
-        "entry_high": 10.1455,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": "observed-quote-v1",
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
-        "symbol": "sh688683",
-        "name": "莱尔科技",
-        "strategy_type": "breakout",
-        "state": "waiting_buy",
-        "reasons": [
-          "冻结记录允许条件式模拟入场；尚无成交记录。",
-          "本计划最早允许日期：2026-09-19；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。"
-        ],
-        "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-18-sh688683",
-        "created_at": "2026-09-18T18:24:34.685324+08:00",
-        "as_of": "2026-09-18",
-        "eligible_from": "2026-09-19",
-        "reference_price": 31.82,
-        "entry_low": 30.8654,
-        "entry_high": 32.7746,
-        "stop_price": null,
-        "target_price": null,
-        "shares": null,
-        "entry_price": null,
-        "execution_mode": "observed-quote-v1",
-        "plan_levels": null,
-        "news": null,
-        "news_items": [],
-        "archive_only": null,
-        "hold_sessions": 3,
-        "max_weight_pct": 30.0,
-        "ledger": []
-      },
-      {
         "symbol": "sz300162",
         "name": "雷曼光电",
         "strategy_type": "breakout",
-        "state": "waiting_buy",
+        "state": "skipped",
         "reasons": [
-          "冻结记录允许条件式模拟入场；尚无成交记录。",
-          "本计划最早允许日期：2026-09-19；仅在该日期起首个交易日的开盘窗口检查，不代表今日已检查。"
+          "计划依据不是上一交易日，不执行过期计划",
+          "本次入场尝试已结束，不会自动补买。"
         ],
         "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-17-sz300162",
         "created_at": "2026-09-18T09:21:18.969410+08:00",
@@ -8145,7 +8324,16 @@
         "archive_only": null,
         "hold_sessions": 3,
         "max_weight_pct": 30.0,
-        "ledger": []
+        "ledger": [
+          {
+            "id": "alpha-shadow-0.3-shortterm-2026-09-17-sz300162-skip",
+            "prediction_id": "alpha-shadow-0.3-shortterm-2026-09-17-sz300162",
+            "symbol": "sz300162",
+            "side": "skipped",
+            "date": "2026-09-21",
+            "reason": "计划依据不是上一交易日，不执行过期计划"
+          }
+        ]
       },
       {
         "symbol": "sh605277",
