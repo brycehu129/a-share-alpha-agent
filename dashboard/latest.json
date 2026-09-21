@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-21T08:47:57.954488+08:00",
+  "exported_at": "2026-09-21T09:24:39.907596+08:00",
   "market": {
     "generated_at": "2026-09-18T15:36:18.194778+08:00",
     "status": "success",
@@ -65,7 +65,7 @@
     }
   },
   "research": {
-    "generated_at": "2026-09-21T08:40:56.395358+08:00",
+    "generated_at": "2026-09-21T09:17:57.651436+08:00",
     "status": "success",
     "factor_cutoff": "2026-09-18",
     "industry_provider": "新浪行业",
@@ -5732,7 +5732,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-21T08:40:28.393120+08:00",
+    "generated_at": "2026-09-21T09:17:22.755289+08:00",
     "status": "partial",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5747,7 +5747,7 @@
     }
   },
   "analysis": {
-    "generated_at": "2026-09-21T08:42:59.634045+08:00",
+    "generated_at": "2026-09-21T09:19:59.650908+08:00",
     "status": "ready",
     "start_date": "20260821",
     "end_date": "20260918",
@@ -6006,44 +6006,43 @@
     },
     {
       "kind": "research",
-      "id": "20260921004006-1",
-      "generated_at": "2026-09-21T08:40:56.395358+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260921004006-1.md"
+      "id": "20260921011702-1",
+      "generated_at": "2026-09-21T09:17:57.651436+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260921011702-1.md"
     },
     {
       "kind": "sync",
-      "id": "20260921004006-1",
-      "generated_at": "2026-09-21T08:40:28.393120+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260921004006-1.md"
+      "id": "20260921011702-1",
+      "generated_at": "2026-09-21T09:17:22.755289+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260921011702-1.md"
     },
     {
       "kind": "analysis",
-      "id": "20260921004006-1",
-      "generated_at": "2026-09-21T08:42:59.634045+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260921004006-1.md"
+      "id": "20260921011702-1",
+      "generated_at": "2026-09-21T09:19:59.650908+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260921011702-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "20260921004006-1",
-      "generated_at": "2026-09-21T08:47:48.326178+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260921004006-1.md"
+      "id": "20260921011702-1",
+      "generated_at": "2026-09-21T09:24:29.431576+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260921011702-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20260921004006-1",
-      "generated_at": "2026-09-21T08:47:47.807717+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260921004006-1.md"
+      "id": "20260921011702-1",
+      "generated_at": "2026-09-21T09:24:28.936460+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260921011702-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-21T08:47:47.807717+08:00",
+    "generated_at": "2026-09-21T09:24:28.936460+08:00",
     "version": "select-0.5",
-    "status": "partial",
+    "status": "ready",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
     "issues": [
       "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
-      "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。"
+      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。"
     ],
     "calibration": {
       "walk_forward_n": 0,
@@ -6120,12 +6119,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 93.75,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sz000797",
@@ -6171,12 +6165,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 90.0,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sz300319",
@@ -6222,12 +6211,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 81.25,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sh600520",
@@ -6273,12 +6257,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 70.0,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sh600776",
@@ -6324,12 +6303,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 68.75,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sz002845",
@@ -6375,12 +6349,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 56.25,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sh600048",
@@ -6426,12 +6395,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 50.0,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sh600064",
@@ -6477,23 +6441,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 43.75,
-        "news": {
-          "status": "flag",
-          "items": [
-            {
-              "time": "2026-09-18T16:51:45+08:00",
-              "title": "南京高科:南京高科关于变更董事长、法定代表人及调整董事会战略委员会主任委员的公告",
-              "level": "flag",
-              "reason": "董事长变更",
-              "columns": [
-                "法定代表人变更",
-                "高管人员任职变动"
-              ]
-            }
-          ],
-          "total_items": 1,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sz301055",
@@ -6539,12 +6487,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 31.25,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sz300698",
@@ -6590,12 +6533,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 30.0,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sz002413",
@@ -6641,68 +6579,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 18.75,
-        "news": {
-          "status": "clear",
-          "items": [
-            {
-              "time": "2026-09-18T20:18:07+08:00",
-              "title": "雷科防务:2026年限制性股票激励计划(草案)",
-              "level": "info",
-              "reason": "",
-              "columns": [
-                "股权激励计划"
-              ]
-            },
-            {
-              "time": "2026-09-18T20:18:07+08:00",
-              "title": "雷科防务:2026年限制性股票激励计划(草案)摘要",
-              "level": "info",
-              "reason": "",
-              "columns": [
-                "股权激励计划摘要"
-              ]
-            },
-            {
-              "time": "2026-09-18T20:18:07+08:00",
-              "title": "雷科防务:关于召开2026年第一次临时股东会的通知",
-              "level": "info",
-              "reason": "",
-              "columns": [
-                "召开股东大会通知"
-              ]
-            },
-            {
-              "time": "2026-09-18T20:18:07+08:00",
-              "title": "雷科防务:2026年限制性股票激励计划实施考核管理办法",
-              "level": "info",
-              "reason": "",
-              "columns": [
-                "管理办法/制度"
-              ]
-            },
-            {
-              "time": "2026-09-18T20:18:07+08:00",
-              "title": "雷科防务:北京市万商天勤律师事务所关于北京雷科防务科技股份有限公司2026年限制性股票激励计划(草案)之法律意见书",
-              "level": "info",
-              "reason": "",
-              "columns": [
-                "法律意见书"
-              ]
-            },
-            {
-              "time": "2026-09-18T20:18:07+08:00",
-              "title": "雷科防务:董事会薪酬与考核委员会关于公司2026年限制性股票激励计划相关事项的核查意见",
-              "level": "info",
-              "reason": "",
-              "columns": [
-                "专项说明/独立意见",
-                "保荐/核查意见"
-              ]
-            }
-          ],
-          "total_items": 8,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sh600171",
@@ -6748,12 +6625,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 10.0,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       },
       {
         "symbol": "sh688636",
@@ -6799,12 +6671,7 @@
           "source": "有回看偏差的历史研究"
         },
         "rank_pct": 6.25,
-        "news": {
-          "status": "clear",
-          "items": [],
-          "total_items": 0,
-          "error": null
-        }
+        "news": null
       }
     ],
     "policy": {
@@ -6971,37 +6838,13 @@
     },
     "forecasts": [
       {
-        "id": "select-0.5-2026-09-18-sh688061",
+        "id": "select-0.5-2026-09-18-sh600048",
         "created_at": "2026-09-21T08:47:47.796131+08:00",
         "as_of": "2026-09-18",
         "eligible_from": "2026-09-21",
-        "symbol": "sh688061",
-        "name": "灿瑞科技",
-        "score": 80.11,
-        "strategy_type": "pullback",
-        "probability": {
-          "n": 28,
-          "cohorts": 5,
-          "wins": 13,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        },
-        "reference_price": 45.37,
-        "paper_eligible": false,
-        "hotmoney": null
-      },
-      {
-        "id": "select-0.5-2026-09-18-sz000797",
-        "created_at": "2026-09-21T08:47:47.796131+08:00",
-        "as_of": "2026-09-18",
-        "eligible_from": "2026-09-21",
-        "symbol": "sz000797",
-        "name": "中国武夷",
-        "score": 100,
+        "symbol": "sh600048",
+        "name": "保利发展",
+        "score": 97.95,
         "strategy_type": "breakout",
         "probability": {
           "n": 5,
@@ -7014,18 +6857,18 @@
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
         },
-        "reference_price": 2.69,
+        "reference_price": 5.32,
         "paper_eligible": false,
         "hotmoney": null
       },
       {
-        "id": "select-0.5-2026-09-18-sz300319",
+        "id": "select-0.5-2026-09-18-sh600064",
         "created_at": "2026-09-21T08:47:47.796131+08:00",
         "as_of": "2026-09-18",
         "eligible_from": "2026-09-21",
-        "symbol": "sz300319",
-        "name": "麦捷科技",
-        "score": 71.27,
+        "symbol": "sh600064",
+        "name": "南京高科",
+        "score": 59.44,
         "strategy_type": "pullback",
         "probability": {
           "n": 28,
@@ -7038,7 +6881,7 @@
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
         },
-        "reference_price": 21.56,
+        "reference_price": 7.76,
         "paper_eligible": false,
         "hotmoney": null
       },
@@ -7091,6 +6934,54 @@
         "hotmoney": null
       },
       {
+        "id": "select-0.5-2026-09-18-sh688061",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sh688061",
+        "name": "灿瑞科技",
+        "score": 80.11,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 45.37,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sz000797",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sz000797",
+        "name": "中国武夷",
+        "score": 100,
+        "strategy_type": "breakout",
+        "probability": {
+          "n": 5,
+          "cohorts": 3,
+          "wins": 2,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 2.69,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
         "id": "select-0.5-2026-09-18-sz002845",
         "created_at": "2026-09-21T08:47:47.796131+08:00",
         "as_of": "2026-09-18",
@@ -7115,37 +7006,13 @@
         "hotmoney": null
       },
       {
-        "id": "select-0.5-2026-09-18-sh600048",
+        "id": "select-0.5-2026-09-18-sz300319",
         "created_at": "2026-09-21T08:47:47.796131+08:00",
         "as_of": "2026-09-18",
         "eligible_from": "2026-09-21",
-        "symbol": "sh600048",
-        "name": "保利发展",
-        "score": 97.95,
-        "strategy_type": "breakout",
-        "probability": {
-          "n": 5,
-          "cohorts": 3,
-          "wins": 2,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        },
-        "reference_price": 5.32,
-        "paper_eligible": false,
-        "hotmoney": null
-      },
-      {
-        "id": "select-0.5-2026-09-18-sh600064",
-        "created_at": "2026-09-21T08:47:47.796131+08:00",
-        "as_of": "2026-09-18",
-        "eligible_from": "2026-09-21",
-        "symbol": "sh600064",
-        "name": "南京高科",
-        "score": 59.44,
+        "symbol": "sz300319",
+        "name": "麦捷科技",
+        "score": 71.27,
         "strategy_type": "pullback",
         "probability": {
           "n": 28,
@@ -7158,31 +7025,7 @@
           "status": "insufficient",
           "source": "有回看偏差的历史研究"
         },
-        "reference_price": 7.76,
-        "paper_eligible": false,
-        "hotmoney": null
-      },
-      {
-        "id": "select-0.5-2026-09-18-sz301055",
-        "created_at": "2026-09-21T08:47:47.796131+08:00",
-        "as_of": "2026-09-18",
-        "eligible_from": "2026-09-21",
-        "symbol": "sz301055",
-        "name": "张小泉",
-        "score": 59.18,
-        "strategy_type": "pullback",
-        "probability": {
-          "n": 28,
-          "cohorts": 5,
-          "wins": 13,
-          "probability": null,
-          "low": null,
-          "high": null,
-          "mean_return_pct": null,
-          "status": "insufficient",
-          "source": "有回看偏差的历史研究"
-        },
-        "reference_price": 30.62,
+        "reference_price": 21.56,
         "paper_eligible": false,
         "hotmoney": null
       },
@@ -7207,6 +7050,30 @@
           "source": "有回看偏差的历史研究"
         },
         "reference_price": 27.13,
+        "paper_eligible": false,
+        "hotmoney": null
+      },
+      {
+        "id": "select-0.5-2026-09-18-sz301055",
+        "created_at": "2026-09-21T08:47:47.796131+08:00",
+        "as_of": "2026-09-18",
+        "eligible_from": "2026-09-21",
+        "symbol": "sz301055",
+        "name": "张小泉",
+        "score": 59.18,
+        "strategy_type": "pullback",
+        "probability": {
+          "n": 28,
+          "cohorts": 5,
+          "wins": 13,
+          "probability": null,
+          "low": null,
+          "high": null,
+          "mean_return_pct": null,
+          "status": "insufficient",
+          "source": "有回看偏差的历史研究"
+        },
+        "reference_price": 30.62,
         "paper_eligible": false,
         "hotmoney": null
       },
