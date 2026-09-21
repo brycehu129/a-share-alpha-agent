@@ -1,0 +1,56 @@
+/* 设计令牌：涨红跌绿（A 股惯例）+ Element Plus 主题覆盖 + 页面公共样式。
+   组件里不要再写死颜色，用这里的变量。 */
+:root {
+  --el-color-primary: #2f5fae;
+  --el-bg-color-page: #f2f5f4;
+  --as-rise: #c23b32;
+  --as-fall: #2f8f5b;
+  --as-flat: #6b7280;
+  --as-muted: #5b6660; /* 次要文字：对白底 ≥ 5.5:1（旧的 #7c8b83 只有 3.4:1） */
+  --as-gold-lo: #f7e6c4;
+  --as-gold-hi: #a3651c;
+  --as-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, 'Courier New', monospace;
+  --as-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+}
+html.dark {
+  --el-color-primary: #8fb3f2;
+  --as-rise: #ef6b5e;
+  --as-fall: #4cc088;
+  --as-flat: #9aa8b3;
+  --as-muted: #a3b5ab;
+  --as-gold-lo: #3c2f18;
+  --as-gold-hi: #e0a542;
+}
+
+html, body { margin: 0; }
+body {
+  font-family: var(--as-sans);
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  background: var(--el-bg-color-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+.num { font-family: var(--as-mono); font-variant-numeric: tabular-nums; }
+.rise { color: var(--as-rise); }
+.fall { color: var(--as-fall); }
+.flat { color: var(--as-flat); }
+.muted { color: var(--as-muted); font-size: 12.5px; line-height: 1.6; }
+.stock-name { font-weight: 600; }
+.stock-code { display: block; color: var(--as-muted); font-size: 12px; }
+
+/* 所有页面共用的内容容器：宽度固定，切换路由时页面不会左右跳。 */
+.container { max-width: 1180px; margin: 0 auto; padding: 20px 20px 56px; }
+.page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 16px; }
+.page-head h1 { margin: 0; font-size: 22px; font-weight: 650; }
+.page-head .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: var(--as-muted); font-size: 13px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.card-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 16px; }
+.card-title .sub { font-weight: 400; font-size: 12.5px; color: var(--as-muted); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.el-card { --el-card-padding: 18px; }
+.el-table .cell { line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .container { padding: 14px 12px 40px; }
+}

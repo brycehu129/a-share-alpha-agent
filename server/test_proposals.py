@@ -321,9 +321,9 @@ class WebTests(Base):
         if auth:
             h['Authorization'] = AUTH
         h.update(headers or {})
-        body = urlencode(form or {}).encode() if method == 'POST' else None
+        body = json.dumps(form or {}).encode() if method == 'POST' else None
         if body is not None:
-            h['Content-Type'] = 'application/x-www-form-urlencoded'
+            h['Content-Type'] = 'application/json'
         conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=30)
         conn.request(method, path, body=body, headers=h)
         resp = conn.getresponse()
@@ -331,61 +331,71 @@ class WebTests(Base):
         conn.close()
         return resp.status, text
 
-    def test_page_requires_login_and_is_in_the_nav(self):
+    def api(self):
+        status, text = self.request('GET', '/api/proposals')
+        return status, json.loads(text)
+
+    def test_api_requires_login_and_the_page_route_serves_the_app(self):
+        self.assertEqual(self.request('GET', '/api/proposals', auth=False)[0], 401)
+        self.assertEqual(self.request('POST', '/api/proposals/approve', {'id': 'p0001'}, auth=False)[0], 401)
         self.assertEqual(self.request('GET', '/proposals', auth=False)[0], 401)
-        self.assertEqual(self.request('POST', '/proposals/approve', {'id': 'p0001'}, auth=False)[0], 401)
-        status, page = self.request('GET', '/proposals')
+        self.assertEqual(self.request('GET', '/proposals')[0], 200)          # 单页应用的客户端路由
+        status, data = self.api()
         self.assertEqual(status, 200)
-        self.assertIn('href="/proposals"', page)
-        self.assertIn('尚无修订', page)
+        self.assertEqual(data['revision'], 0)
+        self.assertEqual(data['revisions'], [])                              # 前端据此显示「尚无修订」
 
-    def test_pending_proposal_is_shown_and_can_be_approved_from_the_page(self):
+    def test_pending_proposal_is_returned_as_data_and_can_be_approved(self):
         p = self.submit(rationale='理由：<script>alert(1)</script>')
-        _, page = self.request('GET', '/proposals')
-        self.assertIn(p['id'], page)
-        self.assertNotIn('<script>alert(1)</script>', page)        # 提议方文字必须转义
-        self.assertIn('&lt;script&gt;', page)
-        self.assertIn('未经验证', page)
-        self.assertIn('42.3% → 42.9%', page)
-        status, page = self.request('POST', '/proposals/approve', {'id': p['id'], 'note': '好'})
+        _, data = self.api()
+        self.assertEqual([x['id'] for x in data['pending']], [p['id']])
+        # 提议方的文字原样交给前端；前端只用文本插值渲染（不用 v-html），所以脚本只会被当文字显示。
+        self.assertEqual(data['pending'][0]['rationale'], '理由：<script>alert(1)</script>')
+        self.assertEqual((data['pending'][0]['breakeven_before'], data['pending'][0]['breakeven_after']), (42.3, 42.9))
+        status, text = self.request('POST', '/api/proposals/approve', {'id': p['id'], 'note': '好'})
         self.assertEqual(status, 200)
-        self.assertIn('已批准', page)
-        self.assertIn('exec-0.3.r1', page)
+        self.assertIn('已批准', text)
+        self.assertIn('exec-0.3.r1', text)
         self.assertEqual(pr.active(self.dir)[0], 1)
+        _, data = self.api()
+        self.assertEqual(data['pending'], [])
+        self.assertEqual(data['revision'], 1)
 
-    def test_reject_from_the_page(self):
+    def test_reject(self):
         p = self.submit()
-        _, page = self.request('POST', '/proposals/reject', {'id': p['id']})
-        self.assertIn('已驳回', page)
+        status, text = self.request('POST', '/api/proposals/reject', {'id': p['id']})
+        self.assertEqual(status, 200)
+        self.assertIn('已驳回', text)
         self.assertEqual(pr.active(self.dir)[0], 0)
 
-    def test_refused_and_insufficient_items_show_in_history_but_have_no_buttons(self):
+    def test_refused_and_insufficient_items_show_in_history_but_are_not_actionable(self):
         r = self.submit(param='capital', new=1)
         i = self.submit(evidence={**EV, 'n': 3}, track='pullback', param='exit.target_r', new=1.75)
-        _, page = self.request('GET', '/proposals')
-        self.assertIn('被代码拒收', page)
-        self.assertIn('证据不足', page)
-        self.assertNotIn('name="id" value="%s"' % r['id'], page)
-        self.assertNotIn('name="id" value="%s"' % i['id'], page)
+        _, data = self.api()
+        statuses = {h['id']: h['status'] for h in data['history']}
+        self.assertEqual(statuses[r['id']], '被代码拒收')
+        self.assertEqual(statuses[i['id']], '证据不足')
+        self.assertEqual(data['pending'], [])                                # 不在待确认里 = 页面上没有批准/驳回按钮
 
     def test_approving_something_unapprovable_via_a_forged_post_is_refused(self):
         i = self.submit(evidence={**EV, 'n': 3})
-        _, page = self.request('POST', '/proposals/approve', {'id': i['id']})
-        self.assertIn('不能批准', page)
+        status, text = self.request('POST', '/api/proposals/approve', {'id': i['id']})
+        self.assertEqual(status, 400)
+        self.assertIn('不能批准', text)
         self.assertEqual(pr.active(self.dir)[0], 0)
 
     def test_cross_site_post_cannot_approve(self):
         p = self.submit()
-        status, _ = self.request('POST', '/proposals/approve', {'id': p['id']},
+        status, _ = self.request('POST', '/api/proposals/approve', {'id': p['id']},
                                  headers={'Origin': 'https://evil.example'})
         self.assertEqual(status, 403)
         self.assertEqual(pr.active(self.dir)[0], 0)
 
-    def test_corrupt_store_shows_an_error_page_not_a_500(self):
+    def test_corrupt_store_is_a_readable_error_not_a_crash(self):
         Path(pr.path(self.dir)).write_text('{broken')
-        status, page = self.request('GET', '/proposals')
-        self.assertEqual(status, 200)
-        self.assertIn('无法读取', page)
+        status, text = self.request('GET', '/api/proposals')
+        self.assertEqual(status, 500)
+        self.assertIn('无法读取', text)
 
 
 class ReviewPipelineDoesNotSelfApplyTests(unittest.TestCase):

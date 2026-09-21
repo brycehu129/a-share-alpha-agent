@@ -83,25 +83,5 @@ class GetDashboardDataTests(unittest.TestCase):
         self.assertIn("JSON", error)
 
 
-class RenderDashboardPageTests(unittest.TestCase):
-    def setUp(self):
-        _reset_cache()
-
-    def test_successful_render_embeds_data_and_no_raw_placeholders_left(self):
-        body = json.dumps(SAMPLE).encode("utf-8")
-        with patch("dashboard_page.urlopen", return_value=FakeResponse(body)):
-            page = dp.render_dashboard_page()
-        self.assertIn('"version": "x"', page)
-        self.assertNotIn("__DASHBOARD_DATA_JSON__", page)
-        self.assertNotIn("__FETCH_OK__", page)
-        self.assertIn("const FETCH_OK = true;", page)
-
-    def test_failed_render_with_no_cache_sets_fetch_ok_false(self):
-        with patch("dashboard_page.urlopen", side_effect=URLError("boom")):
-            page = dp.render_dashboard_page()
-        self.assertIn("const FETCH_OK = false;", page)
-        self.assertIn("const DASHBOARD_DATA = null;", page)
-
-
 if __name__ == "__main__":
     unittest.main()

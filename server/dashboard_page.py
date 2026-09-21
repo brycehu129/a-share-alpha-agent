@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""服务器端渲染看板页面：直接从GitHub market-data分支拉取dashboard/latest.json，
-注入到server/dashboard_template.html里返回给浏览器。
+"""看板数据：直接从GitHub market-data分支拉取dashboard/latest.json（带30秒缓存），
+由 /api/dashboard 交给前端（web/）渲染。
 
 这是Artifact看板（claude.ai/artifact/...）的服务器版：Artifact的CSP不让页面自己
 fetch raw.githubusercontent.com，只能靠Claude这边的定时任务把数据同步进Artifact
@@ -11,7 +11,6 @@ fetch raw.githubusercontent.com，只能靠Claude这边的定时任务把数据�
 Python 3.9+，只用标准库。
 """
 import json
-import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -25,7 +24,6 @@ MARKET_DATA_JSON_URL = (
 )
 CACHE_TTL_SECONDS = 30
 MAX_RESPONSE_BYTES = 5_000_000
-TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "dashboard_template.html")
 
 
 class DashboardFetchError(RuntimeError):
@@ -89,22 +87,8 @@ def get_dashboard_data(force_refresh=False, url=None):
     return data, fetched_at, False, None
 
 
-def _iso(epoch_seconds):
+def iso_cst(epoch_seconds):
     return datetime.fromtimestamp(epoch_seconds, CST).strftime("%Y-%m-%dT%H:%M:%S+08:00")
 
 
-def render_dashboard_page(force_refresh=False, url=None):
-    data, fetched_at, is_stale, error = get_dashboard_data(force_refresh=force_refresh, url=url)
-    fetch_ok = data is not None
-    with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
-        template = f.read()
-    replacements = {
-        "/*__DASHBOARD_DATA_JSON__*/": json.dumps(data, ensure_ascii=False) if fetch_ok else "null",
-        "/*__FETCH_OK__*/": "true" if fetch_ok else "false",
-        "/*__FETCH_ERROR__*/": json.dumps(error) if error else "null",
-        "/*__FETCHED_AT__*/": json.dumps(_iso(fetched_at)) if fetched_at else "null",
-        "/*__IS_STALE__*/": "true" if is_stale else "false",
-    }
-    for token, value in replacements.items():
-        template = template.replace(token, value)
-    return template
+_iso = iso_cst

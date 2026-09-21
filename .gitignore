@@ -2,3 +2,7 @@ server/data/
 __pycache__/
 *.pyc
 .history/
+
+# 前端：依赖不入库；构建产物 server/static/ 入库（服务器不装 Node）
+web/node_modules/
+web/.vite/

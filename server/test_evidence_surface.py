@@ -8,7 +8,6 @@ import alpha_engine
 import conditional_exec as ce
 import contract_labels as cl
 import dashboard_export
-import dashboard_page
 from decision_view import decisions
 from spec_fixtures import build_spec
 from test_contract_labels import outcome, record
@@ -156,15 +155,6 @@ class ExportTests(unittest.TestCase):
         out = dashboard_export.build(h)['agent']
         self.assertEqual(out['exec02']['equity'], 101250.0)
         self.assertIn('breakout/top3', out['evidence']['groups'])
-
-    def test_template_has_no_duplicate_top_level_declarations(self):
-        """页面脚本里一个重复的 const 会让整个看板不渲染——上次就差点这样。"""
-        import re
-        html = Path(dashboard_page.TEMPLATE_PATH).read_text(encoding='utf-8')
-        script = html[html.index('<script>'):]
-        names = re.findall(r'^(?:const|let|var|function)\s+([A-Za-z_$][\w$]*)', script, flags=re.M)
-        dupes = {n for n in names if names.count(n) > 1}
-        self.assertEqual(dupes, set())
 
 
 if __name__ == '__main__':

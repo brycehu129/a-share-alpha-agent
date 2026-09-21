@@ -464,21 +464,25 @@ class WebTests(Base):
         self.assertEqual(self.get('/health/deep', auth=False), (200, 'ok'))
         self.assertEqual(self.get('/health', auth=False), (200, 'ok'))
 
-    def test_config_page_shows_the_health_panel_and_flags_undelivered_alerts(self):
-        status, page = self.get('/')
-        self.assertIn('系统健康', page)
-        self.assertIn('尚未运行', page)
+    def test_settings_api_reports_health_and_flags_undelivered_alerts(self):
+        import json
+        health = lambda: json.loads(self.get('/api/settings')[1])['health']
+        h = health()
+        self.assertIsNone(h['heartbeat_age_min'])                              # 尚未运行
+        self.assertTrue(h['stale'])
         hc.save_state({'last_run_at': datetime.now(CST).isoformat(),
                        'checks': [r('engine', hc.CRIT, '停了<script>x</script>', title='盘中引擎'), r('disk', hc.OK, '剩余 50%', title='磁盘空间')],
                        'last_delivery': {'ok': False, 'reason': '没有配置企业微信 webhook', 'at': datetime.now(CST).isoformat(), 'lines': 1}},
                       self.private)
-        page = self.get('/')[1]
-        self.assertIn('有严重问题', page)
-        self.assertIn('盘中引擎', page)
-        self.assertIn('未送达', page)
-        self.assertNotIn('<script>x</script>', page)                       # 检查消息按文本转义
+        h = health()
+        self.assertTrue(h['critical'])
+        self.assertFalse(h['stale'])
+        self.assertEqual([c['title'] for c in h['checks']], ['盘中引擎', '磁盘空间'])   # 严重的排在前面
+        self.assertFalse(h['last_delivery']['ok'])                                 # 前端据此显示「未送达」
+        # 接口原样交出文本，由前端按文本插值渲染（Vue 会转义）；这里只保证它是普通字符串字段。
+        self.assertEqual(h['checks'][0]['message'], '停了<script>x</script>')
         hc.save_state({'last_run_at': (datetime.now(CST) - timedelta(minutes=40)).isoformat(), 'checks': []}, self.private)
-        self.assertIn('没人在盯着系统了', self.get('/')[1])
+        self.assertTrue(health()['stale'])                                         # 心跳停了：没人在盯着系统
 
 
 class DeploymentFilesTests(unittest.TestCase):

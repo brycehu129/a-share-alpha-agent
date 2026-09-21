@@ -8,12 +8,12 @@ import threading
 import unittest
 from http.server import ThreadingHTTPServer
 from unittest.mock import patch
-from urllib.parse import urlencode
 
 import claude_client
 import llm_settings
 import postclose_report
 import sentinel
+import api
 import webapp
 from test_openrouter_client import FakeOpenRouter
 
@@ -258,9 +258,9 @@ class WebServer(Hermetic):
         if auth:
             h['Authorization'] = AUTH
         h.update(headers or {})
-        body = urlencode(form or {}).encode() if method == 'POST' else None
+        body = json.dumps(form or {}).encode() if method == 'POST' else None
         if body is not None:
-            h['Content-Type'] = 'application/x-www-form-urlencoded'
+            h['Content-Type'] = 'application/json'
         conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=30)
         conn.request(method, path, body=body, headers=h)
         resp = conn.getresponse()
@@ -271,67 +271,72 @@ class WebServer(Hermetic):
 
 class LlmRouteTests(WebServer):
     def test_all_llm_routes_require_login(self):
-        for path in ('/llm/key', '/llm/models', '/llm/check', '/llm/clear'):
+        for path in ('/api/llm/key', '/api/llm/models', '/api/llm/check', '/api/llm/clear'):
             status, _, _ = self.request('POST', path, {'api_key': KEY}, auth=False)
             self.assertEqual(status, 401, path)
         self.assertEqual(llm_settings.load()[0], {})
 
     def test_save_key_then_page_shows_only_the_mask(self):
-        status, page, _ = self.request('POST', '/llm/key', {'api_key': KEY})
+        status, page, _ = self.request('POST', '/api/llm/key', {'api_key': KEY})
         self.assertEqual(status, 200)
         self.assertIn('已保存', page)
         self.assertIn(llm_settings.mask_key(KEY), page)
         self.assertNotIn(KEY, page)
         self.assertNotIn(KEY[8:], page)
-        _, index, resp = self.request('GET', '/')
+        _, index, resp = self.request('GET', '/api/settings')
         self.assertNotIn(KEY, index)
         self.assertIn(llm_settings.mask_key(KEY), index)
         self.assertEqual(resp.getheader('Cache-Control'), 'no-store')
         self.assertEqual(llm_settings.load()[0]['api_key'], KEY)
 
-    def test_the_key_input_is_a_password_field_and_never_prefilled(self):
+    def test_settings_api_never_returns_the_key_only_a_mask(self):
         llm_settings.save_key(KEY)
-        _, page, _ = self.request('GET', '/')
-        self.assertIn('type="password" name="api_key"', page)
-        self.assertNotIn('name="api_key" value', page)
+        status, body, _ = self.request('GET', '/api/settings')
+        self.assertEqual(status, 200)
+        self.assertNotIn(KEY, body)
+        self.assertNotIn(KEY[8:], body)
+        llm = json.loads(body)['llm']
+        self.assertEqual(llm['key']['masked'], llm_settings.mask_key(KEY))
+        self.assertTrue(llm['key']['configured'])
+        self.assertEqual(llm['model']['page_value'], '')      # 没保存过模型：输入框不预填
 
     def test_invalid_key_is_rejected_without_echo_and_without_saving(self):
         bad = 'sk-or-v1-leaky value with spaces'
-        status, page, _ = self.request('POST', '/llm/key', {'api_key': bad})
-        self.assertEqual(status, 200)
+        status, page, _ = self.request('POST', '/api/llm/key', {'api_key': bad})
+        self.assertEqual(status, 400)
         self.assertIn('格式不对', page)
         self.assertNotIn('leaky', page)
         self.assertEqual(llm_settings.load()[0], {})
 
     def test_models_form_and_clear(self):
-        self.request('POST', '/llm/key', {'api_key': KEY})
-        _, page, _ = self.request('POST', '/llm/models', {'model': 'a/b', 'sentinel_model': 'c/d'})
+        self.request('POST', '/api/llm/key', {'api_key': KEY})
+        _, page, _ = self.request('POST', '/api/llm/models', {'model': 'a/b', 'sentinel_model': 'c/d'})
         self.assertIn('模型已保存', page)
         self.assertEqual(llm_settings.load()[0], {'api_key': KEY, 'model': 'a/b', 'sentinel_model': 'c/d'})
-        _, page, _ = self.request('POST', '/llm/clear')
+        _, page, _ = self.request('POST', '/api/llm/clear')
         self.assertIn('已清除', page)
         self.assertEqual(llm_settings.load()[0], {'model': 'a/b', 'sentinel_model': 'c/d'})
         self.assertNotIn('OPENROUTER_API_KEY', os.environ)     # 清除后立即生效，不是等重启
 
     def test_page_key_takes_effect_in_the_running_server_and_clearing_falls_back_to_env(self):
         os.environ['OPENROUTER_API_KEY'] = OTHER
-        _, page, _ = self.request('POST', '/llm/key', {'api_key': KEY})
+        _, page, _ = self.request('POST', '/api/llm/key', {'api_key': KEY})
         self.assertIn('已被页面保存的覆盖', page)
         self.assertEqual(os.environ['OPENROUTER_API_KEY'], KEY)
-        self.request('POST', '/llm/clear')
+        self.request('POST', '/api/llm/clear')
         self.assertEqual(os.environ['OPENROUTER_API_KEY'], OTHER)
 
     def test_anthropic_provider_override_is_called_out(self):
         os.environ['LLM_PROVIDER'] = 'anthropic'
-        _, page, _ = self.request('GET', '/')
+        _, page, _ = self.request('GET', '/api/settings')
         self.assertIn('不会被用到', page)
 
     def test_check_button_sends_one_request_with_the_stored_key(self):
         fake = FakeOpenRouter()
         self.addCleanup(fake.close)
         os.environ['OPENROUTER_BASE_URL'] = fake.url
-        self.request('POST', '/llm/key', {'api_key': KEY})
-        status, page, _ = self.request('POST', '/llm/check')
+        self.request('POST', '/api/llm/key', {'api_key': KEY})
+        status, page, _ = self.request('POST', '/api/llm/check')
         self.assertEqual(status, 200)
         self.assertEqual(len(fake.requests), 1)
         self.assertEqual(fake.requests[0]['headers']['Authorization'], 'Bearer ' + KEY)
@@ -343,8 +348,8 @@ class LlmRouteTests(WebServer):
         self.addCleanup(fake.close)
         fake.script = [(401, {'error': {'message': 'bad key ' + KEY, 'code': 401}})]
         os.environ['OPENROUTER_BASE_URL'] = fake.url
-        self.request('POST', '/llm/key', {'api_key': KEY})
-        _, page, _ = self.request('POST', '/llm/check')
+        self.request('POST', '/api/llm/key', {'api_key': KEY})
+        _, page, _ = self.request('POST', '/api/llm/check')
         self.assertIn('authentication_error', page)
         self.assertNotIn(KEY, page)
 
@@ -352,21 +357,42 @@ class LlmRouteTests(WebServer):
         fake = FakeOpenRouter()
         self.addCleanup(fake.close)
         os.environ['OPENROUTER_BASE_URL'] = fake.url
-        _, page, _ = self.request('POST', '/llm/check')
+        _, page, _ = self.request('POST', '/api/llm/check')
         self.assertEqual(fake.requests, [])
         self.assertIn('不可用', page)
 
     def test_only_one_check_runs_at_a_time(self):
-        self.assertTrue(webapp._llm_check_lock.acquire(blocking=False))
+        self.assertTrue(api._llm_check_lock.acquire(blocking=False))
         try:
-            ok, lines = webapp.run_llm_check()
+            ok, lines = api.run_llm_check()
         finally:
-            webapp._llm_check_lock.release()
+            api._llm_check_lock.release()
         self.assertFalse(ok)
         self.assertIn('正在进行', lines[0])
 
     def test_unknown_llm_route_is_404(self):
-        self.assertEqual(self.request('POST', '/llm/nope')[0], 404)
+        self.assertEqual(self.request('POST', '/api/llm/nope')[0], 404)
+
+    def test_post_must_be_json_an_html_form_is_refused(self):
+        # 跨站的纯 HTML 表单发不出 application/json，所以 CSRF 校验之外这是第二道防线。
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=30)
+        conn.request('POST', '/api/llm/key', body=b'api_key=' + KEY.encode(), headers={
+            'Host': '127.0.0.1:%d' % self.port, 'Authorization': AUTH,
+            'Content-Type': 'application/x-www-form-urlencoded'})
+        resp = conn.getresponse()
+        resp.read()
+        conn.close()
+        self.assertEqual(resp.status, 415)
+        self.assertEqual(llm_settings.load()[0], {})
+
+    def test_malformed_json_is_a_400_not_a_crash(self):
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=30)
+        conn.request('POST', '/api/llm/key', body=b'{not json', headers={
+            'Host': '127.0.0.1:%d' % self.port, 'Authorization': AUTH, 'Content-Type': 'application/json'})
+        resp = conn.getresponse()
+        resp.read()
+        conn.close()
+        self.assertEqual(resp.status, 400)
 
 
 class CsrfTests(WebServer):
@@ -379,28 +405,28 @@ class CsrfTests(WebServer):
         for headers in ({'Sec-Fetch-Site': 'cross-site'}, {'Sec-Fetch-Site': 'same-site'},
                         {'Origin': 'https://evil.example'}, {'Origin': 'null'},
                         {'Origin': 'http://127.0.0.1:1'}):
-            status, page, _ = self.request('POST', '/llm/key', {'api_key': KEY}, headers=headers)
+            status, page, _ = self.request('POST', '/api/llm/key', {'api_key': KEY}, headers=headers)
             self.assertEqual(status, 403, headers)
         self.assertEqual(llm_settings.load()[0], {})
 
     def test_other_state_changing_routes_are_protected_too(self):
         evil = {'Origin': 'https://evil.example'}
-        self.assertEqual(self.request('POST', '/config', {'webhook_url': 'x'}, headers=evil)[0], 403)
-        self.assertEqual(self.request('POST', '/book/holding', {'symbol': '600000'}, headers=evil)[0], 403)
-        self.assertEqual(self.request('POST', '/postclose/run', {}, headers=evil)[0], 403)
-        self.assertEqual(self.request('POST', '/test-push', {}, headers=evil)[0], 403)
+        self.assertEqual(self.request('POST', '/api/settings/webhook', {'webhook_url': 'x'}, headers=evil)[0], 403)
+        self.assertEqual(self.request('POST', '/api/book/holding', {'symbol': '600000'}, headers=evil)[0], 403)
+        self.assertEqual(self.request('POST', '/api/postclose/run', {}, headers=evil)[0], 403)
+        self.assertEqual(self.request('POST', '/api/settings/test-push', {}, headers=evil)[0], 403)
 
     def test_same_origin_browser_and_plain_clients_are_allowed(self):
         for headers in ({'Sec-Fetch-Site': 'same-origin'}, {'Origin': 'http://' + self.host()}, {}):
-            self.assertEqual(self.request('POST', '/llm/key', {'api_key': KEY}, headers=headers)[0], 200, headers)
+            self.assertEqual(self.request('POST', '/api/llm/key', {'api_key': KEY}, headers=headers)[0], 200, headers)
 
     def test_csrf_check_comes_after_login(self):
-        status, _, _ = self.request('POST', '/llm/key', {'api_key': KEY}, auth=False,
+        status, _, _ = self.request('POST', '/api/llm/key', {'api_key': KEY}, auth=False,
                                     headers={'Origin': 'https://evil.example'})
         self.assertEqual(status, 401)
 
     def test_oversized_or_malformed_body_is_refused(self):
-        status, _, _ = self.request('POST', '/llm/key', {'api_key': 'x' * 200_000})
+        status, _, _ = self.request('POST', '/api/llm/key', {'api_key': 'x' * 200_000})
         self.assertEqual(status, 413)
         self.assertEqual(llm_settings.load()[0], {})
 

@@ -322,7 +322,7 @@ class WebTests(Base):
         return resp.status, data, resp
 
     def test_download_is_a_valid_archive_without_credentials(self):
-        status, data, resp = self.request('POST', '/backup/download')
+        status, data, resp = self.request('POST', '/api/backup/download')
         self.assertEqual(status, 200)
         self.assertEqual(resp.getheader('Content-Type'), 'application/gzip')
         self.assertIn('attachment', resp.getheader('Content-Disposition'))
@@ -336,39 +336,40 @@ class WebTests(Base):
             self.assertNotIn(SECRET.encode(), b''.join(tar.extractfile(m).read() for m in tar.getmembers() if m.isfile()))
 
     def test_download_requires_login_and_rejects_cross_site(self):
-        self.assertEqual(self.request('POST', '/backup/download', auth=False)[0], 401)
-        self.assertEqual(self.request('POST', '/backup/download', headers={'Origin': 'https://evil.example'})[0], 403)
-        self.assertEqual(self.request('POST', '/backup/download', headers={'Sec-Fetch-Site': 'cross-site'})[0], 403)
+        self.assertEqual(self.request('POST', '/api/backup/download', auth=False)[0], 401)
+        self.assertEqual(self.request('POST', '/api/backup/download', headers={'Origin': 'https://evil.example'})[0], 403)
+        self.assertEqual(self.request('POST', '/api/backup/download', headers={'Sec-Fetch-Site': 'cross-site'})[0], 403)
 
     def test_a_get_cannot_trigger_a_download(self):
-        status, data, resp = self.request('GET', '/backup/download')
+        status, data, resp = self.request('GET', '/api/backup/download')
         self.assertEqual(status, 404)
 
     def test_oversize_data_is_refused_with_an_explanation(self):
         with patch.object(backup, 'MAX_DOWNLOAD_BYTES', 10):
-            status, data, resp = self.request('POST', '/backup/download')
-        self.assertEqual(status, 200)
+            status, data, resp = self.request('POST', '/api/backup/download')
+        self.assertEqual(status, 413)
         self.assertIn('超过网页下载上限', data.decode())
         self.assertNotEqual(resp.getheader('Content-Type'), 'application/gzip')
 
     def test_empty_private_dir_is_refused_not_downloaded(self):
         with patch.dict(os.environ, {'PRIVATE_DATA_DIR': str(self.tmp / 'nothing')}):
-            status, data, resp = self.request('POST', '/backup/download')
+            status, data, resp = self.request('POST', '/api/backup/download')
+        self.assertEqual(status, 404)
         self.assertIn('没有任何文件可备份', data.decode())
 
-    def test_config_page_shows_backup_health_and_the_honest_caveat(self):
-        _, data, _ = self.request('GET', '/')
-        page = data.decode()
-        self.assertIn('私有数据备份', page)
-        self.assertIn('尚未运行', page)
-        self.assertIn('防不了这台机器本身丢失', page)
-        self.assertIn('不含凭据', page)
-        self.assertNotIn(SECRET, page)
+    def test_settings_api_reports_backup_health(self):
+        import json
+        settings = lambda: json.loads(self.request('GET', '/api/settings')[1].decode())
+        first = settings()
+        self.assertEqual(first['backup']['level'], 'none')
+        self.assertIn('尚未运行', first['backup']['text'])
+        self.assertNotIn(SECRET, json.dumps(first, ensure_ascii=False))
         self.snap()
-        page = self.request('GET', '/')[1].decode()
-        self.assertIn('最近成功快照', page)
+        second = settings()
+        self.assertEqual(second['backup']['level'], 'ok')
+        self.assertIn('最近成功快照', second['backup']['text'])
         with patch.object(backup, 'STALE_HOURS', -100000):
-            self.assertIn('需要留意', self.request('GET', '/')[1].decode())
+            self.assertEqual(settings()['backup']['level'], 'warn')
 
 
 if __name__ == '__main__':
