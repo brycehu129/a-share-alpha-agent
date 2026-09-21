@@ -357,7 +357,9 @@ class DashboardApiTests(ServerCase):
     def test_returns_data_with_stale_and_error_flags(self):
         import dashboard_page
         sample = {"agent": {"version": "x"}}
-        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1_700_000_000.0, False, None)):
+        no_extra = {"hotmoney_board": None, "limit_counts": None}      # 不读真实的 .history：服务器上那里有龙虎榜数据
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1_700_000_000.0, False, None)), \
+                patch("market_board.build", return_value=no_extra), patch("market_board.approx_limits", return_value=None):
             status, payload = self.json("GET", "/api/dashboard")
         self.assertEqual(status, 200)
         self.assertEqual(payload["data"], sample)
