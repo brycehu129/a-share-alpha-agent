@@ -1,0 +1,12 @@
+[Unit]
+Description=Alpha Shadow 资金流留存定时器（交易时段每 5 分钟，第 15 秒）
+
+[Timer]
+# 第 15 秒：错开 intraday 的整分钟（第 0 秒）和 sentinel-analyst（第 30 秒）。写法同 intraday.timer，
+# 只求最不容易出错；时段外的多余触发由引擎的时段闸门在读任何网络之前就退出。
+OnCalendar=Mon..Fri 09..15:00/5:15 Asia/Shanghai
+Persistent=false
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

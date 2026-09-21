@@ -16,7 +16,7 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).with_name('deploy.sh')
 RUN = dict(capture_output=True, text=True, errors='replace')
-TIMERS = ('daily', 'opening', 'postclose', 'intraday', 'sentinel-analyst', 'sentinel-reconcile')
+TIMERS = ('daily', 'opening', 'postclose', 'intraday', 'flow', 'sentinel-analyst', 'sentinel-reconcile')
 
 
 def sh(cmd, cwd=None):

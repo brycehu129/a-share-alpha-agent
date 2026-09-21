@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrow, direction, fmtDateTime, fmtMoney, fmtNum, fmtPct, fmtWan } from './format'
+import { arrow, direction, fmtDateTime, fmtFlow, flowLine, fmtMoney, fmtNum, fmtPct, fmtWan } from './format'
 
 describe('fmtPct', () => {
   it('positive values get a plus sign', () => expect(fmtPct(1.056)).toBe('+1.06%'))
@@ -48,5 +48,35 @@ describe('other formatters', () => {
   it('fmtDateTime trims seconds and timezone', () => {
     expect(fmtDateTime('2026-09-21T10:24:00+08:00')).toBe('2026-09-21 10:24')
     expect(fmtDateTime('')).toBe('—')
+  })
+})
+
+describe('fmtFlow（资金流：元 → 亿/万，带符号）', () => {
+  it('large amounts are in 亿 with two decimals', () => {
+    expect(fmtFlow(-224507630)).toBe('-2.25亿')
+    expect(fmtFlow(1.5e8)).toBe('+1.50亿')
+  })
+  it('smaller amounts are in 万', () => {
+    expect(fmtFlow(56000000)).toBe('+5600万')
+    expect(fmtFlow(-4e7)).toBe('-4000万')
+  })
+  it('zero has no sign', () => expect(fmtFlow(0)).toBe('0万'))
+  it('missing is a dash, never zero or NaN', () => {
+    expect(fmtFlow(null)).toBe('—')
+    expect(fmtFlow(undefined)).toBe('—')
+    expect(fmtFlow('abc')).toBe('—')
+  })
+})
+
+describe('flowLine（资金摘要一行）', () => {
+  const flow = { main: -224507630, main_30m: -4e7, large: -148816241 }
+  it('shows flow and order-book facts', () => {
+    expect(flowLine(flow, { outer_pct: 52.9, bid_ask_ratio: 5.18 })).toBe('主力 -2.25亿（近30分钟 -4000万）｜大单 -1.49亿｜外盘占比 52.9%｜委比 +5.2%')
+  })
+  it('omits whatever is missing instead of printing zero', () => {
+    expect(flowLine(null, { outer_pct: 52.9 })).toBe('外盘占比 52.9%')
+    expect(flowLine(flow, {})).toBe('主力 -2.25亿（近30分钟 -4000万）｜大单 -1.49亿')
+    expect(flowLine(null, null)).toBe('')
+    expect(flowLine(null, { bid_ask_ratio: -3 })).toBe('委比 -3.0%')
   })
 })

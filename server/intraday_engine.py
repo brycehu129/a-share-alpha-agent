@@ -179,6 +179,115 @@ def _append_jsonl(directory, name, record):
         pass
 
 
+# --- 留存与采集健康 ----------------------------------------------------------
+
+# 每轮每只新鲜报价存一行到 bars-<day>.jsonl。只存实际观测到的值，缺失就缺失、不补记。
+BAR_FIELDS = ('last', 'change_pct', 'high', 'low', 'volume_raw', 'amount_wan', 'turnover_pct', 'volume_ratio',
+              'outer_vol', 'inner_vol', 'bid1_price', 'bid1_vol', 'ask1_price', 'ask1_vol',
+              'bid_ask_diff', 'bid_ask_ratio')
+KEEP_DAYS = 60                   # 留存文件保留多久；超过的在每天第一轮顺手清掉
+SESSION_MINUTES = ((9 * 60 + 30, 11 * 60 + 30), (13 * 60, 15 * 60 + 3))   # 含 15:00–15:02 的收盘价轮
+
+
+def record_bars(directory, day, now, quotes):
+    """把本轮的新鲜报价追加进 bars-<day>.jsonl。指数不存（没有内外盘）。失败不影响 tick。"""
+    lines = []
+    for symbol in sorted(quotes):
+        q = quotes[symbol]
+        if q.get('is_index'):
+            continue
+        row = {'at': now.isoformat(), 'symbol': symbol, 'quote_at': q.get('quote_at')}
+        row.update({k: q.get(k) for k in BAR_FIELDS if q.get(k) is not None})
+        lines.append(json.dumps(row, ensure_ascii=False))
+    if not lines:
+        return
+    path = directory / ('bars-%s.jsonl' % day)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def prune_old(directory, day, keep_days=KEEP_DAYS):
+    """删掉超过 keep_days 天的 bars/flow/ticks/events/state 留存。只在当天第一轮调用；出错吞掉。"""
+    try:
+        cutoff = (datetime.fromisoformat(day) - timedelta(days=keep_days)).date().isoformat()
+        for p in directory.glob('*-????-??-??.*'):
+            m = re.search(r'(\d{4}-\d{2}-\d{2})\.', p.name)
+            if m and m.group(1) < cutoff and p.name.split('-')[0] in ('bars', 'flow', 'ticks', 'events', 'state'):
+                p.unlink()
+    except (OSError, ValueError):
+        pass
+
+
+def _in_session_by_clock(now):
+    session = live_quote.clock_session(now)
+    return session in ('morning', 'afternoon') or (session == 'closing' and now.time() < FINAL_TICK_BEFORE)
+
+
+def log_skip(directory, now, reason):
+    """连续竞价时段内被挡掉的轮也要留一行原因——否则"今天只跑了几十轮"没法查。午休、盘前盘后、
+    日历确认休市的例行跳过不记（每天会多出上千行噪音）。"""
+    try:
+        _append_jsonl(directory, 'ticks-%s.jsonl' % now.date().isoformat(),
+                      {'at': now.isoformat(), 'ran': False, 'skipped': reason})
+    except OSError:
+        pass
+
+
+def expected_ticks(day, now=None):
+    """截至 now，这一天理论上应该跑多少轮（按时段内的每一分钟算，含收盘价那三轮）。"""
+    now = now or datetime.now(CST)
+    today = now.date().isoformat()
+    total = sum(b - a for a, b in SESSION_MINUTES)
+    if day < today:
+        return total
+    if day > today:
+        return 0
+    minute = now.hour * 60 + now.minute
+    return sum(max(0, min(minute + 1, b) - a) for a, b in SESSION_MINUTES)
+
+
+def _read_jsonl(path):
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding='utf-8').splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue                       # 写到一半被读到的半行
+    return out
+
+
+def health(directory, day, now=None):
+    """给界面用的采集健康摘要：只读磁盘。"""
+    directory = Path(directory)
+    rows = _read_jsonl(directory / ('ticks-%s.jsonl' % day))
+    ran = [r for r in rows if r.get('ran')]
+    skips = {}
+    for r in rows:
+        if not r.get('ran') and r.get('skipped'):
+            skips[r['skipped']] = skips.get(r['skipped'], 0) + 1
+    state = {}
+    sp = _state_path(directory, day)
+    if sp.exists():
+        try:
+            state = json.loads(sp.read_text(encoding='utf-8'))
+        except ValueError:
+            state = {}
+    gaps = state.get('gaps') or []
+    return {'day': day, 'ticks': len(ran), 'expected': expected_ticks(day, now),
+            'first_tick': ran[0]['at'][11:19] if ran else None, 'last_tick': ran[-1]['at'][11:19] if ran else None,
+            'gap_count': len(gaps), 'gap_seconds': sum(g.get('seconds', 0) for g in gaps),
+            'gaps': [{'from': g['from'][11:19], 'to': g['to'][11:19], 'seconds': g['seconds']} for g in gaps[-10:]],
+            'skips': [{'reason': k, 'count': v} for k, v in sorted(skips.items(), key=lambda kv: -kv[1])],
+            'observations': {s: e.get('n', 0) for s, e in (state.get('extremes') or {}).items()}}
+
+
 # --- 信号 → 事件 ------------------------------------------------------------
 
 def normalize_signal(sig):
@@ -357,6 +466,8 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
     ok, reason = gate(now, calendar)
     if not ok and not force:
         summary['skipped'] = reason
+        if not dry_run and calendar != 'closed' and _in_session_by_clock(now):
+            log_skip(directory, now, reason)
         return summary
     session = live_quote.clock_session(now)
     if not ok:
@@ -368,6 +479,8 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
         symbols = symbols()
     if not symbols:
         summary['skipped'] = '没有需要监控的股票'
+        if not dry_run and _in_session_by_clock(now):
+            log_skip(directory, now, summary['skipped'])
         return summary
 
     lock = None
@@ -379,6 +492,7 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
         except OSError:
             lock.close()
             summary['skipped'] = '上一轮仍在运行，本轮跳过（不排队，避免状态互相覆盖）'
+            log_skip(directory, now, summary['skipped'])
             return summary
     try:
         state = load_state(directory, now.date().isoformat()) if directory.exists() else new_state(now.date().isoformat())
@@ -415,6 +529,12 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
             _append_jsonl(directory, 'ticks-%s.jsonl' % state['date'], log)
             for e in events:
                 _append_jsonl(directory, 'events-%s.jsonl' % state['date'], e)
+            try:                               # 留存不能拖垮 tick：写失败只丢这一轮的留存
+                record_bars(directory, state['date'], now, tick['quotes'])
+                if state['tick_count'] == 1:
+                    prune_old(directory, state['date'])
+            except OSError:
+                pass
         return summary
     except Exception as exc:
         summary.update(error='%s: %s' % (type(exc).__name__, str(exc)[:200]))

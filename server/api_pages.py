@@ -9,10 +9,34 @@ import llm_settings
 # --- 看板 ---------------------------------------------------------------------------------
 
 
+def _with_market_board(data):
+    """给看板补上龙虎榜/涨跌停数据（服务端读 .history，不走 GitHub 导出）。有什么补什么，
+    没有就不加 key；任何问题都退回原数据——市场行情页不能因为补充数据读不出来而整页失败。
+    不改动 dashboard_page 缓存里的原 dict。"""
+    try:
+        import market_board
+        history = history_dir()
+        extra = market_board.build(history)
+        out = dict(data)
+        if extra["hotmoney_board"] and not data.get("hotmoney_board"):
+            out["hotmoney_board"] = extra["hotmoney_board"]
+        if extra["limit_counts"]:
+            out["limit_counts"] = extra["limit_counts"]
+        else:
+            approx = market_board.approx_limits(history)
+            if approx:
+                out["limit_approx"] = approx
+        return out
+    except Exception:
+        return data
+
+
 @get("/api/dashboard")
 def api_dashboard(query):
     import dashboard_page
     data, fetched_at, stale, error = dashboard_page.get_dashboard_data(force_refresh=query.get("refresh") == "1")
+    if isinstance(data, dict):
+        data = _with_market_board(data)
     return {"data": data, "fetched_at": dashboard_page.iso_cst(fetched_at) if fetched_at else None,
             "stale": stale, "error": error}
 
@@ -41,6 +65,18 @@ def _declared(h):
     return " · ".join(parts)
 
 
+NO_ALERTS = {"count": 0, "urgent": 0}
+
+
+def _alert_counts():
+    """每行"告警 N"按钮的角标。只读磁盘；任何问题都当没有——持仓页不能被告警文件拖垮。"""
+    try:
+        import sentinel_view
+        return sentinel_view.alert_counts()
+    except Exception:
+        return {}
+
+
 @get("/api/book")
 def api_book(query):
     """持仓/自选页顺带展示现价。取价失败不影响账本本身：行情只是锦上添花，
@@ -61,6 +97,7 @@ def api_book(query):
         except (OSError, ValueError) as exc:
             trouble = "行情获取失败，只显示账本数据：%s" % exc
 
+    alerts = _alert_counts()
     rows, total_cost, total_value = [], 0.0, 0.0
     for h in holdings:
         q = quotes.get(h["symbol"])
@@ -70,7 +107,8 @@ def api_book(query):
             total_value += last * h["shares"]
         rows.append({"symbol": h["symbol"], "name": h.get("name") or "", "shares": h["shares"],
                      "cost_price": h["cost_price"], "last": last,
-                     "pct": (last / h["cost_price"] - 1) * 100 if last else None, "declared": _declared(h)})
+                     "pct": (last / h["cost_price"] - 1) * 100 if last else None, "declared": _declared(h),
+                     "alerts": alerts.get(h["symbol"], NO_ALERTS)})
     summary = None
     if total_cost and total_value:
         pnl = total_value - total_cost
@@ -82,7 +120,8 @@ def api_book(query):
         watch_rows.append({"symbol": w["symbol"], "name": w.get("name") or "",
                            "intent_label": portfolio_book.INTENT_LABEL.get(w.get("intent"), w.get("intent", "")),
                            "last": float(q["last"]) if q else None,
-                           "change_pct": float(q["change_pct"]) if q else None, "note": w.get("note") or ""})
+                           "change_pct": float(q["change_pct"]) if q else None, "note": w.get("note") or "",
+                           "alerts": alerts.get(w["symbol"], NO_ALERTS)})
     return {"holdings": rows, "watchlist": watch_rows, "summary": summary, "trouble": trouble,
             "hold_types": [{"value": k, "label": v} for k, v in portfolio_book.HOLD_TYPE_LABEL.items()],
             "intents": [{"value": k, "label": v} for k, v in portfolio_book.INTENT_LABEL.items()]}
@@ -270,5 +309,47 @@ def api_postclose_run(body):
 
 @get("/api/sentinel")
 def api_sentinel(query):
+    """"全天告警汇总"抽屉：告警、情景对账、周报、采集健康。只读磁盘。"""
     import sentinel_view
     return sentinel_view.sentinel_payload(query.get("day"))
+
+
+def _live_flow(symbol, day):
+    """某只股票"此刻"的资金流与盘口事实。联网，所以每一项都独立降级：取不到就给原因，不让整个接口失败。
+    只有查看的就是今天时才联网——历史日期接口本来就查不到，只用留存。"""
+    import money_flow
+    import sentinel_view
+    from datetime import datetime
+    from collect_quotes import CST
+    out = {"flow_now": None, "flow_error": None, "book_now": None, "flow_table": None,
+           "flow_source_note": money_flow.SOURCE_NOTE}
+    if day != datetime.now(CST).strftime("%Y-%m-%d"):
+        return out
+    try:
+        flow = money_flow.fetch_flow(symbol)
+        out["flow_now"] = money_flow.compact(flow)
+        out["flow_table"] = sentinel_view.with_outer(money_flow.half_hour_table(flow["rows"]), symbol, day)
+    except money_flow.FlowError as exc:
+        out["flow_error"] = str(exc)
+    try:
+        import live_quote
+        quotes = live_quote.snapshot([symbol])["quotes"]
+        out["book_now"] = money_flow.book_facts(quotes[0]) if quotes else None
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+@get("/api/sentinel/symbol")
+def api_sentinel_symbol(query):
+    """持仓/自选某一行的"告警"抽屉：这只股票当天的告警、情景、留存的资金流表，加上此刻的资金流。"""
+    import sentinel_view
+    symbol = sentinel_view.safe_symbol(query.get("symbol"))
+    if symbol is None:
+        raise ApiError("股票代码格式不对：只支持沪深个股，例如 sz300458。")
+    payload = sentinel_view.symbol_payload(symbol, query.get("day"))
+    live = _live_flow(symbol, payload["day"])
+    if live["flow_table"] is None:                 # 没联网（历史日期或取不到）：用留存的表
+        live["flow_table"] = payload["flow_table"]
+    payload.update(live)
+    return payload

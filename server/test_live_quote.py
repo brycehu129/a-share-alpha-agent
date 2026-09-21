@@ -59,6 +59,22 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(q['quote_date'], '2026-09-18')
         self.assertTrue(q['timezone_verified'])
 
+    def test_order_flow_fields_are_extracted_and_missing_ones_stay_none(self):
+        """内外盘/盘口字段：下标按实测 sz300458 核对（外盘 213103 + 内盘 189631 ≈ 总量 402733 手）。"""
+        q = live_quote.parse_one(CN, 'sh600519', NOW)
+        self.assertEqual(q['outer_vol'], '12061')
+        self.assertEqual(q['inner_vol'], '12829')
+        self.assertEqual(q['bid1_price'], '1257.12')
+        fields = CN.split('~')
+        fields[74] = '5.18'
+        fields[50] = '221'
+        q = live_quote.parse_one('~'.join(fields), 'sh600519', NOW)
+        self.assertEqual(q['bid_ask_ratio'], '5.18')
+        self.assertEqual(q['bid_ask_diff'], '221')
+        fields[74] = ''
+        q = live_quote.parse_one('~'.join(fields), 'sh600519', NOW)
+        self.assertIsNone(q['bid_ask_ratio'])   # 缺失就是缺失，不是 0
+
     def test_index_limit_prices_of_minus_one_become_none(self):
         """指数没有涨跌停，源返回 -1；当成 -1 元的限价会让"距跌停"算出荒谬结果。"""
         q = live_quote.parse_one(CN_INDEX, 'sh000001', NOW)

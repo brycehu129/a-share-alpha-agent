@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, date
 from pathlib import Path
 
 import minute_data
+import money_flow
 import scenario_ledger
 import sentinel as sn
 from collect_quotes import CST
@@ -53,14 +54,22 @@ HOLD = {'symbol': 'sz000001', 'name': '测试股', 'shares': 1000, 'cost_price':
 
 
 class Harness:
-    def __init__(self, holdings=None, watch=None, series=None):
+    def __init__(self, holdings=None, watch=None, series=None, flow=None):
         self.dir = Path(tempfile.mkdtemp())
         self.sent = []
         self.holdings, self.watch = holdings if holdings is not None else [HOLD], watch or []
         self.series = series if series is not None else bars()
+        self.flow, self.flow_calls = flow, []               # flow 为 None 或异常 = 资金流不可用
+
+        def flow_fn(sym, now):
+            self.flow_calls.append(sym)
+            if self.flow is None or isinstance(self.flow, Exception):
+                raise self.flow or money_flow.FlowError('资金流暂不可用')
+            return self.flow
         self.s = sn.Sentinel(Path('.'), book_fn=lambda: (self.holdings, self.watch), series_fn=lambda sym: self.series,
                              send_fn=lambda text: self.sent.append(text) or {'sent': True, 'chunks': 1},
-                             minute_fn=lambda sym, now: minute(), directory=self.dir)
+                             minute_fn=lambda sym, now: minute(), directory=self.dir,
+                             flow_fn=flow_fn, flow_dir=self.dir / 'intraday')
 
 
 def keys(signals, active=None):
@@ -178,13 +187,55 @@ class AfterTickTests(unittest.TestCase):
         rec = json.loads(next(sn.sdir(h.dir).glob('alerts-*.jsonl')).read_text().splitlines()[0])
         self.assertEqual(rec['events'][0]['evidence']['batch_sha256'], 'abc')
 
-    def test_chart_and_pending_item_are_saved(self):
+    def test_alert_text_and_stored_block_carry_flow_and_order_book_facts(self):
+        flow = {'as_of': '1000', 'main': -224507630.0, 'xlarge': -75691389.0, 'large': -148816241.0, 'mid': 1.0,
+                'small': 2.0, 'main_5m': -1e6, 'main_30m': -4e7, 'peak_main': 1e6, 'peak_time': '0940',
+                'from_peak': -2e8, 'flip': None}
+        h = Harness(flow=flow)
+        h.s.evaluate(tick([quote(outer_vol='213103', inner_vol='189631', bid_ask_ratio='5.18')]))
+        h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
+        self.assertIn('资金｜主力 -2.25亿（近30分钟 -4000万）｜大单 -1.49亿｜外盘占比 52.9%｜委比 +5.2%', h.sent[0])
+        rec = json.loads(next(sn.sdir(h.dir).glob('alerts-*.jsonl')).read_text().splitlines()[0])
+        block = rec['blocks'][0]
+        self.assertEqual((block['symbol'], block['urgent'], block['price']), ('sz000001', True, '9.4'))
+        self.assertEqual(block['events'], [{'kind': 'sentinel.stop_hit', 'severity': 'urgent', 'detail': '触及止损'}])
+        self.assertEqual(block['flow']['main'], -224507630.0)
+        self.assertNotIn('rows', block['flow'])
+        self.assertEqual(block['book'], {'outer_pct': 52.9, 'bid_ask_ratio': 5.18})
+        self.assertIn('触及止损', block['text'])                          # 单股原文，界面直接展示
+        self.assertEqual(rec['text'].count('【紧急】'), 1)               # 完整推送原文仍在
+
+    def test_alert_goes_out_without_the_flow_line_when_flow_is_unavailable(self):
+        h = Harness(flow=None); self.prime(h)
+        h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
+        self.assertEqual(len(h.sent), 1)
+        self.assertNotIn('资金｜', h.sent[0])
+        rec = json.loads(next(sn.sdir(h.dir).glob('alerts-*.jsonl')).read_text().splitlines()[0])
+        self.assertIsNone(rec['blocks'][0]['flow'])
+
+    def test_recent_recorded_flow_is_used_without_a_network_call_and_a_stale_one_is_not(self):
+        h = Harness(flow=None); self.prime(h)
+        (h.dir / 'intraday').mkdir()
+        row = {'symbol': 'sz000001', 'as_of': '0958', 'main': 5e7, 'xlarge': 3e7, 'large': 2e7, 'mid': 0.0,
+               'small': 0.0, 'main_5m': 1e6, 'main_30m': 2e6, 'peak_main': 5e7, 'peak_time': '0958', 'from_peak': 0.0}
+        recent = {**row, 'at': (NOW - timedelta(minutes=4)).isoformat()}
+        (h.dir / 'intraday' / 'flow-2026-09-21.jsonl').write_text(json.dumps(recent) + '\n')
+        h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
+        self.assertEqual(h.flow_calls, [])                                # 直接用留存，没联网
+        self.assertIn('主力 +5000万', h.sent[0])
+        old = {**row, 'at': (NOW - timedelta(minutes=30)).isoformat()}
+        (h.dir / 'intraday' / 'flow-2026-09-21.jsonl').write_text(json.dumps(old) + '\n')
+        h.s.cache.clear(); self.prime(h)
+        h.s.after_tick({'events': [event(kind='sentinel.target_hit', severity='normal')], 'dry_run': False}, now=NOW)
+        self.assertEqual(h.flow_calls, ['sz000001'])                       # 留存太旧：联网取（这里取不到）
+        self.assertNotIn('资金｜主力 +5000万', h.sent[1])
+
+    def test_pending_item_is_saved_and_no_chart_is_generated(self):
         h = Harness(); self.prime(h)
         r = h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
-        charts = list((sn.sdir(h.dir) / 'charts').glob('*.svg'))
-        self.assertEqual(len(charts), 1)
-        self.assertIn('<svg', charts[0].read_text())
+        self.assertFalse((sn.sdir(h.dir) / 'charts').exists())          # 分时图已取消：不再生成、不再存盘
         pend = json.loads(next((sn.sdir(h.dir) / 'pending').glob('*.json')).read_text())
+        self.assertNotIn('chart', pend)
         self.assertEqual(pend['symbol'], 'sz000001')
         self.assertTrue(pend['is_holding'])
         self.assertEqual(pend['limits'], {'limit_up': 11.0, 'limit_down': 9.0})
@@ -193,7 +244,7 @@ class AfterTickTests(unittest.TestCase):
         self.assertEqual(r['alerts'], 1)
 
     def test_alert_still_goes_out_when_minute_data_is_unavailable(self):
-        """最需要快的东西不能被慢的/不稳的东西拖住：分时取不到，就没有图和均价线，告警照发。"""
+        """最需要快的东西不能被慢的/不稳的东西拖住：分时取不到，就没有均价线，告警照发。"""
         h = Harness(); self.prime(h)
 
         def boom(sym, now):
@@ -201,7 +252,7 @@ class AfterTickTests(unittest.TestCase):
         h.s.minute_fn = boom
         h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
         self.assertEqual(len(h.sent), 1)
-        self.assertFalse(list((sn.sdir(h.dir) / 'charts').glob('*.svg')) if (sn.sdir(h.dir) / 'charts').exists() else [])
+        self.assertNotIn('均价线', h.sent[0])
 
     def test_minute_fetching_has_a_total_time_budget_so_the_alert_still_goes_out(self):
         """tick 服务的 systemd 时限只有 50 秒，而每次取分时最长 20 秒。预算用完就不再取，告警照发。"""

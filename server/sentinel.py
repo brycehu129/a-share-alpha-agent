@@ -8,7 +8,7 @@
 最需要快的东西不该被最慢的东西拖住。告警文字必须自己就能读懂（谁、现价、为什么触发、
 你的成本/止损），情景研判是随后追加的一条，不是告警的前提。
 
-规则见 sentinel_rules.py，情景与校验见 scenario_analyst.py，图见 chart_svg.py，
+规则见 sentinel_rules.py，情景与校验见 scenario_analyst.py，资金流与盘口事实见 money_flow.py，
 留档与收盘对账见 scenario_ledger.py。
 
 只推可操作的事件；系统只提醒、永远不下单。
@@ -23,19 +23,23 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import flow_recorder
+import intraday_engine as ie
 import live_check
 import live_quote
 import minute_data
+import money_flow
 import portfolio_book
 import scenario_analyst
 import scenario_ledger
 import sentinel_rules as sr
-from chart_svg import render as render_chart
 from collect_quotes import CST
 
 INDEX_SYMBOLS = ['sh000001', 'sz399006', 'sh000300']       # 大盘环境：一起取，同一批请求，不额外花钱
 INDEX_LABEL = {'sh000001': '上证', 'sz399006': '创业板', 'sh000300': '沪深300'}
-ALERT_MINUTE_BUDGET_S = 15     # 告警阶段取分时（画图/均价线）的总时间预算：超了就不再取，告警照发
+ALERT_MINUTE_BUDGET_S = 15     # 告警阶段取分时（均价线）的总时间预算：超了就不再取，告警照发
+ALERT_FLOW_BUDGET_S = 30       # 告警阶段联网取资金流的截止时刻（自 after_tick 开始计）：过了就不再取，告警照发
+FLOW_RECORD_MAX_AGE_S = 600    # 采集器留存的资金流不超过这个年龄就直接用，省一次联网
 PENDING_MAX_AGE_S = 900        # 待分析事件超过 15 分钟就不再分析：那时的情景早已过时
 AI_DAILY_MAX = int(os.environ.get('SENTINEL_AI_MAX_PER_DAY', '15'))
 HINT_LABEL = {'hold': '继续持有', 'add': '可考虑买入/加仓', 'reduce': '可考虑减仓', 'wait': '观望',
@@ -102,6 +106,9 @@ def format_alert(block):
         ctx.append('量比 %s' % q['volume_ratio'])
     if ctx:
         lines.append('｜'.join(ctx))
+    flow = money_flow.flow_line(block.get('flow'), block.get('book'))
+    if flow:
+        lines.append(flow)
     h = block.get('holding')
     if h:
         own = ['持仓 %d股 成本 %.2f（%+.2f%%）' % (h['shares'], h['cost_price'], h['unrealized_pct'])]
@@ -131,13 +138,16 @@ def format_scenarios(entry, name, last):
 # --- 哨兵（注册进盘中引擎的评估器 + 事后处理）----------------------------------
 
 class Sentinel:
-    def __init__(self, history, book_fn=None, series_fn=None, send_fn=None, minute_fn=None, directory=None):
+    def __init__(self, history, book_fn=None, series_fn=None, send_fn=None, minute_fn=None, directory=None,
+                 flow_fn=None, flow_dir=None):
         self.history = Path(history)
         self.directory = directory
         self.book_fn = book_fn or (lambda: (portfolio_book.load('holdings'), portfolio_book.load('watchlist')))
         self.series_fn = series_fn or (lambda s: live_check.load_series(self.history, s)[0])
         self.send_fn = send_fn or wecom_send
         self.minute_fn = minute_fn or minute_data.fetch_minute
+        self.flow_fn = flow_fn or money_flow.fetch_flow
+        self.flow_dir = flow_dir
         self.cache, self.market = {}, {}
 
     def symbols(self):
@@ -212,11 +222,7 @@ class Sentinel:
                     minute = None
             holding = live_check.holding_facts(c['holding'], c['quote']) if c['holding'] else None
             levels = scenario_analyst.key_levels(c['quote'], c['facts'], day or {}, c['holding'], c['limits'])
-            chart = None
-            if minute:
-                chart = self._save_chart(now, symbol, c['name'], minute, levels, float(c['quote']['last']),
-                                         evs[0]['detail'][:40])
-            pending_ids.append(self._enqueue(now, symbol, c, evs, day, holding, levels, chart, minute))
+            pending_ids.append(self._enqueue(now, symbol, c, evs, day, holding, levels, minute))
             # 固定时间节点（09:45/13:05/14:30）本身不是"可操作事件"——单独推一条"开盘方向确立"
             # 没有任何信息，5 只股票 × 3 个节点每天就是 15 条噪音。它的价值是触发情景研判：
             # 节点事件只入队，等研判进程给出带价位的情景后才推那一条有内容的消息。
@@ -224,29 +230,44 @@ class Sentinel:
             actionable = [e for e in evs if not e['kind'].startswith('sentinel.node_')]
             if not actionable:
                 continue
+            # 资金流是事实展示，不是告警的前提：取不到就没有这一行，告警照发。
+            flow = self._flow(symbol, now, started)
             blocks.append({'symbol': symbol, 'name': c['name'], 'events': evs, 'quote': c['quote'], 'holding': holding,
-                           'day': day, 'urgent': any(e['severity'] == 'urgent' for e in evs)})
+                           'day': day, 'urgent': any(e['severity'] == 'urgent' for e in evs),
+                           'flow': flow, 'book': money_flow.book_facts(c['quote'])})
         if not blocks:
             return {'alerts': 0, 'pending': pending_ids}
         blocks.sort(key=lambda b: not b['urgent'])
-        text = '\n\n'.join(format_alert(b) for b in blocks) + '\n\n' + DISCLAIMER
+        texts = [format_alert(b) for b in blocks]
+        text = '\n\n'.join(texts) + '\n\n' + DISCLAIMER
         result = self.send_fn(text)
+        # blocks：按股票拆开的一份（界面按股票查告警用）。text 仍是推送出去的完整原文。
+        stored = [{'symbol': b['symbol'], 'name': b['name'], 'urgent': b['urgent'], 'text': t,
+                   'price': b['quote'].get('last'), 'change_pct': b['quote'].get('change_pct'),
+                   'events': [{'kind': e['kind'], 'severity': e['severity'], 'detail': e['detail']} for e in b['events']],
+                   'flow': money_flow.compact(b['flow']), 'book': b['book']} for b, t in zip(blocks, texts)]
         _append(self.directory, 'alerts-%s.jsonl' % now.strftime('%Y-%m-%d'),
                 {'at': now.isoformat(), 'symbols': [b['symbol'] for b in blocks], 'text': text, 'push': result,
+                 'blocks': stored,
                  'events': [{'key': e['key'], 'kind': e['kind'], 'evidence': e.get('evidence')} for e in events]})
         return {'alerts': len(blocks), 'push': result, 'pending': pending_ids}
 
-    def _save_chart(self, now, symbol, name, minute, levels, last, subtitle):
+    def _flow(self, symbol, now, started):
+        """告警当时的资金流。优先用采集器最近一次留存（不联网），没有再联网取一次；总预算用完就放弃。"""
         try:
-            svg = render_chart(symbol, name, minute, levels, last=last, subtitle=subtitle)
+            rows = flow_recorder.series(self.flow_dir or ie.data_dir(), now.date().isoformat(), symbol)
+        except OSError:
+            rows = []
+        if rows and (now - datetime.fromisoformat(rows[-1]['at'])).total_seconds() <= FLOW_RECORD_MAX_AGE_S:
+            return rows[-1]
+        if time.monotonic() - started >= ALERT_FLOW_BUDGET_S:
+            return None
+        try:
+            return self.flow_fn(symbol, now)
         except Exception:
             return None
-        path = sdir(self.directory) / 'charts' / ('%s-%s.svg' % (symbol, now.strftime('%Y%m%d-%H%M%S')))
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(svg, encoding='utf-8')
-        return str(path.name)
 
-    def _enqueue(self, now, symbol, c, events, day, holding, levels, chart, minute):
+    def _enqueue(self, now, symbol, c, events, day, holding, levels, minute):
         pid = '%s-%s-%s' % (now.strftime('%Y%m%d-%H%M%S'), symbol, uuid.uuid4().hex[:6])
         recent = [(b['t'], b['price']) for b in (minute['bars'][-30:] if minute else [])][::3]
         entry = {'symbol': symbol, 'name': c['name'], 'roles': [r for r, ok in (('holding', c['holding']), ('watchlist', c['watch'])) if ok],
@@ -257,7 +278,7 @@ class Sentinel:
                  'watch': {k: c['watch'].get(k) for k in ('intent', 'buy_low', 'buy_high')} if c['watch'] else None,
                  'key_levels': levels, 'recent_minutes': recent, 'issues': c['issues']}
         _write_json(sdir(self.directory) / 'pending' / (pid + '.json'), {
-            'id': pid, 'created_at': now.isoformat(), 'symbol': symbol, 'chart': chart, 'market': self.market,
+            'id': pid, 'created_at': now.isoformat(), 'symbol': symbol, 'market': self.market,
             'node': max(events, key=lambda e: e['severity'] == 'urgent')['kind'],
             'is_holding': bool(c['holding']), 't_base': (c['holding'] or {}).get('t_base_shares') or 0,
             'limits': {k: c['limits'].get(k) for k in ('limit_up', 'limit_down')}, 'entry': entry})
@@ -403,7 +424,7 @@ def _analyze(d, directory, files, now, day, snapshot_fn, analyze_fn, send_fn, ai
         scenario_ledger.record(directory, day, issued, sym, item['entry']['name'], item['node'], last, e['scenarios'],
                                e['action_hint'], e['confidence'], item['is_holding'],
                                meta={'prompt_version': meta.get('prompt_version'), 'model': meta.get('model'),
-                                     'triggers': [t['kind'] for t in item['entry']['triggers']], 'chart': item.get('chart')},
+                                     'triggers': [t['kind'] for t in item['entry']['triggers']]},
                                delivered=bool(push.get('sent')))
     for m in kept.values():
         for p in m['files']:

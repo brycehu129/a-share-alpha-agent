@@ -76,6 +76,17 @@ class EngineTests(Base):
         self.assertIn('6 分钟', r['message'])
         self.assertEqual(hc.check_engine(self.ctx('10:00:20'))['level'], hc.OK)
 
+    def test_a_skip_record_is_not_a_successful_run(self):
+        """引擎在时段内被挡掉时会记一行 ran=false 的原因；它不能被当成"最后一次成功运行"。"""
+        self.ticks([self.tick('09:58:00'), {'at': at('10:00:00').isoformat(), 'ran': False, 'skipped': '交易日历状态为 unknown'}])
+        r = hc.check_engine(self.ctx('10:04:30'))
+        self.assertEqual(r['level'], hc.CRIT)
+        self.assertIn('6 分钟', r['message'])                       # 按 09:58 那轮算，不是 10:00 的跳过记录
+        self.ticks([{'at': at('10:00:00').isoformat(), 'ran': False, 'skipped': '交易日历状态为 unknown'}])
+        r = hc.check_engine(self.ctx('10:00:20'))
+        self.assertEqual(r['level'], hc.CRIT)
+        self.assertIn('交易日历状态为 unknown', r['message'])      # 直接把原因带出来
+
     def test_yesterdays_ticks_do_not_count_as_todays(self):
         self.ticks([self.tick('09:58:00')], day='2026-09-18')
         self.assertEqual(hc.check_engine(self.ctx('10:00:00'))['level'], hc.CRIT)

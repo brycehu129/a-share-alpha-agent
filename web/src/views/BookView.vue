@@ -1,10 +1,12 @@
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { get, post } from '../api'
 import { useLoad } from '../composables/useLoad'
 import { useAction } from '../composables/useAction'
 import { fmtMoney, fmtNum, direction } from '../format'
 import RiseFall from '../components/RiseFall.vue'
+import SymbolAlertsDrawer from '../components/book/SymbolAlertsDrawer.vue'
+import DayAlertsDrawer from '../components/book/DayAlertsDrawer.vue'
 
 const { data, loading, error, reload } = useLoad(() => get('/api/book'))
 
@@ -16,6 +18,14 @@ function emptyHolding() {
 function emptyWatch() {
   return { symbol: '', name: '', intent: 'watch', note: '', buy_low: '', buy_high: '' }
 }
+
+// 哨兵不再是独立页面：每一行的「告警」按钮打开这只股票的告警详情（含资金流），页头按钮看全天汇总。
+const alertDrawer = reactive({ open: false, symbol: '', name: '' })
+const dayDrawer = ref(false)
+function openAlerts(row) {
+  Object.assign(alertDrawer, { open: true, symbol: row.symbol, name: row.name || row.symbol })
+}
+const alertType = (row) => (row.alerts && row.alerts.urgent ? 'danger' : row.alerts && row.alerts.count ? 'warning' : '')
 
 const saveHolding = useAction()
 const saveWatch = useAction()
@@ -50,7 +60,10 @@ async function remove(kind, row) {
 
 <template>
   <div>
-    <div class="page-head"><h1>持仓与自选股</h1></div>
+    <div class="page-head">
+      <h1>持仓与自选股</h1>
+      <el-button @click="dayDrawer = true">全天告警汇总</el-button>
+    </div>
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px">
       <el-button size="small" @click="reload()">重试</el-button>
     </el-alert>
@@ -75,6 +88,9 @@ async function remove(kind, row) {
             <el-table-column label="现价" width="100" align="right"><template #default="{ row }"><span class="num">{{ fmtNum(row.last) }}</span></template></el-table-column>
             <el-table-column label="浮动" width="110" align="right"><template #default="{ row }"><RiseFall :value="row.pct" /></template></el-table-column>
             <el-table-column prop="declared" label="你的声明 / 备注" min-width="180" />
+            <el-table-column label="告警" width="92" align="center">
+              <template #default="{ row }"><el-button size="small" :type="alertType(row)" plain @click="openAlerts(row)">告警 {{ row.alerts ? row.alerts.count : 0 }}</el-button></template>
+            </el-table-column>
             <el-table-column label="" width="80" align="center">
               <template #default="{ row }"><el-button size="small" type="danger" plain @click="remove('holding', row)">删除</el-button></template>
             </el-table-column>
@@ -121,6 +137,9 @@ async function remove(kind, row) {
             <el-table-column label="现价" width="100" align="right"><template #default="{ row }"><span class="num">{{ fmtNum(row.last) }}</span></template></el-table-column>
             <el-table-column label="涨跌" width="110" align="right"><template #default="{ row }"><RiseFall :value="row.change_pct" /></template></el-table-column>
             <el-table-column prop="note" label="备注" min-width="160" />
+            <el-table-column label="告警" width="92" align="center">
+              <template #default="{ row }"><el-button size="small" :type="alertType(row)" plain @click="openAlerts(row)">告警 {{ row.alerts ? row.alerts.count : 0 }}</el-button></template>
+            </el-table-column>
             <el-table-column label="" width="80" align="center">
               <template #default="{ row }"><el-button size="small" type="danger" plain @click="remove('watch', row)">删除</el-button></template>
             </el-table-column>
@@ -151,6 +170,9 @@ async function remove(kind, row) {
         <p class="muted">持仓数据只保存在这台服务器本地，不会进入公开的 Git 仓库，也不会发送给券商。系统永远不会自动下单。</p>
       </template>
     </div>
+
+    <SymbolAlertsDrawer v-model="alertDrawer.open" :symbol="alertDrawer.symbol" :name="alertDrawer.name" />
+    <DayAlertsDrawer v-model="dayDrawer" />
   </div>
 </template>
 

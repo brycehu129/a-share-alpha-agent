@@ -1,0 +1,11 @@
+[Unit]
+Description=Alpha Shadow 资金流留存（持仓/自选 → 东方财富分钟资金流 → intraday/flow-<日期>.jsonl）
+After=network-online.target
+
+[Service]
+Type=oneshot
+# PRIVATE_DATA_DIR / CONFIG_PATH 等都在这个文件里；留存落在其下的 intraday/，不进 git。
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_flow.sh
+# 采集自己有 40 秒预算；超过 45 秒的一次直接杀掉，别拖到下一次去和它重叠。
+TimeoutStartSec=45

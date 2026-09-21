@@ -355,6 +355,101 @@ class RunTickTests(unittest.TestCase):
         self.assertEqual(r['skipped'], '没有需要监控的股票')
 
 
+class RetentionAndHealthTests(unittest.TestCase):
+    """每分钟取到的报价要留下来，并且能回答"今天到底采集了多少轮、为什么少"。"""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+
+    def tick(self, now, symbols=('sz000001',), calendar='open', quotes=None, **kw):
+        qs = quotes if quotes is not None else [quote(s, when=now) for s in symbols]
+        return ie.run_tick(Path('.'), list(symbols), now=now, directory=self.dir,
+                           snapshot_fn=lambda s: snap(*qs), calendar_fn=lambda d: calendar, evaluators=[], **kw)
+
+    def rows(self, name):
+        return [json.loads(l) for l in (self.dir / name).read_text().splitlines()]
+
+    def test_each_tick_appends_one_row_per_fresh_quote_with_only_observed_fields(self):
+        q = quote(when=at(10, 0))
+        q.update(outer_vol='213103', inner_vol='189631', bid_ask_ratio=None)     # 委比缺失
+        self.tick(at(10, 0), quotes=[q])
+        self.tick(at(10, 1), symbols=('sz000001', 'sz000002'))
+        rows = self.rows('bars-2026-09-21.jsonl')
+        self.assertEqual([(r['symbol'], r['at'][11:16]) for r in rows],
+                         [('sz000001', '10:00'), ('sz000001', '10:01'), ('sz000002', '10:01')])
+        self.assertEqual(rows[0]['outer_vol'], '213103')
+        self.assertNotIn('bid_ask_ratio', rows[0])       # 缺失就缺失，不补 0
+
+    def test_stale_quotes_and_indexes_are_not_recorded(self):
+        idx = {**quote('sh000001', when=at(10, 0)), 'is_index': True}
+        self.tick(at(10, 0), symbols=('sz000001', 'sh000001'), quotes=[quote(age=999, when=at(10, 0)), idx])
+        self.assertFalse((self.dir / 'bars-2026-09-21.jsonl').exists())
+
+    def test_dry_run_records_nothing(self):
+        self.tick(at(10, 0), dry_run=True)
+        self.assertFalse(list(self.dir.glob('*')))
+
+    def test_in_session_skips_leave_a_reason_but_routine_skips_do_not(self):
+        self.tick(at(10, 0), calendar='unknown(ValueError)')       # 日历读不出来：值得记
+        self.tick(at(10, 1), calendar='closed')                    # 确认休市：例行
+        self.tick(at(12, 0))                                       # 午休：例行
+        self.tick(at(20, 0))                                       # 盘后：例行
+        rows = self.rows('ticks-2026-09-21.jsonl')
+        self.assertEqual(len(rows), 1)
+        self.assertFalse(rows[0]['ran'])
+        self.assertIn('unknown', rows[0]['skipped'])
+
+    def test_overlapping_run_and_empty_book_are_logged(self):
+        self.dir.mkdir(parents=True, exist_ok=True)
+        held = open(self.dir / '.lock', 'a')
+        ie._lock_file(held)
+        try:
+            self.tick(at(10, 0))
+        finally:
+            ie._unlock_file(held)
+            held.close()
+        ie.run_tick(Path('.'), [], now=at(10, 1), directory=self.dir, calendar_fn=lambda d: 'open')
+        reasons = [r['skipped'] for r in self.rows('ticks-2026-09-21.jsonl')]
+        self.assertTrue(any('上一轮' in r for r in reasons))
+        self.assertIn('没有需要监控的股票', reasons)
+
+    def test_expected_ticks_counts_session_minutes_only(self):
+        self.assertEqual(ie.expected_ticks('2026-09-18', at(10, 0)), 243)          # 过去的整天
+        self.assertEqual(ie.expected_ticks('2026-09-22', at(10, 0)), 0)            # 还没到
+        self.assertEqual(ie.expected_ticks('2026-09-21', at(9, 29)), 0)
+        self.assertEqual(ie.expected_ticks('2026-09-21', at(9, 30, 1)), 1)
+        self.assertEqual(ie.expected_ticks('2026-09-21', at(11, 29)), 120)
+        self.assertEqual(ie.expected_ticks('2026-09-21', at(12, 30)), 120)         # 午休不增加
+        self.assertEqual(ie.expected_ticks('2026-09-21', at(13, 0)), 121)
+        self.assertEqual(ie.expected_ticks('2026-09-21', at(16, 0)), 243)
+
+    def test_health_summarises_ticks_gaps_skips_and_per_symbol_observations(self):
+        self.tick(at(10, 0), symbols=('sz000001', 'sz000002'))
+        self.tick(at(10, 1), symbols=('sz000001', 'sz000002'))
+        self.tick(at(10, 6), symbols=('sz000001', 'sz000002'))                    # 中间断了 5 分钟
+        self.tick(at(10, 7), calendar='unknown')
+        h = ie.health(self.dir, '2026-09-21', at(10, 8))
+        self.assertEqual((h['ticks'], h['expected']), (3, 39))
+        self.assertEqual((h['first_tick'], h['last_tick']), ('10:00:00', '10:06:00'))
+        self.assertEqual((h['gap_count'], h['gap_seconds']), (1, 300))
+        self.assertEqual(h['gaps'][0], {'from': '10:01:00', 'to': '10:06:00', 'seconds': 300})
+        self.assertEqual(h['skips'], [{'reason': '交易日历状态为 unknown，不是确认开市', 'count': 1}])
+        self.assertEqual(h['observations'], {'sz000001': 3, 'sz000002': 3})
+
+    def test_health_of_a_day_with_no_data_is_all_zero_not_an_error(self):
+        h = ie.health(self.dir, '2026-09-18', at(10, 0))
+        self.assertEqual((h['ticks'], h['expected'], h['gap_count'], h['skips'], h['observations']),
+                         (0, 243, 0, [], {}))
+
+    def test_old_retention_files_are_pruned_on_the_first_tick_of_a_day(self):
+        self.dir.mkdir(parents=True, exist_ok=True)
+        for name in ('bars-2026-06-01.jsonl', 'flow-2026-06-01.jsonl', 'bars-2026-09-01.jsonl', 'sentinel-note.txt'):
+            (self.dir / name).write_text('x')
+        self.tick(at(10, 0))
+        left = sorted(p.name for p in self.dir.glob('*') if p.name.startswith(('bars', 'flow', 'sentinel')))
+        self.assertEqual(left, ['bars-2026-09-01.jsonl', 'bars-2026-09-21.jsonl', 'sentinel-note.txt'])
+
+
 class ObservedOnlyDisciplineTests(unittest.TestCase):
     """这一层的核心纪律：只认实际观测到的报价，漏了就是漏了，绝不事后补记。"""
 

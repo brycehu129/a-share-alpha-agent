@@ -62,7 +62,7 @@ function cycleTheme() {
   text-decoration: none;
   white-space: nowrap;
 }
-/* 窄屏不折叠成「···」：六个入口始终全部可见，放不下时横向滑动 */
+/* 窄屏不折叠成「···」：所有入口始终全部可见，放不下时横向滑动 */
 .nav.el-menu { flex: 1; min-width: 0; border-bottom: none; background: transparent; height: 56px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .nav.el-menu::-webkit-scrollbar { display: none; }
 .nav .el-menu-item { font-weight: 600; height: 56px; flex: none; }

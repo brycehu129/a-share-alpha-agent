@@ -43,7 +43,11 @@ COMMON = {'name': 1, 'code': 2, 'last': 3, 'previous_close': 4, 'open': 5,
 # 只有 A 股（含 A 股指数）才有的字段下标。
 CN_EXTRA = {'volume_raw': 36, 'amount_wan': 37, 'turnover_pct': 38, 'pe': 39,
             'amplitude_pct': 43, 'float_cap_yi': 44, 'total_cap_yi': 45, 'pb': 46,
-            'limit_up': 47, 'limit_down': 48, 'volume_ratio': 49}
+            'limit_up': 47, 'limit_down': 48, 'volume_ratio': 49,
+            # 盘口与内外盘（实测 sz300458：外盘+内盘≈总量，委差=买五量合计-卖五量合计，委比=委差/(买五+卖五)）。
+            # 外盘/内盘是当日累计的"主动买/主动卖"手数；这些字段缺失就是缺失，不当 0 处理。
+            'outer_vol': 7, 'inner_vol': 8, 'bid1_price': 9, 'bid1_vol': 10, 'ask1_price': 19, 'ask1_vol': 20,
+            'bid_ask_diff': 50, 'bid_ask_ratio': 74}
 
 
 class QuoteError(ValueError):

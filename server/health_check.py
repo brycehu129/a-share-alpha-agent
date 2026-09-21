@@ -47,7 +47,7 @@ WARN_CONFIRM_RUNS = 2
 CRIT_REMIND_H = 2
 WARN_REMIND_H = 12
 QUIET_START, QUIET_END = clock_time(22, 30), clock_time(7, 0)
-FREQUENT_UNITS = ('alpha-shadow-intraday', 'alpha-shadow-sentinel-analyst')      # 每分钟一次：偶发失败不算严重
+FREQUENT_UNITS = ('alpha-shadow-intraday', 'alpha-shadow-sentinel-analyst', 'alpha-shadow-flow')      # 高频（每分钟或每 5 分钟）：偶发失败不算严重
 LLM_FATAL = {'authentication_error', 'payment_required', 'permission_denied', 'model_not_found'}
 QUEUE_STUCK_MIN = 10
 DISK_WARN_PCT, DISK_CRIT_PCT = 15, 5
@@ -107,6 +107,12 @@ def _read_jsonl_tail(path, n):
     return out
 
 
+def _ran_ticks(path, n):
+    """ticks 日志里既有跑完的轮，也有「时段内被挡掉」的跳过记录（ran=false，只用来解释为什么少跑）。
+    引擎存活/行情/评估器检查只该看真正跑完的轮，否则一条跳过记录会被当成"最后一次成功运行"。"""
+    return [t for t in _read_jsonl_tail(path, n * 3) if t.get('ran', True)][-n:]
+
+
 def _monitored_symbols():
     try:
         return portfolio_book.all_symbols()
@@ -130,9 +136,12 @@ def check_engine(ctx):
         return check('engine', title, SKIP, '不在连续运行时段')
     if not _monitored_symbols():
         return check('engine', title, SKIP, '没有持仓/自选，引擎无事可做')
-    ticks = _read_jsonl_tail(intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today), 12)
+    ticks = _ran_ticks(intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today), 12)
     if not ticks:
-        return check('engine', title, CRIT, '今天到现在一轮都没有成功运行（找不到 ticks-%s.jsonl）。' % ctx.today)
+        path = intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today)
+        skips = [t.get('skipped') for t in _read_jsonl_tail(path, 5) if t.get('skipped')]
+        why = '，最近一次被跳过的原因：%s' % skips[-1] if skips else '（找不到 ticks-%s.jsonl）' % ctx.today
+        return check('engine', title, CRIT, '今天到现在一轮都没有成功运行%s。' % why)
     last = datetime.fromisoformat(ticks[-1]['at'])
     age = (ctx.now - last).total_seconds()
     if age > ENGINE_MAX_AGE_S:
@@ -144,7 +153,7 @@ def check_quotes(ctx):
     title = '行情源'
     if ctx.calendar_state() != 'open' or not ctx.engine_window():
         return check('quotes', title, SKIP, '不在连续运行时段')
-    ticks = _read_jsonl_tail(intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today), 10)
+    ticks = _ran_ticks(intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today), 10)
     if len(ticks) < 5:
         return check('quotes', title, SKIP, '样本不足（%d 轮）' % len(ticks))
     bad = [t for t in ticks if t.get('failures') or t.get('fresh') == 0 or t.get('error')]
@@ -157,7 +166,7 @@ def check_evaluators(ctx):
     title = '盘中评估器'
     if ctx.calendar_state() != 'open' or not ctx.engine_window():
         return check('evaluators', title, SKIP, '不在连续运行时段')
-    ticks = _read_jsonl_tail(intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today), 10)
+    ticks = _ran_ticks(intraday_engine.data_dir() / ('ticks-%s.jsonl' % ctx.today), 10)
     errors = [e for t in ticks for e in (t.get('evaluator_errors') or [])]
     if errors:
         return check('evaluators', title, WARN, '最近有评估器报错（一个坏了不会影响别的，但它负责的信号已经静默）：%s' % errors[-1][:160])

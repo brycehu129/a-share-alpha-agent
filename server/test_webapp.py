@@ -90,7 +90,7 @@ class SinglePageAppTests(ServerCase):
         self.assertEqual(resp.getheader("Location"), "/dashboard")
 
     def test_every_page_route_serves_the_same_app_shell(self):
-        """六个页面共用同一个 index.html（同一个顶栏）——导航不会因为切页而变样或跳位置。"""
+        """所有页面（含两个旧链接）共用同一个 index.html（同一个顶栏）——导航不会因为切页而变样或跳位置。"""
         bodies = set()
         for route in webapp.SPA_ROUTES:
             status, data, resp = self.request("GET", route)
@@ -101,6 +101,8 @@ class SinglePageAppTests(ServerCase):
             bodies.add(data)
         self.assertEqual(len(bodies), 1)
         self.assertEqual(self.request("GET", "/dashboard/")[0], 200)          # 末尾斜杠也行
+        for route in ("/candidates", "/sentinel", "/postclose"):               # 新页面，以及必须继续可打开的旧链接
+            self.assertIn(route, webapp.SPA_ROUTES)
 
     def test_pages_and_api_and_static_require_login(self):
         for path in ("/", "/dashboard", "/settings", "/api/settings", "/static/index.html"):
@@ -258,6 +260,99 @@ class BookApiTests(ServerCase):
         self.assertEqual(status, 403)
 
 
+class SentinelInBookApiTests(ServerCase):
+    """哨兵不再是独立页面：告警详情挂在持仓/自选每一行的按钮里。"""
+
+    def write_alerts(self, day, *records):
+        d = self.tmp / "private" / "sentinel"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / ("alerts-%s.jsonl" % day)).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records))
+
+    def rec(self, blocks, at="10:00:00", sent=True):
+        import sentinel_view
+        day = sentinel_view.safe_day(None)
+        return {"at": "%sT%s+08:00" % (day, at), "text": "x", "push": {"sent": sent},
+                "symbols": [b["symbol"] for b in blocks], "blocks": blocks}
+
+    def block(self, symbol, urgent=False):
+        return {"symbol": symbol, "name": "测试", "urgent": urgent, "text": "【哨兵】测试 %s" % symbol, "events": [],
+                "flow": {"main": -1e8}, "book": {"outer_pct": 40.0}}
+
+    def test_book_rows_carry_todays_alert_counts_and_zero_when_none(self):
+        import sentinel_view
+        self.write_alerts(sentinel_view.safe_day(None), self.rec([self.block("sh600519", True), self.block("sz000001")]),
+                          self.rec([self.block("sh600519")], "10:05:00"))
+        with patch("live_quote.snapshot", return_value={"quotes": [], "failures": []}):
+            self.json("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1300"})
+            self.json("POST", "/api/book/watch", {"symbol": "000001", "intent": "buy"})
+            self.json("POST", "/api/book/watch", {"symbol": "000002", "intent": "buy"})
+            _, book = self.json("GET", "/api/book")
+        self.assertEqual(book["holdings"][0]["alerts"], {"count": 2, "urgent": 1})
+        self.assertEqual({w["symbol"]: w["alerts"] for w in book["watchlist"]},
+                         {"sz000001": {"count": 1, "urgent": 0}, "sz000002": {"count": 0, "urgent": 0}})
+
+    def test_a_broken_alert_file_never_breaks_the_book_page(self):
+        with patch("live_quote.snapshot", return_value={"quotes": [], "failures": []}):
+            self.json("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1300"})
+            with patch("sentinel_view.alert_counts", side_effect=RuntimeError("boom")):
+                status, book = self.json("GET", "/api/book")
+        self.assertEqual(status, 200)
+        self.assertEqual(book["holdings"][0]["alerts"], {"count": 0, "urgent": 0})
+
+    def test_symbol_endpoint_rejects_anything_that_is_not_a_sh_sz_stock_code(self):
+        for bad in ("", "../x", "hkHSI", "sz00000", "sz000001;x"):
+            status, payload = self.json("GET", "/api/sentinel/symbol?symbol=%s" % bad)
+            self.assertEqual(status, 400, bad)
+            self.assertIn("股票代码", payload["message"])
+
+    def test_symbol_endpoint_returns_alerts_flow_now_and_the_source_note(self):
+        import sentinel_view
+        self.write_alerts(sentinel_view.safe_day(None), self.rec([self.block("sz000001", True)]))
+        flow = {"rows": [{"t": "0931", "main": -1.0, "small": 0.0, "mid": 0.0, "large": -1.0, "xlarge": 0.0}],
+                "as_of": "0931", "main": -1.0, "xlarge": 0.0, "large": -1.0, "mid": 0.0, "small": 0.0,
+                "main_5m": -1.0, "main_30m": -1.0, "peak_main": 0.0, "peak_time": "0931", "from_peak": -1.0, "flip": None}
+        quote = {"outer_vol": "60", "inner_vol": "40", "bid_ask_ratio": "5.0"}
+        with patch("money_flow.fetch_flow", return_value=flow), \
+                patch("live_quote.snapshot", return_value={"quotes": [quote], "failures": []}):
+            status, p = self.json("GET", "/api/sentinel/symbol?symbol=sz000001")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(p["alerts"]), 1)
+        self.assertTrue(p["alerts"][0]["urgent"])
+        self.assertEqual(p["alerts"][0]["flow"], {"main": -1e8})              # 告警当时的快照
+        self.assertEqual(p["flow_now"]["main"], -1.0)                          # 此刻的
+        self.assertEqual(p["book_now"], {"outer_pct": 60.0, "bid_ask_ratio": 5.0})
+        self.assertEqual(p["flow_table"][0]["t"], "09:31")
+        self.assertIn("非交易所披露", p["flow_source_note"])
+        self.assertIsNone(p["flow_error"])
+
+    def test_flow_failure_degrades_to_a_reason_and_the_rest_still_loads(self):
+        import money_flow
+        import sentinel_view
+        self.write_alerts(sentinel_view.safe_day(None), self.rec([self.block("sz000001")]))
+        with patch("money_flow.fetch_flow", side_effect=money_flow.FlowError("资金流请求失败（URLError）")), \
+                patch("live_quote.snapshot", side_effect=OSError("down")):
+            status, p = self.json("GET", "/api/sentinel/symbol?symbol=sz000001")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(p["alerts"]), 1)
+        self.assertIsNone(p["flow_now"])
+        self.assertIn("URLError", p["flow_error"])
+        self.assertIsNone(p["book_now"])
+        self.assertEqual(p["flow_table"], [])                                  # 没有留存也没有联网：空表，不是报错
+
+    def test_a_past_day_never_goes_to_the_network(self):
+        with patch("money_flow.fetch_flow") as fetch, patch("live_quote.snapshot") as snap:
+            status, p = self.json("GET", "/api/sentinel/symbol?symbol=sz000001&day=2026-09-18")
+        self.assertEqual(status, 200)
+        fetch.assert_not_called()
+        snap.assert_not_called()
+        self.assertEqual(p["day"], "2026-09-18")
+
+    def test_day_summary_has_no_charts_and_reports_collection_health(self):
+        _, p = self.json("GET", "/api/sentinel?day=2026-09-18")
+        self.assertNotIn("charts", p)
+        self.assertEqual((p["collection"]["ticks"], p["collection"]["expected"]), (0, 243))
+
+
 class DashboardApiTests(ServerCase):
     def test_returns_data_with_stale_and_error_flags(self):
         import dashboard_page
@@ -273,6 +368,44 @@ class DashboardApiTests(ServerCase):
         self.assertEqual(status, 200)                      # 拉取失败是「数据状态」，不是接口错误：前端要显示失败原因
         self.assertIsNone(payload["data"])
         self.assertEqual(payload["error"], "无法连接GitHub")
+
+    def test_market_board_is_added_from_the_server_side_history_and_the_cached_dict_is_untouched(self):
+        sample = {"agent": {"version": "x"}}
+        extra = {"hotmoney_board": {"hm_date": "2026-09-15", "limit_date": "2026-09-15", "hm_rows": [], "hm_total_rows": 0,
+                                    "limit_rows": [], "limit_total_rows": 0},
+                 "limit_counts": {"date": "2026-09-15", "up": 3, "down": 1, "broken": 2}}
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1_700_000_000.0, False, None)), \
+                patch("market_board.build", return_value=extra):
+            _, payload = self.json("GET", "/api/dashboard")
+        self.assertEqual(payload["data"]["limit_counts"]["up"], 3)
+        self.assertEqual(payload["data"]["hotmoney_board"]["hm_date"], "2026-09-15")
+        self.assertEqual(sample, {"agent": {"version": "x"}})                   # 缓存里的原对象没被改
+
+    def test_without_exact_limit_data_the_approximate_counts_are_offered_and_labelled(self):
+        sample = {"agent": {}}
+        none = {"hotmoney_board": None, "limit_counts": None}
+        approx = {"up": 12, "down": 3, "source_generated_at": "t", "note": "近似"}
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)), \
+                patch("market_board.build", return_value=none), patch("market_board.approx_limits", return_value=approx):
+            _, payload = self.json("GET", "/api/dashboard")
+        self.assertNotIn("limit_counts", payload["data"])
+        self.assertEqual(payload["data"]["limit_approx"]["up"], 12)
+
+    def test_a_failure_in_the_supplement_never_fails_the_dashboard(self):
+        sample = {"agent": {"version": "x"}}
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)), \
+                patch("market_board.build", side_effect=RuntimeError("boom")):
+            status, payload = self.json("GET", "/api/dashboard")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["data"], sample)
+
+    def test_an_existing_hotmoney_board_from_the_export_is_not_overwritten(self):
+        sample = {"hotmoney_board": {"hm_date": "from-export"}}
+        extra = {"hotmoney_board": {"hm_date": "from-server"}, "limit_counts": None}
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)), \
+                patch("market_board.build", return_value=extra), patch("market_board.approx_limits", return_value=None):
+            _, payload = self.json("GET", "/api/dashboard")
+        self.assertEqual(payload["data"]["hotmoney_board"]["hm_date"], "from-export")
 
     def test_refresh_flag_bypasses_the_cache(self):
         with patch("dashboard_page.get_dashboard_data", return_value=(None, None, False, "x")) as get:

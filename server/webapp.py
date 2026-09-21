@@ -5,8 +5,10 @@
 - 后端只用标准库（http.server），不引入任何第三方依赖，和本仓库其余脚本一致。
   前端是 web/ 里的 Vue 工程，`cd web && npm run build` 构建到 server/static/，构建产物提交进 git，
   服务器不需要 Node。
-- 所有页面（看板/哨兵/提议/盘后分析/持仓与自选/设置）是同一个单页应用，共用一个顶栏：
+- 所有页面（看板/候选池/持仓与自选/提议/设置）是同一个单页应用，共用一个顶栏：
   这些客户端路由（SPA_ROUTES）都返回同一个 index.html，由前端路由决定显示哪一页。
+  /sentinel 和 /postclose 已并入持仓与自选、看板，但旧链接（含企业微信推送里的 /postclose）仍要能打开，
+  所以保留在 SPA_ROUTES 里，由前端路由重定向到新位置。
 - 数据接口在 api.py（设置页）和 api_pages.py（其余页面），Handler 只负责鉴权、CSRF 和 IO。
 - 这是本项目的常驻进程，和 GitHub Actions 的日级批处理流程完全独立、互不影响。
 - 配置（webhook 地址）落盘到 CONFIG_PATH。部署在容器上时必须把这个路径挂载到持久卷，
@@ -47,7 +49,8 @@ CST = timezone(timedelta(hours=8))
 # 前端（web/，Vue）的构建产物；`cd web && npm run build` 生成，提交进 git，服务器不需要 Node。
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 # 单页应用的客户端路由：这些路径都返回同一个 index.html，由前端路由决定显示哪一页。
-SPA_ROUTES = ("/dashboard", "/sentinel", "/proposals", "/postclose", "/book", "/settings")
+SPA_ROUTES = ("/dashboard", "/candidates", "/book", "/proposals", "/settings",
+              "/sentinel", "/postclose")     # 后两个是旧链接：前端重定向到 /book、/dashboard?tab=postclose
 
 
 def check_auth(headers, password):

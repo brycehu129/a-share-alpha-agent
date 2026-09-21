@@ -18,7 +18,7 @@ const limitText = (r) => (r.limit === 'U' && r.limit_times ? `${r.limit_times}�
 <template>
   <el-card shadow="never">
     <template #header><div class="card-title"><span>游资龙虎榜 / 涨跌停池</span><span class="sub">{{ summary }}</span></div></template>
-    <p v-if="empty" class="muted" style="margin-top: 0"><b>游资明细（hm_detail）/涨跌停（limit_list_d）接口目前只回补了近期少数交易日，尚未接入每日自动同步，定时任务还没写入过这部分数据。</b></p>
+    <p v-if="empty" class="muted" style="margin-top: 0"><b>服务器上还没有游资明细（hm_detail）/涨跌停池（limit_list_d）的数据。</b>这两个接口目前只回补过近期少数交易日，需要先运行「Tushare扩展数据同步」；同步到之后这里会自动显示最近一次有数据的交易日。</p>
     <template v-else>
       <p class="muted" style="margin-top: 0"><b>这两组数据独立于上方候选股票，展示整个交易日的榜单。</b>接口覆盖有限，某天缺失不代表当天无游资活动或无涨跌停，只是还没同步到；游资龙虎榜按净买卖额绝对值取前30笔（同一股票当天可能有多笔独立交易，不做合并）。</p>
       <div class="board-grid">
