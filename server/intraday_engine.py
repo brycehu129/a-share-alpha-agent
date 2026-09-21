@@ -23,7 +23,6 @@
 这一期没有注册任何评估器，引擎单独跑起来只做轮询、留档、gap 记录。
 """
 import argparse
-import fcntl
 import json
 import os
 import re
@@ -32,6 +31,11 @@ import tempfile
 import time as _time
 from datetime import datetime, time as clock_time, timedelta
 from pathlib import Path
+
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
 
 import live_quote
 import minute_data
@@ -47,6 +51,22 @@ FINAL_TICK_BEFORE = clock_time(15, 3)   # 15:00 收盘后的最后一轮，抓�
 
 SEVERITY_ORDER = {'urgent': 0, 'normal': 1}
 EVALUATORS = []
+
+
+def _lock_file(lock):
+    if os.name == 'nt':
+        lock.seek(0)
+        msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock_file(lock):
+    if os.name == 'nt':
+        lock.seek(0)
+        msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def register(fn):
@@ -355,7 +375,7 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
         directory.mkdir(parents=True, exist_ok=True)
         lock = open(directory / '.lock', 'a')
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _lock_file(lock)
         except OSError:
             lock.close()
             summary['skipped'] = '上一轮仍在运行，本轮跳过（不排队，避免状态互相覆盖）'
@@ -401,8 +421,10 @@ def run_tick(history, symbols, now=None, snapshot_fn=None, minute_fn=None, calen
         return summary
     finally:
         if lock:
-            fcntl.flock(lock, fcntl.LOCK_UN)
-            lock.close()
+            try:
+                _unlock_file(lock)
+            finally:
+                lock.close()
 
 
 def default_symbols():

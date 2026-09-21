@@ -331,17 +331,18 @@ class RunTickTests(unittest.TestCase):
 
     def test_overlapping_run_is_skipped_not_queued(self):
         """一分钟一轮：上一轮还没结束就不能再开一轮，否则两个进程互相覆盖状态。"""
-        import fcntl
         self.dir.mkdir(parents=True, exist_ok=True)
+        (self.dir / '.lock').write_text('existing lock')
         held = open(self.dir / '.lock', 'a')
-        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        ie._lock_file(held)
         try:
             r = self.run_tick()
             self.assertFalse(r['ran'])
             self.assertIn('上一轮', r['skipped'])
         finally:
-            fcntl.flock(held, fcntl.LOCK_UN)
+            ie._unlock_file(held)
             held.close()
+        self.assertTrue(self.run_tick()['ran'])
 
     def test_corrupt_state_file_is_quarantined_not_fatal(self):
         self.dir.mkdir(parents=True, exist_ok=True)
