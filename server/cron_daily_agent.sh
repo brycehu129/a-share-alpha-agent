@@ -48,7 +48,11 @@ rm -f "$GATE_OUTPUT"
 
 if [ "$JOB_STATUS" = "success" ]; then
   if [ "$COLLECT" = "true" ] && [ "${REPORT_SLOT:-}" != "prepare" ]; then
-    python3 -u server/report_pipeline.py --history "$HISTORY_DIR" --run-id "$REPORT_ID" || warn_optional report_pipeline
+    # report_pipeline 拒绝复用已存在的临时库（防止混入旧数据）。默认的 ./results 在服务器上是常驻目录，
+    # 第一次成功后每一轮都会因此失败——看板的指数快照曾因此一直停在 9-18。每轮用全新的临时目录，用完即删。
+    RESULTS_DIR="$(mktemp -d)"
+    python3 -u server/report_pipeline.py --history "$HISTORY_DIR" --run-id "$REPORT_ID" --results "$RESULTS_DIR" || warn_optional report_pipeline
+    rm -rf "$RESULTS_DIR"
     python3 -u server/research_pipeline.py --history "$HISTORY_DIR" --run-id "$REPORT_ID" || warn_optional research_pipeline
   fi
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Alpha Shadow 市场复盘数据定时器
+
+[Timer]
+# 东财龙虎榜 16:30 起陆续发布、17:30 前补全：跑两次，第二次覆盖第一次。
+OnCalendar=Mon..Fri 16:30:00 Asia/Shanghai
+OnCalendar=Mon..Fri 17:30:00 Asia/Shanghai
+Persistent=false
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

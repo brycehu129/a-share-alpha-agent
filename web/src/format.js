@@ -84,3 +84,31 @@ export function todayStr(d = new Date()) {
 export function lotSize(symbol) {
   return String(symbol).startsWith('sh688') ? 200 : 100
 }
+
+// 成交额/市值（元，不带符号）→ 万亿 / 亿 / 万：2031513487711 → 2.03万亿，9468亿，5878万。缺失是破折号。
+export function fmtAmount(v) {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return '—'
+  const n = Math.abs(Number(v))
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + '万亿'
+  if (n >= 1e9) return Math.round(n / 1e8) + '亿'
+  if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿'
+  return (n / 1e4).toFixed(0) + '万'
+}
+
+// 相比上一交易日的放量/缩量文案：'缩量 456亿（-2.2%）'。两个数任一缺失返回空串。
+export function fmtVolumeTrend(delta, pct) {
+  if (delta === null || delta === undefined || Number.isNaN(Number(delta))) return ''
+  const word = delta > 0 ? '放量' : delta < 0 ? '缩量' : '持平'
+  if (delta === 0) return word
+  return `${word} ${fmtAmount(delta)}${pct === null || pct === undefined ? '' : `（${fmtPct(pct, 1)}）`}`
+}
+
+// 连板文案：1 → 首板，3 → 3连板。
+export function fmtBoards(n) {
+  return !n || n <= 1 ? '首板' : `${n}连板`
+}
+
+// 'YYYY-MM-DD' → 'MM-DD'（同一页里日期很多时用短的）。
+export function shortDate(iso) {
+  return iso ? String(iso).slice(5, 10) : '—'
+}

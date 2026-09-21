@@ -505,67 +505,94 @@ class SentinelInBookApiTests(ServerCase):
         self.assertEqual((p["collection"]["ticks"], p["collection"]["expected"]), (0, 243))
 
 
+LIVE = {"fetched_at": "2026-09-21T16:30:00+08:00", "errors": {}, "session": "post_close", "complete": True,
+        "indices": {"quotes": [{"symbol": "sh000001", "name": "上证指数", "last": "3949.91", "change_pct": "0.97",
+                                "quote_at": "2026-09-21T16:14:00+08:00"}]},
+        "turnover": None, "flow": None, "breadth": None}
+
+
 class DashboardApiTests(ServerCase):
+    def setUp(self):
+        super().setUp()
+        # 看板会去取实时行情：测试里绝不能真的联网。
+        p = patch("market_review.market_stats", return_value=LIVE)
+        self.live = p.start()
+        self.addCleanup(p.stop)
+
     def test_returns_data_with_stale_and_error_flags(self):
-        import dashboard_page
         sample = {"agent": {"version": "x"}}
-        no_extra = {"hotmoney_board": None, "limit_counts": None}      # 不读真实的 .history：服务器上那里有龙虎榜数据
-        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1_700_000_000.0, False, None)), \
-                patch("market_board.build", return_value=no_extra), patch("market_board.approx_limits", return_value=None):
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1_700_000_000.0, False, None)):
             status, payload = self.json("GET", "/api/dashboard")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["data"], sample)
+        self.assertEqual(payload["data"]["agent"], {"version": "x"})
         self.assertFalse(payload["stale"])
         self.assertTrue(payload["fetched_at"].endswith("+08:00"))
+        self.live.side_effect = RuntimeError("boom")
         with patch("dashboard_page.get_dashboard_data", return_value=(None, None, False, "无法连接GitHub")):
             status, payload = self.json("GET", "/api/dashboard")
         self.assertEqual(status, 200)                      # 拉取失败是「数据状态」，不是接口错误：前端要显示失败原因
         self.assertIsNone(payload["data"])
         self.assertEqual(payload["error"], "无法连接GitHub")
 
-    def test_market_board_is_added_from_the_server_side_history_and_the_cached_dict_is_untouched(self):
-        sample = {"agent": {"version": "x"}}
-        extra = {"hotmoney_board": {"hm_date": "2026-09-15", "limit_date": "2026-09-15", "hm_rows": [], "hm_total_rows": 0,
-                                    "limit_rows": [], "limit_total_rows": 0},
-                 "limit_counts": {"date": "2026-09-15", "up": 3, "down": 1, "broken": 2}}
-        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1_700_000_000.0, False, None)), \
-                patch("market_board.build", return_value=extra):
+    def test_live_indices_replace_the_stale_snapshot_and_the_cached_dict_is_untouched(self):
+        sample = {"market": {"quotes": [{"name": "上证指数", "last": "3911.87", "quote_at": "2026-09-18T15:36:02+08:00"}]}}
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1_700_000_000.0, False, None)):
             _, payload = self.json("GET", "/api/dashboard")
-        self.assertEqual(payload["data"]["limit_counts"]["up"], 3)
-        self.assertEqual(payload["data"]["hotmoney_board"]["hm_date"], "2026-09-15")
-        self.assertEqual(sample, {"agent": {"version": "x"}})                   # 缓存里的原对象没被改
+        self.assertEqual(payload["data"]["market"]["quotes"][0]["last"], "3949.91")     # 不是上周五的 3911.87
+        self.assertEqual(payload["data"]["market"]["quotes_source"], "live")
+        self.assertEqual(payload["data"]["live"]["session"], "post_close")
+        self.assertEqual(sample["market"]["quotes"][0]["last"], "3911.87")             # 缓存里的原对象没被改
 
-    def test_without_exact_limit_data_the_approximate_counts_are_offered_and_labelled(self):
-        sample = {"agent": {}}
-        none = {"hotmoney_board": None, "limit_counts": None}
-        approx = {"up": 12, "down": 3, "source_generated_at": "t", "note": "近似"}
-        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)), \
-                patch("market_board.build", return_value=none), patch("market_board.approx_limits", return_value=approx):
+    def test_live_market_still_shows_when_the_github_snapshot_is_unavailable(self):
+        with patch("dashboard_page.get_dashboard_data", return_value=(None, None, False, "无法连接GitHub")):
             _, payload = self.json("GET", "/api/dashboard")
-        self.assertNotIn("limit_counts", payload["data"])
-        self.assertEqual(payload["data"]["limit_approx"]["up"], 12)
+        self.assertEqual(payload["data"]["live"]["indices"]["quotes"][0]["last"], "3949.91")
+        self.assertEqual(payload["error"], "无法连接GitHub")
 
-    def test_a_failure_in_the_supplement_never_fails_the_dashboard(self):
+    def test_a_failure_in_live_stats_never_fails_the_dashboard(self):
         sample = {"agent": {"version": "x"}}
-        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)), \
-                patch("market_board.build", side_effect=RuntimeError("boom")):
+        self.live.side_effect = RuntimeError("boom")
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)):
             status, payload = self.json("GET", "/api/dashboard")
         self.assertEqual(status, 200)
         self.assertEqual(payload["data"], sample)
 
-    def test_an_existing_hotmoney_board_from_the_export_is_not_overwritten(self):
-        sample = {"hotmoney_board": {"hm_date": "from-export"}}
-        extra = {"hotmoney_board": {"hm_date": "from-server"}, "limit_counts": None}
-        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)), \
-                patch("market_board.build", return_value=extra), patch("market_board.approx_limits", return_value=None):
+    def test_live_failure_keeps_the_snapshot_quotes(self):
+        sample = {"market": {"quotes": [{"name": "上证指数", "last": "3911.87"}]}}
+        live = dict(LIVE, indices=None, errors={"indices": "down"})
+        self.live.return_value = live
+        with patch("dashboard_page.get_dashboard_data", return_value=(sample, 1.0, False, None)):
             _, payload = self.json("GET", "/api/dashboard")
-        self.assertEqual(payload["data"]["hotmoney_board"]["hm_date"], "from-export")
+        self.assertEqual(payload["data"]["market"]["quotes"][0]["last"], "3911.87")
+        self.assertEqual(payload["data"]["live"]["errors"], {"indices": "down"})
 
     def test_refresh_flag_bypasses_the_cache(self):
         with patch("dashboard_page.get_dashboard_data", return_value=(None, None, False, "x")) as get:
             self.json("GET", "/api/dashboard?refresh=1")
             self.json("GET", "/api/dashboard")
         self.assertEqual([c.kwargs["force_refresh"] for c in get.call_args_list], [True, False])
+
+
+class MarketReviewApiTests(ServerCase):
+    REVIEW = {"source": "stored", "trade_date": "20260921", "date": "2026-09-21", "pools": {"zt": {"total": 0, "rows": []}},
+              "errors": {}, "lhb": None, "next_day_watch": None, "fetched_at": "t"}
+
+    def test_review_endpoint_returns_the_current_review(self):
+        with patch("market_review.current_review", return_value=self.REVIEW):
+            status, payload = self.json("GET", "/api/market/review")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["review"]["date"], "2026-09-21")
+
+    def test_stock_endpoint_validates_the_symbol_and_returns_detail(self):
+        status, payload = self.json("GET", "/api/market/stock?symbol=600721")
+        self.assertEqual(status, 400)
+        self.assertIn("股票代码格式不对", payload["message"])
+        with patch("market_review.current_review", return_value=self.REVIEW), \
+                patch("stock_detail.detail", return_value={"symbol": "sh600721", "errors": {}}) as detail:
+            status, payload = self.json("GET", "/api/market/stock?symbol=SH600721")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["detail"]["symbol"], "sh600721")
+        self.assertEqual(detail.call_args.args[0], "sh600721")                 # 大小写归一
 
 
 class PostcloseApiTests(ServerCase):

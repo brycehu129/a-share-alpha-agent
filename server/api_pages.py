@@ -9,36 +9,56 @@ import llm_settings
 # --- 看板 ---------------------------------------------------------------------------------
 
 
-def _with_market_board(data):
-    """给看板补上龙虎榜/涨跌停数据（服务端读 .history，不走 GitHub 导出）。有什么补什么，
-    没有就不加 key；任何问题都退回原数据——市场行情页不能因为补充数据读不出来而整页失败。
-    不改动 dashboard_page 缓存里的原 dict。"""
+def _with_live_market(data, force=False):
+    """给看板补上实时统计（指数、两市成交额、资金流向、涨跌家数）。这些直接取自行情源，**不读**
+    GitHub 上那份日级快照——快照会因为批处理没跑而停在几天前（曾经停在上周五）。
+    快照里的 market.quotes 被实时指数覆盖；实时取不到就保留快照，前端靠 live.errors 提示。
+    不改动 dashboard_page 缓存里的原 dict；任何问题都退回原数据，市场行情页不能因此整页失败。"""
     try:
-        import market_board
-        history = history_dir()
-        extra = market_board.build(history)
-        out = dict(data)
-        if extra["hotmoney_board"] and not data.get("hotmoney_board"):
-            out["hotmoney_board"] = extra["hotmoney_board"]
-        if extra["limit_counts"]:
-            out["limit_counts"] = extra["limit_counts"]
-        else:
-            approx = market_board.approx_limits(history)
-            if approx:
-                out["limit_approx"] = approx
-        return out
+        import market_review
+        live = market_review.market_stats(force=force)
     except Exception:
         return data
+    out = dict(data or {})
+    out["live"] = live
+    indices = live.get("indices")
+    if indices:
+        market = dict(out.get("market") or {})
+        market["quotes"] = indices["quotes"]
+        market["quotes_source"] = "live"
+        out["market"] = market
+    return out
 
 
 @get("/api/dashboard")
 def api_dashboard(query):
     import dashboard_page
     data, fetched_at, stale, error = dashboard_page.get_dashboard_data(force_refresh=query.get("refresh") == "1")
-    if isinstance(data, dict):
-        data = _with_market_board(data)
+    if query.get("live") != "0" and (isinstance(data, dict) or data is None):     # 候选池页不需要实时统计
+        with_live = _with_live_market(data, force=query.get("refresh") == "1")
+        if with_live and with_live.get("live"):     # 实时统计取不到就保持原样（含 GitHub 也失败时的 None）
+            data = with_live
     return {"data": data, "fetched_at": dashboard_page.iso_cst(fetched_at) if fetched_at else None,
             "stale": stale, "error": error}
+
+
+@get("/api/market/review")
+def api_market_review(query):
+    """涨停/跌停/炸板/昨日涨停/强势池 + 龙虎榜 + 次日关注。各块各带自己的日期和失败原因。"""
+    import market_review
+    return {"review": market_review.current_review()}
+
+
+@get("/api/market/stock")
+def api_market_stock(query):
+    """个股详情抽屉：行情快照、日 K + 均线、公司资料/概念、龙虎榜席位、它在复盘里的位置。"""
+    import market_review
+    import stock_detail
+    symbol = (query.get("symbol") or "").strip().lower()
+    try:
+        return {"detail": stock_detail.detail(symbol, market_review.current_review(), force=query.get("refresh") == "1")}
+    except market_review.ReviewError as exc:
+        raise ApiError(str(exc))
 
 
 # --- 持仓与自选 ---------------------------------------------------------------------------

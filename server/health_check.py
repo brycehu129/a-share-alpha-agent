@@ -104,6 +104,7 @@ SCHEDULES = {
     'daily': '工作日 15:35（18:20 与每小时 :17 补跑）',
     'premarket': '工作日 08:40（09:25 前须冻结计划）',
     'postclose': '工作日 16:30',
+    'review': '工作日 16:30、17:30',
     'reconcile': '工作日 15:20',
     'backup': '每天 17:30',
     'units': '每次检查时实时查询',
@@ -317,6 +318,26 @@ def check_postclose(ctx):
     return check('postclose', title, OK, '已生成，带 AI 研判', generated_at)
 
 
+def check_review(ctx):
+    """市场复盘数据（涨跌停池、龙虎榜、次日关注）。看板这一块曾因为数据源要手动同步而长期缺失，
+    所以 17:30 那轮之后必须有今天的文件，且涨停池、龙虎榜都不是空的。"""
+    title = '市场复盘数据（16:30 / 17:30）'
+    if ctx.calendar_state() != 'open' or ctx.now.time() < clock_time(17, 45):
+        return check('review', title, SKIP, '尚未到检查时间或非交易日')
+    import market_review
+    review = market_review.load_latest(ctx.private.parent / 'market_review')
+    generated_at = (review or {}).get('fetched_at') or None
+    if not review or review.get('trade_date') != ctx.now.strftime('%Y%m%d'):
+        return check('review', title, WARN, '今天的市场复盘数据没有生成：看板的涨跌停池、龙虎榜会停在旧的一天。'
+                     '`journalctl -u alpha-shadow-review -n 50` 看原因。', generated_at)
+    missing = [name for name, ok in (('涨停池', (review['pools'].get('zt') or {}).get('total')),
+                                     ('龙虎榜', ((review.get('lhb') or {}).get('rows'))),
+                                     ('次日关注', (review.get('next_day_watch') or {}).get('items'))) if not ok]
+    if missing:
+        return check('review', title, WARN, '今天的复盘数据缺：%s（接口失败或尚未发布）。' % '、'.join(missing), generated_at)
+    return check('review', title, OK, '已生成，涨停池、龙虎榜、次日关注齐全', generated_at)
+
+
 def check_reconcile(ctx):
     title = '情景收盘对账（15:20）'
     if ctx.calendar_state() != 'open' or ctx.now.time() < clock_time(15, 45):
@@ -406,7 +427,7 @@ def check_llm(ctx):
 
 
 CHECKS = [check_calendar, check_engine, check_quotes, check_evaluators, check_sentinel_queue, check_sentinel_ai,
-          check_daily_pipeline, check_premarket_plans, check_postclose, check_reconcile, check_backup, check_units, check_disk, check_cert,
+          check_daily_pipeline, check_premarket_plans, check_postclose, check_review, check_reconcile, check_backup, check_units, check_disk, check_cert,
           check_webhook, check_llm]
 
 

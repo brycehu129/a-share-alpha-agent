@@ -24,7 +24,8 @@ export function useLoad(fetcher, { intervalMs = 0, immediate = true } = {}) {
   }
   function start() {
     stop()
-    if (intervalMs > 0) timer = setInterval(() => reload({ silent: true }), intervalMs)
+    // 页面在后台标签页时不轮询：没人看，白打后端和外部行情接口。
+    if (intervalMs > 0) timer = setInterval(() => { if (!document.hidden) reload({ silent: true }) }, intervalMs)
   }
   onMounted(() => {
     if (immediate) reload()

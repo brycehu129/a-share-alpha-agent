@@ -1,0 +1,10 @@
+[Unit]
+Description=Alpha Shadow 市场复盘数据（涨跌停池、龙虎榜、次日关注）
+After=network-online.target
+
+[Service]
+Type=oneshot
+# LLM 配置（OpenRouter/Anthropic key）和 CONFIG_PATH 都在这个文件里；没有 key 时次日关注照常出规则结果，
+# 只是没有 AI 点评（见 next_day_watch.py）。
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_review.sh

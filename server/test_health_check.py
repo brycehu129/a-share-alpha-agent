@@ -191,6 +191,24 @@ class PipelineTests(Base):
         self.postclose('2026-09-21T16:40:00+08:00', 'ok')
         self.assertEqual(hc.check_postclose(self.ctx('17:30:00'))['level'], hc.OK)
 
+    def test_review_data_must_exist_for_today_and_be_complete(self):
+        import market_review
+        d = self.private.parent / 'market_review'
+        self.assertEqual(hc.check_review(self.ctx('17:30:00'))['level'], hc.SKIP)                 # 17:45 前不查
+        self.assertEqual(hc.check_review(self.ctx('17:50:00'))['level'], hc.WARN)                 # 没有文件
+        review = {'trade_date': '20260918', 'date': '2026-09-18', 'fetched_at': 't',
+                  'pools': {'zt': {'total': 5, 'rows': []}}, 'lhb': {'rows': [1]}, 'next_day_watch': {'items': [1]}}
+        market_review.save_review(review, d)
+        self.assertEqual(hc.check_review(self.ctx('17:50:00'))['level'], hc.WARN)                 # 上一个交易日的
+        review.update(trade_date='20260921', date='2026-09-21', lhb=None)
+        market_review.save_review(review, d)
+        r = hc.check_review(self.ctx('17:50:00'))
+        self.assertEqual(r['level'], hc.WARN)
+        self.assertIn('龙虎榜', r['message'])
+        review['lhb'] = {'rows': [1]}
+        market_review.save_review(review, d)
+        self.assertEqual(hc.check_review(self.ctx('17:50:00'))['level'], hc.OK)
+
     def test_reconcile_record_expected_after_the_close(self):
         self.assertEqual(hc.check_reconcile(self.ctx('15:30:00'))['level'], hc.SKIP)
         self.assertEqual(hc.check_reconcile(self.ctx('16:00:00'))['level'], hc.WARN)

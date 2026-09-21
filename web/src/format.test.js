@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrow, direction, fmtDateTime, fmtFlow, flowLine, fmtMoney, fmtNum, fmtPct, fmtPrice, fmtWan, lotSize, todayStr } from './format'
+import { arrow, direction, fmtAmount, fmtBoards, fmtDateTime, fmtFlow, flowLine, fmtMoney, fmtNum, fmtPct, fmtPrice, fmtVolumeTrend, fmtWan, lotSize, shortDate, todayStr } from './format'
 
 describe('fmtPct', () => {
   it('positive values get a plus sign', () => expect(fmtPct(1.056)).toBe('+1.06%'))
@@ -99,4 +99,41 @@ describe('fmtPrice', () => {
     expect(fmtPrice(10)).toBe('10.00')
   })
   it('missing is a dash', () => expect(fmtPrice(null)).toBe('—'))
+})
+
+describe('fmtAmount', () => {
+  it('picks the unit by magnitude', () => {
+    expect(fmtAmount(2031513487711)).toBe('2.03万亿')
+    expect(fmtAmount(946819124309)).toBe('9468亿')
+    expect(fmtAmount(555268254)).toBe('5.55亿')
+    expect(fmtAmount(58783810)).toBe('5878万')
+  })
+  it('is unsigned and tolerant of missing values', () => {
+    expect(fmtAmount(-45586807979)).toBe('456亿')
+    expect(fmtAmount(null)).toBe('—')
+    expect(fmtAmount(undefined)).toBe('—')
+    expect(fmtAmount('x')).toBe('—')
+  })
+})
+
+describe('fmtVolumeTrend', () => {
+  it('shrink / expand / flat / missing', () => {
+    expect(fmtVolumeTrend(-45586807979, -2.2)).toBe('缩量 456亿（-2.2%）')
+    expect(fmtVolumeTrend(1.2e11, 5)).toBe('放量 1200亿（+5.0%）')
+    expect(fmtVolumeTrend(0, 0)).toBe('持平')
+    expect(fmtVolumeTrend(null, null)).toBe('')
+    expect(fmtVolumeTrend(1e10, null)).toBe('放量 100亿')
+  })
+})
+
+describe('fmtBoards / shortDate', () => {
+  it('board labels', () => {
+    expect(fmtBoards(1)).toBe('首板')
+    expect(fmtBoards(undefined)).toBe('首板')
+    expect(fmtBoards(3)).toBe('3连板')
+  })
+  it('short date', () => {
+    expect(shortDate('2026-09-21')).toBe('09-21')
+    expect(shortDate(null)).toBe('—')
+  })
 })

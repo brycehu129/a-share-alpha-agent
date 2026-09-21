@@ -134,3 +134,12 @@ OpenRouter 上 `anthropic/claude-opus-5`、`claude-sonnet-5`、`claude-fable-5.1
 情景研判用 `effort=medium`、单次最多等 100 秒且**不重试**（SDK 默认 2 次重试会让总耗时超过 systemd 时限），`max_tokens=8000`。成本：每天最多 15 次调用（可配），每次约 4–9k 输入字符。
 
 `prompt_version = sentinel-scenario-1`（盘中）、`postclose-analyst-2`（盘后，本次因持仓口径修正而升版）。
+
+## 次日关注 AI 点评（2026-09-21）
+
+第三份提示词（`next_day_watch.SYSTEM`，`prompt_version = nextday-analyst-1`），和 `ai_analyst`、`scenario_analyst` 彼此隔离：
+
+- 输入是**规则**从当日涨停池 + 龙虎榜筛出的前 8 只，以及当日情绪指标（涨停/炸板/跌停数、封板率、最高板、昨日涨停今日表现）。模型只点评这几只，**不增删候选**；返回了未送入的代码会被剔除，漏掉的会在 `ai_meta.validation_issues` 里标出。
+- 同样禁止提及消息面（输入里没有新闻/公告）；**不给具体价位**，只写条件句和放弃信号；不出现胜率/概率。情绪转弱时要求降低 `focus` 数量。
+- 由 `alpha-shadow-review` 定时任务在 17:30 那次调用（`next_day_watch.py --ai`），结果写进 `market_review/<日期>.json` 的 `next_day_watch`；没配 key 或调用失败时照常展示规则结果，页面标明 AI 未生成的原因。
+- 规则打分（`WEIGHTS`）不是概率；每一分的来源都以「加分/风险」文字保留在结果里，可复核。

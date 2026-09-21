@@ -1,0 +1,1 @@
+import{I as e,p as t,z as n}from"./runtime-core.esm-bundler-SYSnr6m3.js";import{t as r}from"./_plugin-vue_export-helper-RHy_O4ZA.js";var i={},a={class:`stat-grid`};function o(r,i){return e(),t(`div`,a,[n(r.$slots,`default`,{},void 0,!0)])}var s=r(i,[[`render`,o],[`__scopeId`,`data-v-5a1f5975`]]);export{s as t};

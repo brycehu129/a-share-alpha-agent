@@ -13,7 +13,7 @@ import SourceFooter from '../components/dashboard/SourceFooter.vue'
 
 // 候选池：规则化选股的候选股票、虚拟账户（exec-0.1 / exec-0.2）、预测与待执行计划、证据与随机基线。
 // 数据和看板是同一份 /api/dashboard（服务端 30 秒缓存）。
-const { resp, d, agent, loading, error, refresh } = useDashboard()
+const { resp, d, agent, loading, error, refresh } = useDashboard({ live: false })
 const holdSessions = computed(() => (agent.value && agent.value.policy && agent.value.policy.hold_sessions) || 3)
 const statusTag = computed(() => (agent.value && agent.value.status === 'ready' ? { type: 'success', text: '数据完整（ready）' } : { type: 'warning', text: '部分完整（partial）' }))
 const openRules = ref([])
