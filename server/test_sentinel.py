@@ -49,8 +49,10 @@ def tick(quotes, minutes=None, due=None):
             'minutes': minutes or (lambda s: minute()), 'node_due': due or (lambda h: None)}
 
 
-HOLD = {'symbol': 'sz000001', 'name': '测试股', 'shares': 1000, 'cost_price': 10.0, 'stop_price': 9.5,
-        'target_price': 12.0, 'hold_type': 'swing', 't_base_shares': 0}
+# sellable_shares=0：默认这笔持仓是今天买的（T+1 不能卖），所以没有做T底仓；要测做T的用例再改成 500。
+# 止损/止盈位不在账本里——系统按成本价和 ATR 算（测试用的日线是一字板，ATR 无效，退回典型波动 5.25%：
+# 止损 10×(1−5.25%)=9.47，止盈 10×(1+7.9%)=10.79）。
+HOLD = {'symbol': 'sz000001', 'name': '测试股', 'shares': 1000, 'cost_price': 10.0, 'sellable_shares': 0}
 
 
 class Harness:
@@ -59,6 +61,7 @@ class Harness:
         self.sent = []
         self.holdings, self.watch = holdings if holdings is not None else [HOLD], watch or []
         self.series = series if series is not None else bars()
+        self.sector = {'industry': '银行', 'change': 0.0, 'n': 30}      # 测试里不联网取板块：板块持平
         self.flow, self.flow_calls = flow, []               # flow 为 None 或异常 = 资金流不可用
 
         def flow_fn(sym, now):
@@ -69,7 +72,8 @@ class Harness:
         self.s = sn.Sentinel(Path('.'), book_fn=lambda: (self.holdings, self.watch), series_fn=lambda sym: self.series,
                              send_fn=lambda text: self.sent.append(text) or {'sent': True, 'chunks': 1},
                              minute_fn=lambda sym, now: minute(), directory=self.dir,
-                             flow_fn=flow_fn, flow_dir=self.dir / 'intraday')
+                             flow_fn=flow_fn, flow_dir=self.dir / 'intraday',
+                             sector_fn=lambda sym, day: self.sector)
 
 
 def keys(signals, active=None):
@@ -95,11 +99,11 @@ class EvaluateTests(unittest.TestCase):
 
     def test_held_and_watched_symbol_does_not_double_fire(self):
         """既持有又在自选：早先两边都会汇报 high20-break 等同名信号，同一件事推两次。"""
-        w = {'symbol': 'sz000001', 'name': '测试股', 'intent': 'buy', 'buy_low': 9.0, 'buy_high': 9.5}
+        w = {'symbol': 'sz000001', 'name': '测试股'}
         h = Harness(watch=[w])
         sigs = h.s.evaluate(tick([quote(last=9.4)]))
         self.assertEqual(len({x['key'] for x in sigs}), len(sigs))
-        self.assertIn('buy-zone', keys(sigs))                                    # 自选独有的买入区间保留
+        self.assertIn('buy-signal', keys(sigs))                                  # 自选独有的买入信号保留
 
     def test_corporate_action_drops_ma_signals_but_keeps_price_level_ones(self):
         """昨收对不上缓存 = 多半除权：均线不可信，宁可不触发均线类；但成本价/止损位是你自己的价位，照常。"""
@@ -114,15 +118,38 @@ class EvaluateTests(unittest.TestCase):
         self.assertNotIn('ma20-break', keys(sigs))
         self.assertTrue(any('日线缓存' in i for i in h.s.cache['sz000001']['issues']))
 
-    def test_t_prompts_need_minute_data_and_failure_degrades_gracefully(self):
-        h = Harness(holdings=[{**HOLD, 't_base_shares': 500}])
-
+    def test_t_prompts_follow_the_sellable_base_and_the_environment(self):
         def boom(sym):
             raise minute_data.MinuteError('接口挂了')
-        sigs = h.s.evaluate(tick([quote(last=9.4)], minutes=boom))
-        self.assertNotIn('t-sell-high', keys(sigs))                              # 没有分时就不做T提示，但其余照常
+        # 今天买的仓位没有可卖老仓：不做T
+        none = Harness().s.evaluate(tick([quote(last=9.4)]))
+        self.assertFalse(keys([x for x in none if x['key'].startswith('t-')], active=True))
+        # 有 500 股老仓，价格在日内低位（9.4 在 9.4–10.1 的最低点），大盘/板块平稳：分时取不到也照常判断
+        h = Harness(holdings=[{**HOLD, 'sellable_shares': 500}])
+        sigs = h.s.evaluate(tick([quote(last=9.4), quote('sh000300', last=3800, prev=3795, is_index=True, name='沪深300')], minutes=boom))
+        self.assertIn('t-buy-low', keys(sigs, active=True))
         self.assertIn('stop', keys(sigs))
-        self.assertTrue(any('做T提示暂停' in i for i in h.s.cache['sz000001']['issues']))
+        self.assertTrue(any('不含均价线' in i for i in h.s.cache['sz000001']['issues']))
+        self.assertEqual(h.s.cache['sz000001']['t']['env']['sector'], 0.0)
+
+    def test_a_falling_sector_vetoes_the_buy_back_and_a_missing_environment_says_so(self):
+        h = Harness(holdings=[{**HOLD, 'sellable_shares': 500}])
+        h.sector = {'industry': '银行', 'change': -2.6, 'n': 30}
+        sigs = h.s.evaluate(tick([quote(last=9.4)]))
+        self.assertNotIn('t-buy-low', keys(sigs, active=True))
+        self.assertIn('板块整体杀跌', h.s.cache['sz000001']['t']['veto'][0])
+        h2 = Harness(holdings=[{**HOLD, 'sellable_shares': 500}])
+        h2.sector = None                                    # 板块取不到、也没有指数报价、没有资金流
+        h2.s.evaluate(tick([quote(last=9.4)]))
+        self.assertTrue(any('暂不判断' in i for i in h2.s.cache['sz000001']['issues']))
+
+    def test_levels_and_t_base_are_computed_by_the_system_not_read_from_the_ledger(self):
+        """账本里就算残留着旧版本的声明字段，也不再起作用。"""
+        legacy = {**HOLD, 'stop_price': 1.0, 'target_price': 99.0, 'hold_type': 'long', 't_base_shares': 800}
+        h = Harness(holdings=[legacy])
+        h.s.evaluate(tick([quote(last=9.4)]))
+        got = h.s.cache['sz000001']['holding']
+        self.assertEqual((got['stop_price'], got['target_price'], got['t_base_shares']), (9.47, 10.79, 0))
 
     def test_symbols_include_the_market_indices_for_free(self):
         self.assertEqual(Harness().s.symbols()[-3:], sn.INDEX_SYMBOLS)
@@ -148,7 +175,7 @@ class AfterTickTests(unittest.TestCase):
         r = h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
         self.assertEqual(r['alerts'], 1)
         text = h.sent[0]
-        for needle in ('【紧急】', '测试股', 'sz000001', '9.40', '触及止损', '成本 10.00', '止损 9.50', '不下单'):
+        for needle in ('【紧急】', '测试股', 'sz000001', '9.40', '触及止损', '成本 10.00', '系统止损位 9.47', '不下单'):
             self.assertIn(needle, text)
 
     def test_only_sentinel_events_are_pushed(self):
@@ -239,8 +266,8 @@ class AfterTickTests(unittest.TestCase):
         self.assertEqual(pend['symbol'], 'sz000001')
         self.assertTrue(pend['is_holding'])
         self.assertEqual(pend['limits'], {'limit_up': 11.0, 'limit_down': 9.0})
-        self.assertIn('你的止损价', pend['entry']['key_levels'])
-        self.assertEqual(pend['entry']['holding']['stop_price'], 9.5)
+        self.assertIn('系统止损位', pend['entry']['key_levels'])
+        self.assertEqual(pend['entry']['holding']['stop_price'], 9.47)
         self.assertEqual(r['alerts'], 1)
 
     def test_alert_still_goes_out_when_minute_data_is_unavailable(self):

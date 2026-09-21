@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrow, direction, fmtDateTime, fmtFlow, flowLine, fmtMoney, fmtNum, fmtPct, fmtWan } from './format'
+import { arrow, direction, fmtDateTime, fmtFlow, flowLine, fmtMoney, fmtNum, fmtPct, fmtPrice, fmtWan, lotSize, todayStr } from './format'
 
 describe('fmtPct', () => {
   it('positive values get a plus sign', () => expect(fmtPct(1.056)).toBe('+1.06%'))
@@ -79,4 +79,24 @@ describe('flowLine（资金摘要一行）', () => {
     expect(flowLine(null, null)).toBe('')
     expect(flowLine(null, { bid_ask_ratio: -3 })).toBe('委比 -3.0%')
   })
+})
+
+describe('todayStr / lotSize', () => {
+  it('formats the local date with zero padding', () => expect(todayStr(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05'))
+  it('does not shift to the previous day just after local midnight', () => expect(todayStr(new Date(2026, 8, 21, 0, 5))).toBe('2026-09-21'))
+  it('star board lots are 200, everything else 100', () => {
+    expect(lotSize('sh688981')).toBe(200)
+    expect(lotSize('sh600519')).toBe(100)
+    expect(lotSize('sz300458')).toBe(100)
+  })
+})
+
+describe('fmtPrice', () => {
+  it('keeps at least two decimals and at most three', () => {
+    expect(fmtPrice(1252.57)).toBe('1252.57')
+    expect(fmtPrice(11.9)).toBe('11.90')
+    expect(fmtPrice(11.905)).toBe('11.905')
+    expect(fmtPrice(10)).toBe('10.00')
+  })
+  it('missing is a dash', () => expect(fmtPrice(null)).toBe('—'))
 })

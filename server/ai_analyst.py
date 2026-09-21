@@ -14,11 +14,11 @@ import json
 
 from shortterm_model import BREAKOUT, PULLBACK, SHORT_POLICY, SELECTION_VERSION as STRATEGY_VERSION
 
-PROMPT_VERSION = 'postclose-analyst-2'
+PROMPT_VERSION = 'postclose-analyst-3'
 
 CANDIDATE_VERDICTS = ['buy_tomorrow', 'watch', 'pass']
 # 持仓判断里没有 swing_t（做T）：盘后报告没有日内高低点、均价线这类支撑数据，模型给出"适合做T"
-# 完全是凭空的。做T提示只在盘中哨兵里出现，那里有分时数据和用户声明的底仓（见 sentinel_rules.t_signals）。
+# 完全是凭空的。做T提示只在盘中哨兵里出现，那里有分时数据和系统算出的可卖老仓（见 sentinel_rules.t_signals）。
 HOLDING_VERDICTS = ['hold', 'add', 'reduce', 'exit']
 
 # 结构化输出只接受 JSON Schema 的一个子集：type / enum / description / title /
@@ -117,10 +117,11 @@ def system_prompt():
 基于用户消息里的结构化事实，给出：当天大盘情况、候选池逐只研判、持仓逐只研判。
 
 **持仓的判断和候选池是两回事。** 你不知道用户为什么买这只股票，所以：
-- 不要拿上面候选池的规则（track 门槛、持有期、止损止盈比例）去衡量用户的持仓；
-- 只依据 `holding` 里**用户自己声明**的信息：成本价、持有类型(hold_type)、止损价、目标价。
-  没声明的就是没设——不要替用户设一个止损位，也不要说"应该止损在X"；
-- 持有类型是"长期"的，不要按短线的标准建议减仓；"套牢待解"的，低于成本价是常态而不是危险信号。
+- 不要拿上面候选池的规则（track 门槛、持有期）去衡量用户的持仓；
+- `holding.cost_price` 是用户买入时录入的成本价。`stop_price` / `target_price` 是**系统按策略的波动率(ATR)规则
+  从成本价算出的参考位**，不是用户设的：可以引用，但要说明它们是系统参考位；不要自己另设一个止损位，
+  也不要说"应该止损在X"；
+- 没有 `stop_price` / `target_price` 的（日线不足），就只谈成本价和均线，不要编一个位置。
 
 # 硬性要求
 

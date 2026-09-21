@@ -1,0 +1,1 @@
+import{Or as e,jr as t,ur as n}from"./css-DLXTJEzZ.js";import{t as r}from"./_plugin-vue_export-helper-Bq8Qvnkl.js";var i={},a={class:`stat-grid`};function o(r,i){return e(),n(`div`,a,[t(r.$slots,`default`,{},void 0,!0)])}var s=r(i,[[`render`,o],[`__scopeId`,`data-v-5a1f5975`]]);export{s as t};

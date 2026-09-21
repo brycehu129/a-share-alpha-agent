@@ -100,13 +100,14 @@ class EntryValidationTests(unittest.TestCase):
 
 
 class KeyLevelTests(unittest.TestCase):
-    def test_only_real_levels_are_offered_and_holdings_add_your_own(self):
+    def test_only_real_levels_are_offered_and_holdings_add_the_systems_own(self):
         q = {'previous_close': '10', 'open': '10.1'}
         lv = sa.key_levels(q, {'ma20': 10.4, 'ma60': None}, {'day_high': 10.8, 'day_low': 9.9, 'vwap': 10.2},
                            holding={'cost_price': 9.5, 'stop_price': 9.0, 'target_price': None},
                            limits={'limit_up': 11.0, 'limit_down': 9.0})
-        self.assertEqual(lv['你的止损价'], 9.0)
-        self.assertNotIn('你的目标价', lv)             # 没填就不出现，不替用户造一个
+        self.assertEqual(lv['系统止损位'], 9.0)
+        self.assertNotIn('系统止盈位', lv)              # 算不出来就不出现，不替用户造一个
+        self.assertNotIn('你的止损价', lv)
         self.assertNotIn('MA60', lv)
         self.assertEqual(lv['分时均价线'], 10.2)
         self.assertNotIn('成本价', sa.key_levels(q, {}, {}, holding=None))

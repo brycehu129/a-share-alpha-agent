@@ -1,16 +1,17 @@
-"""自选股哨兵的触发规则。纯函数：输入报价与事实，输出 signal 列表；没有网络、没有 AI。
+"""自选股/持仓哨兵的触发规则。纯函数：输入报价与事实，输出 signal 列表；没有网络、没有 AI。
 
 触发器必须是规则而不是 AI：省 token（AI 只在触发之后才调）、可回测、可审计。
 
-**系统不知道你为什么买，就推导不出什么时候该卖。** 所以卖出/止损类信号只在你自己声明了
-止损价/目标价时才触发；没填就不触发，绝不替你猜一个默认值。`hold_type` 是你对这笔
-持仓的自我声明，这里只用它来**决定该推哪些提醒**（例如"套牢待解"的持仓，低于成本价是
-常态、不该推，"回到成本价"才是事件；"长期"持仓不推 MA20 破位这类噪音），不据此发明
-任何买卖规则。
+**买卖判断由系统给出，不由用户声明。** 持仓的止损位/止盈位是系统按策略（ATR，见 book_levels.py）从
+成本价算出来的，做T 底仓是今天可卖的老仓；自选股的买入信号复用策略两条 track（突破/回调反弹）的
+实时门槛（live_check.breakout_gates / pullback_gates）。本模块不读任何用户"意愿"字段——持有类型、
+止损价、目标价、做T底仓、买入区间都已取消录入。
 
 信号的 key 里带股票代码和类型，引擎据此做边沿/冷却去重；带 carry 的信号是"持续状态"
 （已跌破成本价、已跌破MA20），跨日继承，避免每天早上把同一个状态当成新事件再推一遍。
 """
+import live_check
+
 NODES = ('0945', '1305', '1430')
 NODE_LABEL = {'0945': '开盘方向确立', '1305': '午后开盘', '1430': '尾盘决策'}
 NODE_MAX_LATE_S = 300           # 节点已经迟到超过 5 分钟就不再推：那时的"开盘方向"已不是开盘方向
@@ -24,7 +25,16 @@ T_MIN_AMPLITUDE_PCT = 3.0       # 往返成本约 0.31%，日内振幅不足这�
 T_SELL_POSITION = 0.8           # 现价处在当日区间的 80% 以上 → 高抛位
 T_BUY_POSITION = 0.2            # 20% 以下 → 低吸位
 T_REARM_S = 900
-# 你自己设的价位（成本、止损、目标）是最关心的位置，价格常常在它附近来回磨蹭。默认 5 分钟的重新武装
+# 做T 的环境阈值（%）。都是经验默认值，没有经过回测；集中放在这里，页面的「判断规则」也读这里。
+T_MARKET_STRONG = 1.0           # 大盘涨幅≥1%：强势日
+T_MARKET_WEAK = -0.5            # 大盘 ≤ -0.5%：偏弱
+T_MARKET_CRASH = -1.5           # 大盘 ≤ -1.5%：系统性杀跌
+T_SECTOR_HOT = 1.0              # 板块中位涨幅≥1%：板块走强
+T_SECTOR_DUMP = -2.0            # 板块中位涨幅≤-2%：板块杀跌
+T_SECTOR_FLAT = -0.5            # 板块没有明显走弱的下限
+T_OUTPERFORM_PP = 1.5           # 个股比板块多涨这么多个百分点：个股脉冲
+T_NEAR_LIMIT_PCT = 3.0          # 距涨停/跌停不足 3%：单边行情，不做T
+# 成本价、系统止损位、止盈位是最关心的位置，价格常常在它附近来回磨蹭。默认 5 分钟的重新武装
 # 间隔下，茅台在止损位 1250 附近的一天里触发了 4 次紧急推送——都是真实的穿越，但已经是刷屏。
 # 这类状态型信号放宽到 30 分钟：真的又跌回去了，半小时后你会再收到；磨蹭期间不会。
 LEVEL_REARM_S = 1800
@@ -57,34 +67,31 @@ def sig(key, symbol, kind, active, detail, severity='normal', carry=False, **kw)
 
 
 def holding_signals(h, q, facts, limits):
-    """真实持仓的信号。h 是账本行，q 是新鲜报价，facts 是 live_check.price_facts 的结果。"""
+    """真实持仓的信号。h 是账本行经 book_levels.enrich 补上系统止损/止盈位之后的样子，
+    q 是新鲜报价，facts 是 live_check.price_facts 的结果。"""
     s, name = h['symbol'], h.get('name') or h['symbol']
     last, cost = float(q['last']), float(h['cost_price'])
-    hold_type = h.get('hold_type')
     pct = (last / cost - 1) * 100
-    out = []
-
-    if hold_type == 'trapped':
-        out.append(sig('back-to-cost', s, 'back_to_cost', last >= cost,
-                       '%s 回到成本价 %.2f 上方（现价 %.2f，%+.2f%%）——你标记的是"套牢待解"' % (name, cost, last, pct),
-                       carry=True, rearm_s=LEVEL_REARM_S))
-    else:
-        out.append(sig('below-cost', s, 'below_cost', last < cost,
-                       '%s 跌破成本价 %.2f（现价 %.2f，浮亏 %.2f%%）' % (name, cost, last, -pct), carry=True,
-                       rearm_s=LEVEL_REARM_S))
+    out = [sig('below-cost', s, 'below_cost', last < cost,
+               '%s 跌破成本价 %.2f（现价 %.2f，浮亏 %.2f%%）' % (name, cost, last, -pct), carry=True,
+               rearm_s=LEVEL_REARM_S)]
 
     stop, target = h.get('stop_price'), h.get('target_price')
+    levels = h.get('levels') or {}
+    basis = '按波动率(ATR)计算' if not levels.get('nominal') else '按典型波动估算'
     if stop:
         out.append(sig('stop', s, 'stop_hit', last <= stop,
-                       '%s 触及你设的止损价 %.2f（现价 %.2f）' % (name, stop, last),
+                       '%s 触及系统止损位 %.2f（成本 %.2f 下方 %.1f%%，%s；现价 %.2f）' % (
+                           name, stop, cost, levels.get('stop_pct', 0) * 100, basis, last),
                        severity='urgent', carry=True, rearm_s=LEVEL_REARM_S,
                        level={'price': float(stop), 'direction': 'down'}))
     if target:
         out.append(sig('target', s, 'target_hit', last >= target,
-                       '%s 触及你设的目标价 %.2f（现价 %.2f）' % (name, target, last),
+                       '%s 触及系统止盈位 %.2f（成本 %.2f 上方 %.1f%%，%s；现价 %.2f）' % (
+                           name, target, cost, levels.get('target_pct', 0) * 100, basis, last),
                        carry=True, rearm_s=LEVEL_REARM_S, level={'price': float(target), 'direction': 'up'}))
 
-    if facts.get('ma20') and hold_type != 'long':
+    if facts.get('ma20'):
         out.append(sig('ma20-break', s, 'ma20_break', last < facts['ma20'],
                        '%s 跌破 MA20 %.2f（现价 %.2f）' % (name, facts['ma20'], last), carry=True))
     if facts.get('ma60'):
@@ -110,15 +117,54 @@ def holding_signals(h, q, facts, limits):
     return [x for x in out if x]
 
 
-def watch_signals(w, q, facts, limits):
-    """自选股（非持仓）的信号。"""
+TRACK_LABEL = {'breakout': '突破', 'pullback': '回调反弹'}
+GATES_PER_TRACK = 3       # 两条 track 的实时价格门槛各有 3 个"判定项"（量比只作参考，不算）
+
+
+def buy_setup(q, facts):
+    """自选股的买入形态：用实时价把策略两条 track 的价格门槛各判一遍。
+
+    返回 {'track', 'passed', 'passed_gates', 'failed_gates'}。passed 表示某条 track 的 3 个判定项**全部**通过；
+    没通过时 track 是"离通过最近"的那条，failed_gates 给出还差什么。日线不足以算均线时 track 为 None——
+    缺数据就说缺数据，不当作"没信号"。"""
+    if not facts:
+        return {'track': None, 'passed': False, 'passed_gates': [], 'failed_gates': []}
+    results = {}
+    for track, gates in (('breakout', live_check.breakout_gates(facts, q)),
+                         ('pullback', live_check.pullback_gates(facts, q))):
+        decisive = {n: (ok, d) for n, (ok, d) in gates.items() if ok is not None}
+        results[track] = {'complete': len(decisive) == GATES_PER_TRACK,
+                          'passed': [(n, d) for n, (ok, d) in decisive.items() if ok],
+                          'failed': [(n, d) for n, (ok, d) in decisive.items() if not ok]}
+    for track, r in results.items():
+        if r['complete'] and not r['failed']:
+            return {'track': track, 'passed': True, 'passed_gates': r['passed'], 'failed_gates': []}
+    best = max(results, key=lambda t: (len(results[t]['passed']), t == 'pullback'))
+    return {'track': best, 'passed': False, 'passed_gates': results[best]['passed'],
+            'failed_gates': results[best]['failed']}
+
+
+def buy_blocker(limits, market_pause):
+    """形态满足也买不了/不该买的原因；没有就返回空串。"""
+    if limits.get('at_limit_up'):
+        return '已涨停，排不上队，买不进'
+    if limits.get('at_limit_down'):
+        return '已跌停，不是买点'
+    if market_pause:
+        return '大盘趋势评分低于暂停线，策略暂停新增买入'
+    return ''
+
+
+def watch_signals(w, q, facts, limits, market_pause=None):
+    """自选股（非持仓）的信号。market_pause：策略的大盘评分是否低于暂停线（None = 读不到，不据此拦截）。"""
     s, name = w['symbol'], w.get('name') or w['symbol']
     last, out = float(q['last']), []
-    lo, hi = w.get('buy_low'), w.get('buy_high')
-    if lo and hi:      # 用户没填买入区间就不触发这一类，不猜
-        out.append(sig('buy-zone', s, 'buy_zone', lo <= last <= hi,
-                       '%s 进入你设的买入区间 %.2f–%.2f（现价 %.2f）' % (name, lo, hi, last),
-                       level={'price': float(hi), 'direction': 'down'}))
+    setup = buy_setup(q, facts)
+    if setup['track']:
+        detail = '%s 具备买入信号（%s形态）：%s' % (
+            name, TRACK_LABEL[setup['track']], '；'.join('%s %s' % g for g in setup['passed_gates']))
+        active = setup['passed'] and not buy_blocker(limits, market_pause)
+        out.append(sig('buy-signal', s, 'buy_signal', active, detail, rearm_s=LEVEL_REARM_S))
     ratio, change = _f(q.get('volume_ratio')), _f(q.get('change_pct'))
     out.append(sig('vol-surge', s, 'volume_surge',
                    ratio is not None and ratio >= VOLUME_RATIO_SURGE and change is not None and abs(change) >= 3,
@@ -150,23 +196,93 @@ def node_signals(symbol, name, node_due):
     return out
 
 
-def t_signals(h, q, day):
-    """做T的高抛/低吸位提示。**只是位置提示**：系统不知道你是否已执行，不跟踪、不闭环。
+def _t_sell_env(q, env, limits):
+    """高抛位的环境：(支持理由, 否决理由)。缺数据的项直接跳过，不当成"平淡"。"""
+    market, sector, flow = env.get('market'), env.get('sector'), env.get('flow')
+    change = _f(q.get('change_pct'))
+    support, veto = [], []
+    up = limits.get('to_limit_up_pct')
+    if up is not None and up <= T_NEAR_LIMIT_PCT:
+        veto.append('距涨停仅 %.1f%%，强势单边行情，先卖容易卖飞' % up)
+    if (market is not None and sector is not None and market >= T_MARKET_STRONG and sector >= T_SECTOR_HOT
+            and (flow is None or flow['main_30m'] > 0)):
+        veto.append('大盘（%+.2f%%）与板块（%+.2f%%）同步走强%s，顺势上行，不宜先卖' % (
+            market, sector, '，主力仍在净流入' if flow else '（无资金流数据，按保守处理）'))
+    if sector is not None and change is not None and change - sector >= T_OUTPERFORM_PP:
+        support.append('个股涨 %+.2f%%、板块中位 %+.2f%%，比板块多涨 %.1f 个点，属个股冲高' % (change, sector, change - sector))
+    if flow is not None and flow['main_30m'] < 0:
+        support.append('价格在高位而近 30 分钟主力净流出 %s，量价背离' % _money(flow['main_30m']))
+    if market is not None and market <= T_MARKET_WEAK:
+        support.append('大盘偏弱（%+.2f%%），弱市里的冲高更容易回落' % market)
+    return support, veto
 
-    A股 T+1：当日买入不能当日卖出，真正的日内 T 只能"先卖后买"——用底仓在高位卖出、
-    低位买回，净持仓不变。所以前提是你声明了底仓（t_base_shares>0），并且当日振幅
-    ≥3%（往返成本约0.31%，振幅不足没有空间）。任一不满足就不产生任何提示。"""
+
+def _t_buy_env(q, env, limits):
+    market, sector, flow = env.get('market'), env.get('sector'), env.get('flow')
+    support, veto = [], []
+    down = limits.get('to_limit_down_pct')
+    if down is not None and down <= T_NEAR_LIMIT_PCT:
+        veto.append('距跌停仅 %.1f%%，单边下跌，不是买回点' % down)
+    if market is not None and market <= T_MARKET_CRASH:
+        veto.append('大盘大跌（%+.2f%%），系统性下跌，别急着买回' % market)
+    if sector is not None and sector <= T_SECTOR_DUMP:
+        veto.append('板块整体杀跌（中位 %+.2f%%），不是个股的日内波动' % sector)
+    if flow is not None and flow['main'] < 0 and flow['main_30m'] < 0:
+        veto.append('全天主力净流出 %s，近 30 分钟仍在流出，资金没有承接' % _money(flow['main']))
+    if market is not None and market > T_MARKET_WEAK:
+        support.append('大盘没有走弱（%+.2f%%），这次下探更像个股的日内波动' % market)
+    if sector is not None and sector > T_SECTOR_FLAT:
+        support.append('板块没有跟着跌（中位 %+.2f%%）' % sector)
+    if flow is not None and flow['main_30m'] > 0:
+        support.append('近 30 分钟主力净流入 %s，有资金承接' % _money(flow['main_30m']))
+    return support, veto
+
+
+def _money(v):
+    return ('%+.2f亿' % (v / 1e8)) if abs(v) >= 1e8 else ('%+.0f万' % (v / 1e4))
+
+
+def t_evaluate(h, q, day, env_fn=None, limits=None):
+    """做T 的三层判断。**只是位置提示**：系统不知道你是否已执行，不跟踪、不闭环。
+
+    1. 空间：今天有可卖的老仓（T+1：当天买入的卖不出去，只能先卖老仓、低位再买回），且日内振幅 ≥3%
+       （往返成本约 0.31%，振幅不足没有空间）。
+    2. 位置：现价在日内区间的 80% 以上（高抛）或 20% 以下（低吸）。
+    3. 环境：大盘、板块、个股资金流。有**否决项**就不做（顺势上涨不先卖、系统性杀跌不接飞刀）；
+       没有否决项时还要至少一个**支持项**（个股冲高、量价背离、弱市冲高 / 大盘与板块没走弱、资金承接）。
+    环境数据只在 1、2 都满足时才通过 env_fn 懒取；取不到就明说"缺数据，暂不判断"，不退回只看价格。
+
+    返回 {'side','ok','support','veto','env','unavailable','base','amplitude','position'}。"""
     base = h.get('t_base_shares') or 0
+    amp, pos = day.get('amplitude_pct'), day.get('position_in_range')
+    out = {'base': base, 'side': None, 'ok': False, 'support': [], 'veto': [], 'env': None, 'unavailable': '',
+           'amplitude': amp, 'position': pos, 'vwap': day.get('vwap')}
+    if not (base and amp is not None and amp >= T_MIN_AMPLITUDE_PCT and pos is not None):
+        return out
+    out['side'] = 'sell' if pos >= T_SELL_POSITION else 'buy' if pos <= T_BUY_POSITION else None
+    if out['side'] is None:
+        return out
+    env = env_fn() if env_fn else None
+    if not env or all(env.get(k) is None for k in ('market', 'sector', 'flow')):
+        out['unavailable'] = '大盘、板块、资金流数据都取不到，做T暂不判断'
+        return out
+    limits = limits if limits is not None else live_check.limit_facts(q)
+    support, veto = (_t_sell_env if out['side'] == 'sell' else _t_buy_env)(q, env, limits)
+    out.update(env=env, support=support, veto=veto, ok=bool(support) and not veto)
+    return out
+
+
+def t_signals(h, q, day, evaluation=None, env_fn=None):
+    """做T 信号。evaluation 可以传入已经算好的 t_evaluate 结果（页面要同时拿到理由，避免重复联网）。"""
+    ev = evaluation if evaluation is not None else t_evaluate(h, q, day, env_fn)
     s, name = h['symbol'], h.get('name') or h['symbol']
-    amp, pos, vwap = day.get('amplitude_pct'), day.get('position_in_range'), day.get('vwap')
-    last = float(q['last'])
-    ready = bool(base) and amp is not None and amp >= T_MIN_AMPLITUDE_PCT and pos is not None and vwap
-    note = '（底仓 %d 股，先卖后买；仅位置提示，系统不知道你是否已执行）' % base
+    pos, amp, vwap = ev['position'], ev['amplitude'], ev['vwap']
+    note = '（可卖老仓 %d 股，先卖后买；仅位置提示，系统不知道你是否已执行）' % ev['base']
+    line = '区间位置 %.0f%%%s（振幅 %.1f%%）' % ((pos or 0) * 100, '，均价线 %.2f' % vwap if vwap else '', amp or 0)
+    why = '｜'.join(ev['support'])
     return [
-        sig('t-sell-high', s, 't_sell_high', ready and pos >= T_SELL_POSITION and last > vwap,
-            '%s 处于日内高位：区间位置 %.0f%%，高于均价线 %.2f（振幅 %.1f%%）%s' % (
-                name, (pos or 0) * 100, vwap or 0, amp or 0, note), rearm_s=T_REARM_S),
-        sig('t-buy-low', s, 't_buy_low', ready and pos <= T_BUY_POSITION and last < vwap,
-            '%s 处于日内低位：区间位置 %.0f%%，低于均价线 %.2f（振幅 %.1f%%）%s' % (
-                name, (pos or 0) * 100, vwap or 0, amp or 0, note), rearm_s=T_REARM_S),
+        sig('t-sell-high', s, 't_sell_high', ev['ok'] and ev['side'] == 'sell',
+            '%s 处于日内高位：%s；%s%s' % (name, line, why, note), rearm_s=T_REARM_S),
+        sig('t-buy-low', s, 't_buy_low', ev['ok'] and ev['side'] == 'buy',
+            '%s 处于日内低位：%s；%s%s' % (name, line, why, note), rearm_s=T_REARM_S),
     ]

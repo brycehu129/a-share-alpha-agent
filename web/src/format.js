@@ -5,6 +5,13 @@ export function fmtNum(v, digits = 2) {
   return Number(v).toFixed(digits)
 }
 
+// 成本价/成交价：最多 3 位小数，末尾的 0 去掉但至少留两位（1252.570 → 1252.57，11.9 → 11.90，11.905 → 11.905）。
+export function fmtPrice(v) {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return '—'
+  const s = Number(v).toFixed(3)
+  return s.endsWith('0') ? s.slice(0, -1) : s
+}
+
 export function fmtPct(v, digits = 2) {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '—'
   // 先四舍五入再判符号：-0.001 显示成 “0.00%”，而不是 “-0.00%”。
@@ -65,4 +72,15 @@ export function flowLine(flow, book) {
     parts.push(`委比 ${r > 0 ? '+' : ''}${r.toFixed(1)}%`)
   }
   return parts.join('｜')
+}
+
+// 本地日期 'YYYY-MM-DD'（不经过 UTC，北京时间凌晨不会变成前一天）。
+export function todayStr(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+// 沪深A股最小交易单位：科创板 200 股，其余 100 股（和 server/portfolio_book.lot_size 一致）。
+export function lotSize(symbol) {
+  return String(symbol).startsWith('sh688') ? 200 : 100
 }

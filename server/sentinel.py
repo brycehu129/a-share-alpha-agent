@@ -23,6 +23,8 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import book_levels
+import book_verdict
 import flow_recorder
 import intraday_engine as ie
 import live_check
@@ -33,6 +35,7 @@ import portfolio_book
 import scenario_analyst
 import scenario_ledger
 import sentinel_rules as sr
+import t_context
 from collect_quotes import CST
 
 INDEX_SYMBOLS = ['sh000001', 'sz399006', 'sh000300']       # 大盘环境：一起取，同一批请求，不额外花钱
@@ -43,7 +46,7 @@ FLOW_RECORD_MAX_AGE_S = 600    # 采集器留存的资金流不超过这个年�
 PENDING_MAX_AGE_S = 900        # 待分析事件超过 15 分钟就不再分析：那时的情景早已过时
 AI_DAILY_MAX = int(os.environ.get('SENTINEL_AI_MAX_PER_DAY', '15'))
 HINT_LABEL = {'hold': '继续持有', 'add': '可考虑买入/加仓', 'reduce': '可考虑减仓', 'wait': '观望',
-              't_sell_high': '高位，可考虑用底仓先卖（做T）', 't_buy_low': '低位，可考虑买回（做T）'}
+              't_sell_high': '高位，可考虑用老仓先卖（做T）', 't_buy_low': '低位，可考虑买回（做T）'}
 DISCLAIMER = '研究参考，不构成投资建议；系统只提醒、不下单，决定由你自己做。'
 
 
@@ -113,9 +116,9 @@ def format_alert(block):
     if h:
         own = ['持仓 %d股 成本 %.2f（%+.2f%%）' % (h['shares'], h['cost_price'], h['unrealized_pct'])]
         if h.get('stop_price'):
-            own.append('止损 %.2f' % h['stop_price'])
+            own.append('系统止损位 %.2f' % h['stop_price'])
         if h.get('target_price'):
-            own.append('目标 %.2f' % h['target_price'])
+            own.append('系统止盈位 %.2f' % h['target_price'])
         lines.append('｜'.join(own))
     return '\n'.join(lines)
 
@@ -139,10 +142,14 @@ def format_scenarios(entry, name, last):
 
 class Sentinel:
     def __init__(self, history, book_fn=None, series_fn=None, send_fn=None, minute_fn=None, directory=None,
-                 flow_fn=None, flow_dir=None):
+                 flow_fn=None, flow_dir=None, market_pause_fn=None, sector_fn=None):
         self.history = Path(history)
         self.directory = directory
-        self.book_fn = book_fn or (lambda: (portfolio_book.load('holdings'), portfolio_book.load('watchlist')))
+        # 默认账本：持仓行带上"今天可卖数量"（按成交流水的 T+1 算），做T底仓与之挂钩。
+        self.book_fn = book_fn or (lambda: (portfolio_book.with_sellable(portfolio_book.load('holdings')),
+                                            portfolio_book.load('watchlist')))
+        self.market_pause_fn = market_pause_fn or (lambda: book_verdict.market_pause(self.history))
+        self.sector_fn = sector_fn            # (symbol, day) -> {'industry','change','n'} | None；不传就用真实行情
         self.series_fn = series_fn or (lambda s: live_check.load_series(self.history, s)[0])
         self.send_fn = send_fn or wecom_send
         self.minute_fn = minute_fn or minute_data.fetch_minute
@@ -159,6 +166,7 @@ class Sentinel:
         hold, wl = {h['symbol']: h for h in holdings}, {w['symbol']: w for w in watch}
         quotes = tick['quotes']
         self.market = {INDEX_LABEL[s]: float(quotes[s]['change_pct']) for s in INDEX_SYMBOLS if s in quotes}
+        market_pause = self.market_pause_fn() if wl else None
         signals = []
         for symbol in sorted(set(hold) | set(wl)):
             q = quotes.get(symbol)
@@ -171,25 +179,35 @@ class Sentinel:
             if (facts.get('adjustment_drift_pct') or 0) > live_check.ADJUST_TOLERANCE_PCT:
                 facts = {}          # 除权/缓存过期：均线不可信，宁可不触发均线类信号
             limits = live_check.limit_facts(q)
-            day, minute = None, None
+            day, minute, t = None, None, None
             if h:
-                signals += sr.holding_signals({**h, 'name': name}, q, facts, limits)
-                if h.get('t_base_shares'):
+                # 止损/止盈位与做T底仓由系统算（成本价来自买入记录），不再读用户声明。
+                h = book_levels.enrich({**h, 'name': name}, bars, q.get('quote_date'))
+                signals += sr.holding_signals(h, q, facts, limits)
+                if h['t_base_shares']:
                     try:
                         minute = tick['minutes'](symbol)
-                        day = sr.day_facts(q, minute)
-                        signals += sr.t_signals({**h, 'name': name}, q, day)
                     except minute_data.MinuteError as exc:
-                        issues.append('分时数据不可用，做T提示暂停：%s' % exc)
-                if w:               # 既持有又在自选：持仓信号已覆盖，只保留自选独有的买入区间
-                    signals += [x for x in sr.watch_signals({**w, 'name': name}, q, facts, limits)
-                                if x['key'].startswith('buy-zone')]
-            else:
-                signals += sr.watch_signals({**w, 'name': name}, q, facts, limits)
+                        issues.append('分时数据不可用，做T提示不含均价线：%s' % exc)
+                    day = sr.day_facts(q, minute)
+                    t = sr.t_evaluate(h, q, day, self._env_fn(symbol, q, tick), limits)
+                    if t['unavailable']:
+                        issues.append(t['unavailable'])
+                    signals += sr.t_signals(h, q, day, evaluation=t)
+            if w:                   # 既持有又在自选：持仓信号已覆盖卖出侧，买入信号照常（可能是加仓机会）
+                own = sr.watch_signals({**w, 'name': name}, q, facts, limits, market_pause)
+                signals += [x for x in own if not h or x['key'].startswith('buy-signal')]
             signals += sr.node_signals(symbol, name, tick['node_due'])
             self.cache[symbol] = {'quote': q, 'facts': facts, 'limits': limits, 'holding': h, 'watch': w,
-                                  'name': name, 'day': day, 'minute': minute, 'issues': issues}
+                                  'name': name, 'day': day, 'minute': minute, 'issues': issues, 't': t}
         return signals
+
+    def _env_fn(self, symbol, quote, tick):
+        """做T 的环境（大盘/板块/资金流）。返回一个懒取函数：只有价格位置满足时才会真的联网。"""
+        now, directory = tick['now'], self.flow_dir or ie.data_dir()
+        sector = self.sector_fn or (lambda sym, day: t_context.sector_change(self.history, sym, day, now, cache_dir=directory))
+        flow = lambda sym, day: t_context.flow_facts(directory, sym, day, now)
+        return lambda: t_context.build_env(symbol, tick['quotes'], quote.get('quote_date'), sector, flow)
 
     # -- 告警 ------------------------------------------------------------------
     def after_tick(self, summary, now=None):
@@ -275,8 +293,9 @@ class Sentinel:
                  'quote': {k: c['quote'].get(k) for k in ('last', 'previous_close', 'open', 'high', 'low', 'change_pct',
                                                           'volume_ratio', 'turnover_pct', 'amplitude_pct')},
                  'price_facts': c['facts'], 'day': day, 'limit_facts': c['limits'], 'holding': holding,
-                 'watch': {k: c['watch'].get(k) for k in ('intent', 'buy_low', 'buy_high')} if c['watch'] else None,
-                 'key_levels': levels, 'recent_minutes': recent, 'issues': c['issues']}
+                 'watch': {'note': c['watch'].get('note') or None} if c['watch'] else None,
+                 'key_levels': levels, 'recent_minutes': recent, 'issues': c['issues'],
+                 't_context': {k: c['t'][k] for k in ('side', 'ok', 'support', 'veto', 'env')} if c.get('t') and c['t']['side'] else None}
         _write_json(sdir(self.directory) / 'pending' / (pid + '.json'), {
             'id': pid, 'created_at': now.isoformat(), 'symbol': symbol, 'market': self.market,
             'node': max(events, key=lambda e: e['severity'] == 'urgent')['kind'],

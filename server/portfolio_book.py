@@ -10,24 +10,27 @@
 
 和 alpha_portfolio.py 的虚拟账户完全无关，两者不共享状态也不互相影响：那个是策略
 的模拟账本，这个是用户自己报给系统的真实持仓，只用于分析和提醒，系统永远不下单。
+
+**录入方式照券商来：** 自选股只记「关注哪只」；持仓不能凭空录入，只能从自选股「买入」、
+从持仓「卖出」，每一笔都进成交流水（trades.json）。所以：
+
+- 成本价 = 你每次买入价的加权平均，不是手填的一个数字；卖出不改变剩余持仓的成本价，只记已实现盈亏。
+- 系统按 T+1 算「可卖数量」：当天买入的股当天卖不出去，做T 的底仓只能是这部分之外的老仓。
+- 止损位/止盈位/做T底仓不再由用户声明——系统按策略（ATR）和可卖数量自己算，见 book_levels.py。
 """
 import json
-import math
 import os
 import re
 import tempfile
+import uuid
 from datetime import date, datetime
 
 from collect_quotes import CST
 
 SYMBOL_RE = re.compile(r'(sh|sz)\d{6}')
-INTENTS = ('buy', 'watch', 'sell')
-INTENT_LABEL = {'buy': '想买入', 'watch': '观察', 'sell': '想卖出'}
-# 持有类型只是你对这笔持仓的自我声明，系统据此选择措辞和关注点，不据此发明卖出规则——
-# 系统不知道你为什么买，就推导不出什么时候该卖，止损/目标位必须由你自己填。
-HOLD_TYPES = ('short', 'swing', 'long', 'trapped')
-HOLD_TYPE_LABEL = {'short': '短线', 'swing': '波段', 'long': '长期', 'trapped': '套牢待解'}
 MAX_ENTRIES = 200
+MAX_SHARES = 100_000_000
+MAX_PRICE = 100_000
 
 
 class BookError(ValueError):
@@ -45,6 +48,10 @@ def default_dir():
 
 def _path(kind, directory=None):
     return os.path.join(directory or default_dir(), kind + '.json')
+
+
+def _today(now=None):
+    return (now or datetime.now(CST)).date()
 
 
 def normalize_symbol(raw):
@@ -69,92 +76,73 @@ def normalize_symbol(raw):
     raise BookError('暂不支持该市场的代码（本项目只覆盖沪深A股）: ' + raw)
 
 
-def _positive(raw, field):
+def _positive(raw, field, cap=None):
     try:
         value = float(str(raw).strip())
     except (TypeError, ValueError) as exc:
         raise BookError(field + ' 必须是数字') from exc
     if not value > 0 or value != value or value in (float('inf'), float('-inf')):
         raise BookError(field + ' 必须大于 0')
+    if cap is not None and value > cap:
+        raise BookError('%s 超出合理范围（不超过 %s）' % (field, cap))
     return value
 
 
-def _lot_size(symbol):
+def lot_size(symbol):
     """科创板最小申报数量是 200 股，其余 A 股 100 股。"""
     return 200 if symbol.startswith('sh688') else 100
 
 
-def _optional_positive(form, key, label):
-    raw = form.get(key)
-    if raw is None or str(raw).strip() == '':
-        return None
-    return round(_positive(raw, label), 4)
-
-
-def validate_holding(form):
-    symbol = normalize_symbol(form.get('symbol'))
-    shares = _positive(form.get('shares'), '持仓数量')
+def _shares(raw, symbol, field):
+    shares = _positive(raw, field, MAX_SHARES)
     if shares != int(shares):
-        raise BookError('持仓数量必须是整数股')
+        raise BookError(field + '必须是整数股')
     shares = int(shares)
-    lot = _lot_size(symbol)
+    lot = lot_size(symbol)
     if shares % lot:
         # 拒绝而不是四舍五入：数量错了会让后面算出来的盈亏和仓位全错。
-        raise BookError('持仓数量必须是 %d 股的整数倍（%s）' % (lot, symbol))
-    opened_on = (form.get('opened_on') or '').strip()
-    if opened_on:
-        try:
-            parsed = date.fromisoformat(opened_on)
-        except ValueError as exc:
-            raise BookError('建仓日期格式应为 YYYY-MM-DD') from exc
-        if parsed > datetime.now(CST).date():
-            raise BookError('建仓日期不能是未来')
-        opened_on = parsed.isoformat()
-    hold_type = (form.get('hold_type') or '').strip() or None
-    if hold_type is not None and hold_type not in HOLD_TYPES:
-        raise BookError('持有类型只能是 ' + '/'.join(HOLD_TYPES))
-    stop_price = _optional_positive(form, 'stop_price', '止损价')
-    target_price = _optional_positive(form, 'target_price', '目标价')
-    if stop_price is not None and target_price is not None and stop_price >= target_price:
-        raise BookError('止损价必须低于目标价')
-    raw_t = form.get('t_base_shares')
-    if raw_t is None or str(raw_t).strip() == '':
-        t_base = 0
-    else:
-        try:
-            value = float(str(raw_t).strip())
-        except ValueError as exc:
-            raise BookError('做T底仓必须是数字') from exc
-        # 先判有限性再取整：int(inf) 会抛 OverflowError，不是 BookError，webapp 会变成 500。
-        if not (math.isfinite(value) and value >= 0 and value == int(value)):
-            raise BookError('做T底仓必须是非负整数股')
-        t_base = int(value)
-    if t_base and (t_base % lot or t_base > shares):
-        # 做T只能用底仓先卖后买：超过持仓的部分卖不出去，提示了也没法执行。
-        raise BookError('做T底仓必须是 %d 股的整数倍且不超过持仓数量' % lot)
-    return {'symbol': symbol, 'name': (form.get('name') or '').strip()[:20],
-            'shares': shares, 'cost_price': round(_positive(form.get('cost_price'), '成本价'), 4),
-            'opened_on': opened_on or None, 'note': (form.get('note') or '').strip()[:200],
-            'hold_type': hold_type, 'stop_price': stop_price, 'target_price': target_price,
-            't_base_shares': t_base, 'updated_at': datetime.now(CST).isoformat()}
+        raise BookError('%s必须是 %d 股的整数倍（%s）' % (field, lot, symbol))
+    return shares
 
 
-def validate_watch(form):
-    intent = (form.get('intent') or 'watch').strip()
-    if intent not in INTENTS:
-        raise BookError('关注类型只能是 ' + '/'.join(INTENTS))
-    buy_low = _optional_positive(form, 'buy_low', '买入区间下沿')
-    buy_high = _optional_positive(form, 'buy_high', '买入区间上沿')
-    if (buy_low is None) != (buy_high is None):
-        raise BookError('买入区间需要同时填写下沿和上沿，或者都不填')
-    if buy_low is not None and buy_low >= buy_high:
-        raise BookError('买入区间下沿必须低于上沿')
+def _trade_date(raw, today):
+    text = (raw or '').strip()
+    if not text:
+        return today.isoformat()
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError as exc:
+        raise BookError('成交日期格式应为 YYYY-MM-DD') from exc
+    if parsed > today:
+        raise BookError('成交日期不能是未来')
+    return parsed.isoformat()
+
+
+def validate_watch(form, now=None):
     return {'symbol': normalize_symbol(form.get('symbol')),
-            'name': (form.get('name') or '').strip()[:20], 'intent': intent,
-            'buy_low': buy_low, 'buy_high': buy_high,
+            'name': (form.get('name') or '').strip()[:20],
             'note': (form.get('note') or '').strip()[:200],
-            'added_on': datetime.now(CST).date().isoformat(),
-            'updated_at': datetime.now(CST).isoformat()}
+            'added_on': _today(now).isoformat(),
+            'updated_at': (now or datetime.now(CST)).isoformat()}
+
+
+def validate_buy(form, now=None):
+    symbol = normalize_symbol(form.get('symbol'))
+    return {'symbol': symbol, 'price': round(_positive(form.get('price'), '买入价', MAX_PRICE), 4),
+            'shares': _shares(form.get('shares'), symbol, '买入数量'),
+            'date': _trade_date(form.get('date'), _today(now)),
+            'note': (form.get('note') or '').strip()[:200]}
+
+
+def validate_sell(form, now=None):
+    symbol = normalize_symbol(form.get('symbol'))
+    price = round(_positive(form.get('price'), '卖出价', MAX_PRICE), 4)
+    raw = _positive(form.get('shares'), '卖出数量', MAX_SHARES)
+    if raw != int(raw):
+        raise BookError('卖出数量必须是整数股')
+    return {'symbol': symbol, 'price': price, 'shares': int(raw),
+            'date': _trade_date(form.get('date'), _today(now)),
+            'note': (form.get('note') or '').strip()[:200]}
 
 
 def load(kind, directory=None):
@@ -208,12 +196,106 @@ def remove(kind, symbol, directory=None):
     return _save(kind, kept, directory)
 
 
-def add_holding(form, directory=None):
-    return upsert('holdings', validate_holding(form), directory)
+def add_watch(form, directory=None, now=None):
+    """加入自选。已经在自选里就只更新名称/备注，保留最初加入的日期。"""
+    entry = validate_watch(form, now)
+    for row in load('watchlist', directory):
+        if row.get('symbol') == entry['symbol']:
+            entry['added_on'] = row.get('added_on') or entry['added_on']
+            entry['name'] = entry['name'] or row.get('name') or ''
+            if not (form.get('note') or '').strip():
+                entry['note'] = row.get('note') or ''
+    return upsert('watchlist', entry, directory)
 
 
-def add_watch(form, directory=None):
-    return upsert('watchlist', validate_watch(form), directory)
+# --- 成交流水与 T+1 -----------------------------------------------------------
+
+def _append_trade(trade, directory=None):
+    trades = load('trades', directory)
+    trades.append(trade)
+    _save('trades', trades, directory)
+
+
+def bought_on(trades, symbol, day):
+    """某只股票在某一天买入的股数：这部分按 T+1 当天不能卖。"""
+    return sum(t['shares'] for t in trades
+               if t.get('symbol') == symbol and t.get('side') == 'buy' and t.get('date') == day)
+
+
+def sellable_shares(holding, trades, day):
+    return max(0, int(holding['shares']) - bought_on(trades, holding['symbol'], day))
+
+
+def with_sellable(holdings, trades=None, now=None, directory=None):
+    """给每条持仓补上 sellable_shares（今天可卖）。返回新列表，不改账本。"""
+    trades = load('trades', directory) if trades is None else trades
+    day = _today(now).isoformat()
+    return [{**h, 'sellable_shares': sellable_shares(h, trades, day)} for h in holdings]
+
+
+def recent_trades(limit=50, directory=None):
+    return list(reversed(load('trades', directory)[-limit:]))
+
+
+def _new_trade(now, side, entry, name, **extra):
+    return {'id': '%s-%s' % (now.strftime('%Y%m%d%H%M%S'), uuid.uuid4().hex[:4]), 'at': now.isoformat(),
+            'side': side, 'symbol': entry['symbol'], 'name': name, 'price': entry['price'],
+            'shares': entry['shares'], 'date': entry['date'], 'note': entry['note'], **extra}
+
+
+def buy(form, directory=None, now=None):
+    """从自选股买入。已持有就按加权平均更新成本价（不含费用，和页面上的盈亏口径一致）。
+
+    先写流水、后写持仓：万一第二步失败，多出来的只是一条没有对应持仓的买入记录（无害）；
+    反过来的话持仓里有一笔流水里没有的买入，T+1 的可卖数量就会多算。"""
+    now = now or datetime.now(CST)
+    entry = validate_buy(form, now)
+    watch = next((w for w in load('watchlist', directory) if w.get('symbol') == entry['symbol']), None)
+    if watch is None:
+        raise BookError('买入请从自选股操作：先把 %s 加入自选股' % entry['symbol'])
+    current = next((h for h in load('holdings', directory) if h.get('symbol') == entry['symbol']), None)
+    if current:
+        total = current['shares'] + entry['shares']
+        cost = (current['cost_price'] * current['shares'] + entry['price'] * entry['shares']) / total
+        opened = min(filter(None, [current.get('opened_on'), entry['date']]))
+    else:
+        total, cost, opened = entry['shares'], entry['price'], entry['date']
+    name = (watch.get('name') or (current or {}).get('name') or '')
+    holding = {'symbol': entry['symbol'], 'name': name, 'shares': total, 'cost_price': round(cost, 4),
+               'opened_on': opened, 'note': (current or {}).get('note') or '',
+               'updated_at': now.isoformat()}
+    if not current and len(load('holdings', directory)) >= MAX_ENTRIES:
+        raise BookError('最多只能保存 %d 条记录' % MAX_ENTRIES)
+    _append_trade(_new_trade(now, 'buy', entry, name), directory)
+    return upsert('holdings', holding, directory)
+
+
+def sell(form, directory=None, now=None):
+    """从持仓卖出。全部卖出就清掉这条持仓；部分卖出不改变剩余持仓的成本价，只记已实现盈亏。"""
+    now = now or datetime.now(CST)
+    entry = validate_sell(form, now)
+    current = next((h for h in load('holdings', directory) if h.get('symbol') == entry['symbol']), None)
+    if current is None:
+        raise BookError('持仓里没有这只股票: ' + entry['symbol'])
+    held, shares = int(current['shares']), entry['shares']
+    if shares > held:
+        raise BookError('卖出数量 %d 超过持仓 %d' % (shares, held))
+    lot = lot_size(entry['symbol'])
+    if shares % lot and shares != held:
+        raise BookError('卖出数量必须是 %d 股的整数倍（全部卖出除外）' % lot)
+    sellable = sellable_shares(current, load('trades', directory), entry['date'])
+    if shares > sellable:
+        raise BookError('T+1：当天买入的 %d 股当天不能卖，目前最多可卖 %d 股' % (held - sellable, sellable))
+    cost = float(current['cost_price'])
+    trade = _new_trade(now, 'sell', entry, current.get('name') or '', cost_price=cost,
+                       realized_pnl=round((entry['price'] - cost) * shares, 2))
+    _append_trade(trade, directory)
+    if shares == held:
+        return remove('holdings', entry['symbol'], directory)
+    # 显式列出字段而不是 {**current}：旧版本录入的行带着 hold_type/止损/目标/做T底仓，趁这次改写把它们丢掉。
+    return upsert('holdings', {'symbol': current['symbol'], 'name': current.get('name') or '', 'shares': held - shares,
+                               'cost_price': cost, 'opened_on': current.get('opened_on'),
+                               'note': current.get('note') or '', 'updated_at': now.isoformat()}, directory)
 
 
 def all_symbols(directory=None):

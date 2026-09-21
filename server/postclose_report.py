@@ -301,12 +301,12 @@ def render(report):
                   and 'candidate' not in r['roles']]
     if watch_only:
         lines += ['## 自选股（非持仓、不在候选池）', '',
-                  '| 股票 | 现价 | 涨跌 | MA20偏离 | 关注类型 |', '|---|---:|---:|---:|---|']
+                  '| 股票 | 现价 | 涨跌 | MA20偏离 | 备注 |', '|---|---:|---:|---:|---|']
         for row in watch_only:
             lines.append('| %s %s | %s | %s%% | %s%% | %s |' % (
                 row['name'], row['symbol'], row['quote']['last'], row['quote']['change_pct'],
                 row['price_facts'].get('ma20_deviation_pct'),
-                portfolio_book.INTENT_LABEL.get((row.get('watch') or {}).get('intent'), '—')))
+                (row.get('watch') or {}).get('note') or '—'))
         lines += ['', '这些股票不在策略候选池里，没有经过两条 track 的规则筛选，'
                       '上面的数字只是行情事实。', '']
 

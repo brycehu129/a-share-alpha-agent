@@ -23,6 +23,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
+import book_levels
 from collect_quotes import CST
 from dashboard_export import latest
 from shortterm_model import BREAKOUT, PULLBACK
@@ -134,7 +135,7 @@ def pullback_gates(facts, quote):
     gates = {}
     if facts.get('return2_pct') is not None:
         ok = facts['return2_pct'] <= PULLBACK['return2_max']
-        gates['近2日回调'] = (ok, '%.2f%% (要求≤%.1f%%)' % (facts['return2_pct'], PULLBACK['return2_max']))
+        gates['近2日涨跌'] = (ok, '%.2f%% (要求≤%.1f%%)' % (facts['return2_pct'], PULLBACK['return2_max']))
     if facts.get('ma20_deviation_pct') is not None:
         ok = 0 <= facts['ma20_deviation_pct'] <= PULLBACK['deviation_max']
         gates['MA20偏离'] = (ok, '%.2f%% (要求0–%.0f%%)' % (facts['ma20_deviation_pct'], PULLBACK['deviation_max']))
@@ -160,6 +161,8 @@ def entry_band(forecast, quote):
 
 
 def holding_facts(holding, quote):
+    """持仓事实。holding 应是 book_levels.enrich 之后的行：止损/止盈位是系统按策略（ATR）从成本价算的，
+    做T底仓是今天可卖的老仓——都不是用户声明的，下游据此措辞。没 enrich 过就是 None，不代填默认值。"""
     last = _f(quote.get('last'))
     cost, shares = float(holding['cost_price']), int(holding['shares'])
     value = round(last * shares, 2)
@@ -168,8 +171,7 @@ def holding_facts(holding, quote):
     return {'shares': shares, 'cost_price': cost, 'market_value': value,
             'unrealized_pnl': pnl, 'unrealized_pct': round((last / cost - 1) * 100, 4),
             'opened_on': holding.get('opened_on'), 'note': holding.get('note') or None,
-            # 用户自己声明的：不填就是 None，下游据此决定这类信号触不触发，绝不代填默认值。
-            'hold_type': holding.get('hold_type'), 'stop_price': stop, 'target_price': target,
+            'stop_price': stop, 'target_price': target,
             't_base_shares': holding.get('t_base_shares') or 0,
             'to_stop_pct': round((last / stop - 1) * 100, 4) if stop else None,
             'to_target_pct': round((target / last - 1) * 100, 4) if target else None}
@@ -235,10 +237,10 @@ def check(history, quotes, holdings=None, watchlist=None, agent=None):
             row['plan']['paper_eligible'] = forecast.get('paper_eligible')
             row['plan']['plan_reasons'] = forecast.get('plan_reasons', [])
         if symbol in holdings:
-            row['holding'] = holding_facts(holdings[symbol], quote)
+            row['holding'] = holding_facts(
+                book_levels.enrich(holdings[symbol], bars, quote.get('quote_date')), quote)
         if symbol in watchlist:
-            row['watch'] = {'intent': watchlist[symbol].get('intent'),
-                            'note': watchlist[symbol].get('note') or None}
+            row['watch'] = {'note': watchlist[symbol].get('note') or None}
         rows.append(row)
 
     rows.sort(key=lambda r: (0 if 'holding' in r['roles'] else 1, r['symbol']))

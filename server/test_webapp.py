@@ -54,7 +54,9 @@ class ServerCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         env = patch.dict(os.environ, {"ADMIN_PASSWORD": PASSWORD, "CONFIG_PATH": str(self.tmp / "config.json"),
-                                      "PRIVATE_DATA_DIR": str(self.tmp / "private")})
+                                      "PRIVATE_DATA_DIR": str(self.tmp / "private"),
+                                      # 不指定的话 api_pages 会去读这台机器上真实的 .history（日线缓存、策略评分）。
+                                      "HISTORY_DIR": str(self.tmp / "history")})
         env.start()
         self.addCleanup(env.stop)
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), webapp.Handler)
@@ -223,39 +225,186 @@ class SettingsApiTests(ServerCase):
         self.assertIn("发送失败", payload["message"])
 
 
+def flat_bars(n=40, close=10.0):
+    """n 根平的日线（一字板，ATR 无效）：够算 MA20/MA60 以外的均线类事实，够触发"按典型波动估算"。"""
+    from datetime import date, timedelta
+    out, d = [], date(2026, 9, 18)
+    while len(out) < n:
+        if d.weekday() < 5:
+            out.append({"date": d.isoformat(), "close": str(close), "open": str(close), "high": str(close),
+                        "low": str(close)})
+        d -= timedelta(days=1)
+    return list(reversed(out))
+
+
+def live(symbol="sh600519", last="1300", prev="1300", name="贵州茅台", **kw):
+    q = {"symbol": symbol, "market": "cn", "name": name, "last": last, "previous_close": prev, "open": prev,
+         "high": last, "low": last, "change_pct": "0.00", "volume_ratio": "1.0", "quote_date": "2026-09-21",
+         "quote_at": "2026-09-21T10:00:00+08:00", "age_seconds": 3, "is_index": False,
+         "limit_up": None, "limit_down": None}
+    q.update(kw)
+    return q
+
+
+def snapshot(*quotes, failures=()):
+    return {"quotes": list(quotes), "failures": list(failures), "session": "morning"}
+
+
 class BookApiTests(ServerCase):
-    def test_add_list_and_remove_a_holding_and_a_watch(self):
-        with patch("live_quote.snapshot", return_value={"quotes": [], "failures": []}):
-            status, payload = self.json("POST", "/api/book/holding", {"symbol": "600519", "name": "茅台", "shares": 100, "cost_price": "1300"})
-            self.assertEqual(status, 200)
-            status, payload = self.json("POST", "/api/book/watch", {"symbol": "000001", "intent": "buy"})
-            self.assertEqual(status, 200)
-            _, book = self.json("GET", "/api/book")
-            self.assertEqual([h["symbol"] for h in book["holdings"]], ["sh600519"])
-            self.assertEqual(book["holdings"][0]["shares"], 100)
-            self.assertEqual([w["symbol"] for w in book["watchlist"]], ["sz000001"])
-            self.assertEqual(self.json("POST", "/api/book/holding/remove", {"symbol": "sh600519"})[0], 200)
-            self.assertEqual(self.json("POST", "/api/book/watch/remove", {"symbol": "sz000001"})[0], 200)
-            _, book = self.json("GET", "/api/book")
-            self.assertEqual((book["holdings"], book["watchlist"]), ([], []))
+    def watch(self, symbol="600519", name="贵州茅台"):
+        return self.json("POST", "/api/book/watch", {"symbol": symbol, "name": name})
+
+    def buy(self, symbol="600519", shares=100, price="1300", **kw):
+        return self.json("POST", "/api/book/buy", {"symbol": symbol, "shares": shares, "price": price, **kw})
+
+    def book(self, *quotes, bars=None):
+        with patch("live_quote.snapshot", return_value=snapshot(*quotes)), \
+                patch("live_check.load_series", return_value=(bars or [], None, None)):
+            return self.json("GET", "/api/book")
+
+    def test_watch_buy_sell_remove_flow(self):
+        self.assertEqual(self.watch()[0], 200)
+        self.assertEqual(self.buy(shares=300, price="1300", date="2026-09-01")[0], 200)
+        _, book = self.book(live())
+        self.assertEqual([h["symbol"] for h in book["holdings"]], ["sh600519"])
+        h = book["holdings"][0]
+        self.assertEqual((h["shares"], h["sellable"], h["cost_price"]), (300, 300, 1300.0))
+        self.assertEqual([w["symbol"] for w in book["watchlist"]], ["sh600519"])
+        self.assertEqual(book["watchlist"][0]["held_shares"], 300)
+        status, payload = self.json("POST", "/api/book/sell", {"symbol": "600519", "shares": 100, "price": "1400"})
+        self.assertEqual(status, 200)
+        _, book = self.book(live())
+        self.assertEqual(book["holdings"][0]["shares"], 200)
+        self.assertEqual([t["side"] for t in book["trades"]], ["sell", "buy"])
+        self.assertEqual(book["trades"][0]["realized_pnl"], 10000.0)
+        self.assertEqual(self.json("POST", "/api/book/watch/remove", {"symbol": "sh600519"})[0], 200)
+
+    def test_the_old_direct_holding_entry_is_gone(self):
+        """持仓不能凭空录入：只能从自选买入、从持仓卖出。"""
+        status, _ = self.json("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1300"})
+        self.assertEqual(status, 404)
+
+    def test_buying_something_not_on_the_watchlist_is_refused(self):
+        status, payload = self.buy()
+        self.assertEqual(status, 400)
+        self.assertIn("自选", payload["message"])
+
+    def test_same_day_buy_cannot_be_sold_the_same_day(self):
+        self.watch()
+        self.assertEqual(self.buy()[0], 200)                                   # 日期默认今天
+        status, payload = self.json("POST", "/api/book/sell", {"symbol": "600519", "shares": 100, "price": "1400"})
+        self.assertEqual(status, 400)
+        self.assertIn("T+1", payload["message"])
+        _, book = self.book(live())
+        self.assertEqual(book["holdings"][0]["sellable"], 0)
 
     def test_invalid_entries_are_rejected_with_a_readable_message(self):
-        status, payload = self.json("POST", "/api/book/holding", {"symbol": "zzz", "shares": "100", "cost_price": "1"})
+        status, payload = self.json("POST", "/api/book/buy", {"symbol": "zzz", "shares": "100", "price": "1"})
         self.assertEqual(status, 400)
         self.assertIn("无法识别", payload["message"])
+        self.watch()
+        status, payload = self.buy(shares=150)
+        self.assertEqual(status, 400)
+        self.assertIn("100 股的整数倍", payload["message"])
+
+    def test_adding_a_watch_fills_the_name_from_search_when_the_client_did_not_send_one(self):
+        with patch("stock_search.resolve", return_value={"symbol": "sz000001", "name": "平安银行"}):
+            self.assertEqual(self.json("POST", "/api/book/watch", {"symbol": "000001"})[0], 200)
+        _, book = self.book(live("sz000001", "10", "10", "平安银行"))
+        self.assertEqual(book["watchlist"][0]["name"], "平安银行")
+
+    def test_adding_an_unknown_code_is_refused_but_a_search_outage_does_not_block_it(self):
+        import stock_search
+        with patch("stock_search.resolve", return_value=None):
+            status, payload = self.json("POST", "/api/book/watch", {"symbol": "000009"})
+        self.assertEqual(status, 400)
+        self.assertIn("没有找到", payload["message"])
+        with patch("stock_search.resolve", side_effect=stock_search.SearchError("down")):
+            self.assertEqual(self.json("POST", "/api/book/watch", {"symbol": "000009"})[0], 200)
+
+    def test_rules_endpoint_serves_the_rule_text_for_the_page(self):
+        status, p = self.json("GET", "/api/book/rules")
+        self.assertEqual(status, 200)
+        self.assertEqual(p["holding"]["groups"][0]["label"], "建议彻底卖出")
+        self.assertEqual(p["watch"]["groups"][0]["label"], "具备买入信号")
+        self.assertIn("前瞻验证", p["disclaimer"])
+
+    def test_search_endpoint(self):
+        import stock_search
+        hit = {"symbol": "sh600519", "code": "600519", "name": "贵州茅台", "pinyin": "GZMT", "board": ""}
+        with patch("stock_search.search", return_value=[hit]):
+            status, payload = self.json("GET", "/api/book/search?q=maotai")
+        self.assertEqual((status, payload["results"]), (200, [hit]))
+        with patch("stock_search.search", side_effect=stock_search.SearchError("搜索接口请求失败")):
+            status, payload = self.json("GET", "/api/book/search?q=x")
+        self.assertEqual(status, 502)
+
+    def test_lookup_returns_name_price_and_whether_it_is_already_watched_or_held(self):
+        self.watch()
+        with patch("stock_search.resolve", return_value={"symbol": "sh600519", "name": "贵州茅台"}), \
+                patch("live_quote.snapshot", return_value=snapshot(live(last="1350", prev="1300", change_pct="3.85",
+                                                                        limit_up="1430", limit_down="1170"))):
+            status, p = self.json("GET", "/api/book/lookup?symbol=600519")
+        self.assertEqual(status, 200)
+        self.assertEqual((p["symbol"], p["name"], p["last"], p["limit_up"], p["in_watch"], p["held_shares"], p["lot"]),
+                         ("sh600519", "贵州茅台", 1350.0, "1430", True, 0, 100))
+
+    def test_lookup_of_an_unknown_stock_and_of_garbage(self):
+        with patch("stock_search.resolve", return_value=None), patch("live_quote.snapshot", return_value=snapshot()):
+            status, p = self.json("GET", "/api/book/lookup?symbol=000009")
+        self.assertEqual(status, 400)
+        self.assertIn("没有找到", p["message"])
+        self.assertEqual(self.json("GET", "/api/book/lookup?symbol=abc")[0], 400)
+
+    def test_lookup_survives_a_quote_outage_using_the_search_name(self):
+        with patch("stock_search.resolve", return_value={"symbol": "sh600519", "name": "贵州茅台"}), \
+                patch("live_quote.snapshot", side_effect=OSError("down")):
+            status, p = self.json("GET", "/api/book/lookup?symbol=600519")
+        self.assertEqual((status, p["name"], p["last"]), (200, "贵州茅台", None))
+        self.assertIn("取不到行情", p["warning"])
 
     def test_quote_failure_does_not_hide_the_book_and_is_reported(self):
-        with patch("live_quote.snapshot", return_value={"quotes": [], "failures": []}):
-            self.json("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1300"})
+        self.watch()
+        self.buy(date="2026-09-01")
         with patch("live_quote.snapshot", side_effect=OSError("network down")):
             status, book = self.json("GET", "/api/book")
         self.assertEqual(status, 200)
         self.assertEqual(len(book["holdings"]), 1)
         self.assertIn("network down", book["trouble"])
         self.assertIsNone(book["holdings"][0]["last"])
+        self.assertIsNone(book["holdings"][0]["verdict"])
+
+    def test_rows_carry_the_systems_verdict_not_a_user_declaration(self):
+        # 持仓：现价跌破系统止损位（成本 1300 的 5.25% 以下 = 1231.75）→ 建议彻底卖出
+        self.watch()
+        self.buy(date="2026-09-01")
+        _, book = self.book(live(last="1200", prev="1300", change_pct="-7.69"), bars=flat_bars(close=1300.0))
+        v = book["holdings"][0]["verdict"]
+        self.assertEqual(v["action"], "exit")
+        self.assertIn("系统止损位", "".join(v["reasons"]))
+        self.assertAlmostEqual(v["stop_price"], 1231.75, places=2)
+        # 现价在成本附近：继续持有，并给出到系统止损/止盈位的距离
+        _, book = self.book(live(last="1310", prev="1300", change_pct="0.77"), bars=flat_bars(close=1300.0))
+        v = book["holdings"][0]["verdict"]
+        self.assertEqual(v["action"], "hold")
+        self.assertLess(v["to_stop_pct"], 10)
+        self.assertTrue(any("典型波动" in c for c in v["caveats"]))                # 日线是一字板，波动率算不出来
+        # 自选：没有买入形态
+        w = book["watchlist"][0]["verdict"]
+        self.assertEqual(w["action"], "wait")
+
+    def test_a_verdict_that_cannot_be_computed_only_affects_its_own_row(self):
+        self.watch()
+        self.buy(date="2026-09-01")
+        with patch("live_quote.snapshot", return_value=snapshot(live())), \
+                patch("live_check.load_series", side_effect=RuntimeError("boom")):
+            status, book = self.json("GET", "/api/book")
+        self.assertEqual(status, 200)
+        self.assertEqual(book["holdings"][0]["verdict"]["action"], "nodata")
+        self.assertIn("RuntimeError", book["holdings"][0]["verdict"]["reasons"][0])
 
     def test_cross_site_write_is_blocked(self):
-        status, _, _ = self.request("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1"},
+        status, _, _ = self.request("POST", "/api/book/buy", {"symbol": "600519", "shares": 100, "price": "1"},
                                     headers={"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(status, 403)
 
@@ -282,18 +431,21 @@ class SentinelInBookApiTests(ServerCase):
         import sentinel_view
         self.write_alerts(sentinel_view.safe_day(None), self.rec([self.block("sh600519", True), self.block("sz000001")]),
                           self.rec([self.block("sh600519")], "10:05:00"))
+        self.json("POST", "/api/book/watch", {"symbol": "600519", "name": "茅台"})
+        self.json("POST", "/api/book/buy", {"symbol": "600519", "shares": 100, "price": "1300", "date": "2026-09-01"})
+        self.json("POST", "/api/book/watch", {"symbol": "000001", "name": "甲"})
+        self.json("POST", "/api/book/watch", {"symbol": "000002", "name": "乙"})
         with patch("live_quote.snapshot", return_value={"quotes": [], "failures": []}):
-            self.json("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1300"})
-            self.json("POST", "/api/book/watch", {"symbol": "000001", "intent": "buy"})
-            self.json("POST", "/api/book/watch", {"symbol": "000002", "intent": "buy"})
             _, book = self.json("GET", "/api/book")
         self.assertEqual(book["holdings"][0]["alerts"], {"count": 2, "urgent": 1})
         self.assertEqual({w["symbol"]: w["alerts"] for w in book["watchlist"]},
-                         {"sz000001": {"count": 1, "urgent": 0}, "sz000002": {"count": 0, "urgent": 0}})
+                         {"sh600519": {"count": 2, "urgent": 1}, "sz000001": {"count": 1, "urgent": 0},
+                          "sz000002": {"count": 0, "urgent": 0}})
 
     def test_a_broken_alert_file_never_breaks_the_book_page(self):
+        self.json("POST", "/api/book/watch", {"symbol": "600519", "name": "茅台"})
+        self.json("POST", "/api/book/buy", {"symbol": "600519", "shares": 100, "price": "1300", "date": "2026-09-01"})
         with patch("live_quote.snapshot", return_value={"quotes": [], "failures": []}):
-            self.json("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1300"})
             with patch("sentinel_view.alert_counts", side_effect=RuntimeError("boom")):
                 status, book = self.json("GET", "/api/book")
         self.assertEqual(status, 200)

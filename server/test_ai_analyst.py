@@ -84,7 +84,9 @@ class PromptTests(unittest.TestCase):
         p = ai_analyst.system_prompt()
         self.assertIn('只适用于候选池，不适用于用户的持仓', p)
         self.assertIn('不知道用户为什么买', p)
-        self.assertIn('没声明的就是没设', p)
+        self.assertIn('系统按策略的波动率(ATR)规则', p)
+        self.assertIn('不是用户设的', p)
+        self.assertNotIn('hold_type', p)
         self.assertNotIn('最长持有', p)
         self.assertNotIn('止损3%', p)
 

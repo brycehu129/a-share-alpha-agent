@@ -2,7 +2,7 @@
 
 和 ai_analyst（盘后、候选池口径）彻底分开——那份 prompt 会把候选池的策略口径
 （"最长持有3个交易日""止损3%止盈5%"）拿来衡量你自己买的票，而系统根本不知道你为什么买。
-这里的 prompt 只描述你自己声明的信息（成本、止损、目标、持有类型、做T底仓）。
+这里的 prompt 只描述你的买入成本，以及系统按波动率(ATR)从成本价算出的止损/止盈参考位和可卖老仓。
 
 **不画预测路径，给带触发条件的情景。** 日内走势预测的准确率接近随机，而一条预测曲线的
 说服力远超它的信息量——你会信它，而它驱动的是真金白银的决策。情景是可证伪的：
@@ -17,7 +17,7 @@ import os
 
 from ai_analyst import SUPPORTED_KEYWORDS  # noqa: F401  同一套结构化输出关键字约束
 
-PROMPT_VERSION = 'sentinel-scenario-1'
+PROMPT_VERSION = 'sentinel-scenario-2'
 ANALYSIS_TIMEOUT_S = 100
 # 推理 token 和可见输出共用这个预算（Anthropic 直连和 OpenRouter 都是）。情景本身只是几百字的结构化
 # JSON，但推理可能吃掉几千 token；预算太小会出现"推理耗尽、可见内容为空、照样计费"。
@@ -75,8 +75,9 @@ def system_prompt():
 
 # 你不知道的事（不要假装知道）
 
-- 你**不知道用户为什么买这只股票**，所以不要用任何"策略规则"去评价它。用户告诉你的只有：成本价、
-  持有类型（短线/波段/长期/套牢待解）、他自己设的止损价/目标价、做T底仓。没填的就是没设，不要替他设。
+- 你**不知道用户为什么买这只股票**，所以不要用任何"策略规则"去评价它。用户告诉你的只有买入成本价；
+  输入里的 stop_price / target_price 是**系统按波动率(ATR)从成本价算出的参考位**（不是用户设的），
+  t_base_shares 是系统按 T+1 算出的今天可卖老仓。没有这些字段就是没算出来，不要替他设。
 - 你**没有任何新闻、公告、研报、业绩、政策信息**。禁止提及或暗示任何消息面内容——你没有这些数据，
   写出来就是编造。
 - 你**无法预测日内走势**。不要画路径、不要说"预计收于X"。只给带触发条件的情景。
@@ -108,8 +109,8 @@ def key_levels(quote, facts, day, holding=None, limits=None):
               '20日最高收盘': facts.get('high20_close'), '20日最低收盘': facts.get('low20_close'),
               '涨停价': (limits or {}).get('limit_up'), '跌停价': (limits or {}).get('limit_down')}
     if holding:
-        levels.update({'成本价': f(holding.get('cost_price')), '你的止损价': f(holding.get('stop_price')),
-                       '你的目标价': f(holding.get('target_price'))})
+        levels.update({'成本价': f(holding.get('cost_price')), '系统止损位': f(holding.get('stop_price')),
+                       '系统止盈位': f(holding.get('target_price'))})
     return {k: round(v, 4) for k, v in levels.items() if v}
 
 
@@ -174,7 +175,7 @@ def validate_entry(entry, last, limit_up=None, limit_down=None, is_holding=False
         problems.append('没有任何合格的情景，本条只展示规则层事实')
     hint = entry.get('action_hint')
     if hint in ('t_sell_high', 't_buy_low') and not t_base:
-        problems.append('action_hint=%s 需要你声明做T底仓，已改为 wait' % hint)
+        problems.append('action_hint=%s 需要今天有可卖的老仓做底仓，已改为 wait' % hint)
         entry['action_hint'] = 'wait'
     elif hint in HOLDING_ONLY_HINTS and not is_holding:
         problems.append('action_hint=%s 只对持仓有意义，已改为 wait' % hint)
