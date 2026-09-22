@@ -293,6 +293,16 @@ def check_premarket_plans(ctx):
             continue
         if created_at[:10] == ctx.today:
             return check('premarket', title, OK, '今天的买入计划已冻结', created_at)
+    ops = ctx.history / 'operations.json'
+    if ops.exists():
+        try:
+            checkpoints = json.loads(ops.read_text(encoding='utf-8')).get('checkpoints', {})
+        except (OSError, ValueError):
+            checkpoints = {}
+        phase = 'premarket_after_open' if ctx.now.time() >= clock_time(9, 35) else 'premarket'
+        prior = checkpoints.get(phase) or checkpoints.get('premarket') or {}
+        if prior.get('report_date') == ctx.today and prior.get('status') in ('ready', 'closed'):
+            return check('premarket', title, OK, '盘前流程已完成；今天没有可冻结的买入计划。', prior.get('finished_at') or prior.get('updated_at'))
     return check('premarket', title, CRIT, '今天到现在没有冻结出任何买入计划：盘前选股没有跑完（或选出 0 只）。'
                                             '执行器 09:25 之后不再等计划，今天不会有条件入场。')
 

@@ -175,6 +175,20 @@ class PipelineTests(Base):
         self.assertEqual(hc.check_premarket_plans(self.ctx('09:30:00'))['level'], hc.OK)
         self.assertEqual(hc.check_premarket_plans(self.ctx('16:30:00'))['level'], hc.SKIP)            # 收盘后不再查
 
+    def test_completed_premarket_phase_with_zero_plans_is_not_a_system_failure(self):
+        (self.history / 'operations.json').write_text(json.dumps({
+            'checkpoints': {
+                'premarket': {
+                    'report_date': '2026-09-21',
+                    'status': 'ready',
+                    'finished_at': '2026-09-21T08:58:00+08:00',
+                }
+            }
+        }))
+        r = hc.check_premarket_plans(self.ctx('10:00:00'))
+        self.assertEqual(r['level'], hc.OK)
+        self.assertIn('盘前流程已完成', r['message'])
+
     def postclose(self, generated, ai_status=None):
         d = self.private / 'postclose'
         d.mkdir(exist_ok=True)
