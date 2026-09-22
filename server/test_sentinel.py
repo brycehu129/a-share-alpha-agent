@@ -179,8 +179,8 @@ def event(symbol='sz000001', kind='sentinel.stop_hit', severity='urgent', detail
 
 
 class AfterTickTests(unittest.TestCase):
-    def prime(self, h, **kw):
-        h.s.evaluate(tick([quote(**kw)]))
+    def prime(self, h, minutes=None, **kw):
+        h.s.evaluate(tick([quote(**kw)], minutes=minutes))
 
     def test_alert_is_sent_immediately_and_stands_on_its_own(self):
         h = Harness(); self.prime(h)
@@ -284,14 +284,16 @@ class AfterTickTests(unittest.TestCase):
 
     def test_alert_still_goes_out_when_minute_data_is_unavailable(self):
         """最需要快的东西不能被慢的/不稳的东西拖住：分时取不到，就没有均价线，告警照发。"""
-        h = Harness(); self.prime(h)
+        h = Harness()
 
-        def boom(sym, now):
-            raise OSError('down')
-        h.s.minute_fn = boom
+        def boom(sym):
+            raise minute_data.MinuteError('down')
+        self.prime(h, minutes=boom)
+        h.s.minute_fn = lambda sym, now: (_ for _ in ()).throw(OSError('down'))
         h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
         self.assertEqual(len(h.sent), 1)
         self.assertNotIn('均价线', h.sent[0])
+        self.assertNotIn('MACD', h.sent[0])
 
     def test_minute_fetching_has_a_total_time_budget_so_the_alert_still_goes_out(self):
         """tick 服务的 systemd 时限只有 50 秒，而每次取分时最长 20 秒。预算用完就不再取，告警照发。"""
