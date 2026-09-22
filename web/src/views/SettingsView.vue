@@ -116,13 +116,7 @@ function healthHead(h) {
   return { tag: h.critical ? 'danger' : 'success', label: h.critical ? '有严重问题' : '运行中', text: `最近一次检查 ${age} 分钟前。` }
 }
 const fmtAt = (iso) => String(iso || '').slice(0, 16).replace('T', ' ')
-// 「上次执行」列：当天的只显示时分秒，其它天带上月日；没有依据的执行记录（例如今天不在运行时段）显示 —
-const fmtWhen = (iso) => {
-  const s = String(iso || '')
-  if (!s) return '—'
-  const t = s.slice(11, 19)
-  return s.slice(0, 10) === new Date().toLocaleDateString('sv-SE') ? t : `${s.slice(5, 10)} ${t.slice(0, 5)}`
-}
+const fmtWhen = (iso) => String(iso || '').slice(0, 19).replace('T', ' ') || '—'
 </script>
 
 <template>
@@ -278,7 +272,7 @@ const fmtWhen = (iso) => {
             <el-table-column label="状态" width="90">
               <template #default="{ row }"><el-tag :type="LEVEL_TAG[row.level] || 'info'" size="small">{{ LEVEL_TEXT[row.level] || row.level }}</el-tag></template>
             </el-table-column>
-            <el-table-column label="上次执行" width="130">
+            <el-table-column label="上次执行" width="165">
               <template #default="{ row }">{{ fmtWhen(row.at) }}</template>
             </el-table-column>
             <el-table-column prop="schedule" label="计划时间" min-width="170" />

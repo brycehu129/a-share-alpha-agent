@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { fmtAmount, fmtBoards, fmtNum, fmtPct, fmtTs } from '../../format'
 import { openStock } from '../../composables/useStockDetail'
 
-// 次日关注：从当日涨停池 + 龙虎榜里用透明规则筛出的强势股，附 AI 点评。分数是规则分数，不是概率；
+// 次日关注：从当日涨停池 + 强势股池 + 龙虎榜里用透明规则筛出的强势股，附 AI 点评。分数是规则分数，不是概率；
 // 每一分从哪来都列在「加分项」里，风险点单独列出。AI 只点评这几只，不增删候选，也不给具体价位。
 const props = defineProps({ watch: { type: Object, default: null } })
 
@@ -29,7 +29,7 @@ const aiReason = computed(() => {
       </div>
     </template>
 
-    <p v-if="!watch" class="muted" style="margin: 0">次日关注暂无：涨停池/龙虎榜落盘后由定时任务（工作日 16:30、17:30）生成。</p>
+    <p v-if="!watch" class="muted" style="margin: 0">次日关注暂无：涨停池/强势股池/龙虎榜落盘后由定时任务（工作日 16:30、17:30）生成。</p>
     <p v-else-if="!items.length" class="muted" style="margin: 0">{{ watch.note || '当日没有满足条件的候选。' }}</p>
     <template v-else>
       <div v-if="s" class="sentiment num">

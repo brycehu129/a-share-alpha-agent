@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""次日关注：从当日涨停池 + 龙虎榜里，用透明的规则筛出"比较强势、值得第二天重点看"的股票，再让 AI 点评。
+"""次日关注：从当日涨停池 + 强势股池 + 龙虎榜里，用透明的规则筛出"比较强势、值得第二天重点看"的股票，再让 AI 点评。
 
 **这是短线情绪视图，独立于「候选池」的策略选股**（那边有自己冻结的口径和回测），互不影响。
 
@@ -174,29 +174,54 @@ def score_row(row, industry_counts, lhb_net):
 
 
 def rank(review, top_n=TOP_N):
-    """→ {'items': [...], 'sentiment': {...}}。涨停池缺失就没有可排的东西，返回空列表并说明。"""
+    """→ {'items': [...], 'sentiment': {...}}。涨停池/强势股池都缺失就没有可排的东西。"""
     pools = review.get('pools') or {}
     zt = pools.get('zt')
+    qs = pools.get('qs')
     out = {'rules_version': RULES_VERSION, 'date': review.get('date'), 'sentiment': sentiment(pools), 'items': [],
            'note': None}
-    if not zt or not zt['rows']:
-        out['note'] = '当日没有涨停池数据，无法生成次日关注。'
+    zt_rows = (zt or {}).get('rows') or []
+    qs_rows = (qs or {}).get('rows') or []
+    if not zt_rows and not qs_rows:
+        out['note'] = '当日没有涨停池/强势股池数据，无法生成次日关注。'
         return out
     counts = {}
-    for r in zt['rows']:
+    for r in zt_rows:
         if r.get('industry'):
             counts[r['industry']] = counts.get(r['industry'], 0) + 1
     lhb = {r['symbol']: r for r in ((review.get('lhb') or {}).get('rows') or [])}
+    merged = {r['symbol']: dict(r, source_kinds=['zt']) for r in zt_rows if r.get('symbol')}
+    for r in qs_rows:
+        symbol = r.get('symbol')
+        if not symbol:
+            continue
+        if symbol in merged:
+            merged[symbol]['source_kinds'].append('qs')
+            merged[symbol]['new_high'] = r.get('new_high')
+            merged[symbol]['volume_ratio'] = r.get('volume_ratio')
+            continue
+        item = dict(r)
+        item['source_kinds'] = ['qs']
+        merged[symbol] = item
     items = []
-    for r in zt['rows']:
+    for r in merged.values():
         if _excluded(r['name']):
             continue
         l = lhb.get(r['symbol'])
         score, tags, reasons, risks = score_row(r, counts, l['net'] if l else None)
+        if 'qs' in r.get('source_kinds', []):
+            tags.append('强势股')
+            new_high = r.get('new_high') or 0
+            volume_ratio = r.get('volume_ratio')
+            if new_high:
+                reasons.append('%d 日新高' % new_high)
+            if volume_ratio is not None and volume_ratio >= 1.5:
+                reasons.append('量比 %.2f' % volume_ratio)
         items.append({'symbol': r['symbol'], 'name': r['name'], 'score': score, 'boards': r.get('boards', 1),
                       'industry': r.get('industry'), 'price': r.get('price'), 'pct': r.get('pct'),
                       'first_seal': r.get('first_seal'), 'seal_fund': r.get('seal_fund'), 'float_cap': r.get('float_cap'),
-                      'open_times': r.get('open_times'), 'turnover': r.get('turnover'),
+                      'open_times': r.get('open_times'), 'turnover': r.get('turnover'), 'new_high': r.get('new_high'),
+                      'volume_ratio': r.get('volume_ratio'), 'source_kinds': r.get('source_kinds', []),
                       'lhb_net': l['net'] if l else None, 'tags': tags, 'reasons': reasons, 'risks': risks})
     items.sort(key=lambda x: (-x['score'], -x['boards'], -(x['seal_fund'] or 0)))
     out['items'] = items[:top_n]

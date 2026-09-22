@@ -1,0 +1,1 @@
+import{I as e,p as t,z as n}from"./runtime-core.esm-bundler-DboZaCIX.js";import{t as r}from"./_plugin-vue_export-helper-Fzs_nXv5.js";var i={},a={class:`stat-grid`};function o(r,i){return e(),t(`div`,a,[n(r.$slots,`default`,{},void 0,!0)])}var s=r(i,[[`render`,o],[`__scopeId`,`data-v-780c4e2f`]]);export{s as t};

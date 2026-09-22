@@ -13,6 +13,11 @@ def zt(symbol='sz000001', name='甲', boards=1, first='09:45:00', open_times=0, 
             'industry': industry, **kw}
 
 
+def qs(symbol='sz000101', name='强股', pct=8.0, industry='电力', turn=12.0, new_high=60, volume_ratio=2.3, **kw):
+    return {'symbol': symbol, 'code': symbol[2:], 'name': name, 'price': 12.0, 'pct': pct, 'turnover': turn,
+            'float_cap': 2e9, 'industry': industry, 'new_high': new_high, 'volume_ratio': volume_ratio, **kw}
+
+
 def review(rows, lhb=None, **pools):
     return {'trade_date': '20260921', 'date': '2026-09-21', 'pools': {'zt': {'total': len(rows), 'rows': rows}, **pools},
             'lhb': {'rows': lhb or [], 'trade_date': '20260921', 'date': '2026-09-21'}}
@@ -77,9 +82,21 @@ class RankTests(unittest.TestCase):
         self.assertIn('龙虎榜净买', out['items'][0]['tags'])
 
     def test_no_limit_pool_gives_empty_with_note(self):
-        out = nw.rank({'date': 'd', 'pools': {'zt': None}})
+        out = nw.rank({'date': 'd', 'pools': {'zt': None, 'qs': None}})
         self.assertEqual(out['items'], [])
-        self.assertIn('没有涨停池', out['note'])
+        self.assertIn('没有涨停池/强势股池', out['note'])
+
+    def test_qs_pool_also_feeds_candidates(self):
+        out = nw.rank(review([], qs={'total': 1, 'rows': [qs('sz000777', '强势样本')]}))
+        self.assertEqual([i['name'] for i in out['items']], ['强势样本'])
+        self.assertIn('强势股', out['items'][0]['tags'])
+        self.assertIn('60 日新高', '；'.join(out['items'][0]['reasons']))
+
+    def test_zt_and_qs_duplicate_symbol_is_merged(self):
+        out = nw.rank(review([zt('sz000001', '甲', boards=2)], qs={'total': 1, 'rows': [qs('sz000001', '甲')]}))
+        self.assertEqual(len(out['items']), 1)
+        self.assertIn('zt', out['items'][0]['source_kinds'])
+        self.assertIn('qs', out['items'][0]['source_kinds'])
 
     def test_sentiment_metrics(self):
         pools = {'zt': {'rows': [zt(boards=2, name='高'), zt(boards=1, name='低')]}, 'zb': {'rows': [zt()]},
