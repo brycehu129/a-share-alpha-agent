@@ -262,6 +262,34 @@ class BookApiTests(ServerCase):
                 patch("live_check.load_series", return_value=(bars or [], None, None)):
             return self.json("GET", "/api/book")
 
+    def test_holding_verdict_uses_minute_data_when_available(self):
+        self.watch()
+        self.buy(date="2026-09-01")
+        minute = {"trade_date": "2026-09-21", "bars": [
+            {"t": "0930", "price": 1290.0, "vwap": 1295.0, "minute_volume_shares": 100, "cum_volume_shares": 100, "cum_amount": 1.0},
+            {"t": "0931", "price": 1285.0, "vwap": 1295.0, "minute_volume_shares": 100, "cum_volume_shares": 200, "cum_amount": 2.0},
+            {"t": "0932", "price": 1315.0, "vwap": 1295.0, "minute_volume_shares": 100, "cum_volume_shares": 300, "cum_amount": 3.0},
+        ], "vwap": 1295.0, "high_close": 1315.0, "low_close": 1285.0, "complete": False, "symbol": "sh600519"}
+        with patch("live_quote.snapshot", return_value=snapshot(live(last="1315", prev="1300", change_pct="1.15", high="1315", low="1285"))), \
+                patch("live_check.load_series", return_value=(flat_bars(close=1300.0), None, None)), \
+                patch("minute_data.fetch_minute", return_value=minute):
+            _, book = self.json("GET", "/api/book")
+        v = book["holdings"][0]["verdict"]
+        self.assertEqual(v["action"], "hold")
+        self.assertTrue(any("上穿盘中支撑" in r for r in v["reasons"]))
+
+    def test_minute_data_failure_falls_back_to_the_old_verdict_path(self):
+        import minute_data
+        self.watch()
+        self.buy(date="2026-09-01")
+        with patch("live_quote.snapshot", return_value=snapshot(live(last="1310", prev="1300", change_pct="0.77"))), \
+                patch("live_check.load_series", return_value=(flat_bars(close=1300.0), None, None)), \
+                patch("minute_data.fetch_minute", side_effect=minute_data.MinuteError("down")):
+            _, book = self.json("GET", "/api/book")
+        v = book["holdings"][0]["verdict"]
+        self.assertEqual(v["action"], "hold")
+        self.assertFalse(any("盘中支撑" in r for r in v["reasons"]))
+
     def test_watch_buy_sell_remove_flow(self):
         self.assertEqual(self.watch()[0], 200)
         self.assertEqual(self.buy(shares=300, price="1300", date="2026-09-01")[0], 200)
@@ -503,6 +531,30 @@ class SentinelInBookApiTests(ServerCase):
         _, p = self.json("GET", "/api/sentinel?day=2026-09-18")
         self.assertNotIn("charts", p)
         self.assertEqual((p["collection"]["ticks"], p["collection"]["expected"]), (0, 243))
+
+    def test_day_summary_exposes_grouped_judgments(self):
+        import scenario_ledger
+        sdir = scenario_ledger.sentinel_dir(None)
+        sdir.mkdir(parents=True, exist_ok=True)
+        day = '2026-09-21'
+        rows = [
+            {'id': 'r1', 'day': day, 'symbol': 'sz000001', 'name': '测试', 'node': 'sentinel.stop_hit',
+             'issued_at': '2026-09-21T10:00:30+08:00', 'price_at_issue': 10.0, 'action_hint': 'wait', 'confidence': 3,
+             'is_holding': True, 'delivered': True, 'triggers': ['sentinel.stop_hit'],
+             'scenario': {'label': '上攻', 'direction': 'up', 'trigger_price': 10.2, 'trigger_condition': 'c',
+                          'target_low': 10.4, 'target_high': 10.6, 'invalidate_price': 9.8}},
+            {'id': 'r2', 'day': day, 'symbol': 'sz000001', 'name': '测试', 'node': 'sentinel.stop_hit',
+             'issued_at': '2026-09-21T10:00:30+08:00', 'price_at_issue': 10.0, 'action_hint': 'wait', 'confidence': 3,
+             'is_holding': True, 'delivered': True, 'triggers': ['sentinel.stop_hit'],
+             'scenario': {'label': '转弱', 'direction': 'down', 'trigger_price': 9.8, 'trigger_condition': 'c',
+                          'target_low': 9.5, 'target_high': 9.7, 'invalidate_price': 10.2}},
+        ]
+        (sdir / ('scenarios-%s.jsonl' % day)).write_text('\n'.join(json.dumps(r, ensure_ascii=False) for r in rows) + '\n')
+        (sdir / ('reconcile-%s.json' % day)).write_text(json.dumps(
+            {'results': [{'id': 'r1', 'outcome': 'triggered_and_hit'}, {'id': 'r2', 'outcome': 'not_triggered'}]}, ensure_ascii=False))
+        _, p = self.json('GET', '/api/sentinel?day=2026-09-21')
+        self.assertEqual(len(p['judgments']), 1)
+        self.assertEqual(p['judgments'][0]['outcome'], '1触发且命中 / 1未触发')
 
 
 LIVE = {"fetched_at": "2026-09-21T16:30:00+08:00", "errors": {}, "session": "post_close", "complete": True,

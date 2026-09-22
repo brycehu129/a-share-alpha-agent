@@ -64,6 +64,21 @@ const pickerDay = computed({
 
         <CollectionLine :collection="data.collection" />
 
+        <h3>判断总表</h3>
+        <el-card shadow="never">
+          <el-table :data="data.judgments || []" size="small" empty-text="这一天没有形成可留档的判断。">
+            <el-table-column prop="time" label="时间" width="80"><template #default="{ row }"><span class="num">{{ row.time }}</span></template></el-table-column>
+            <el-table-column label="股票" min-width="120">
+              <template #default="{ row }"><span class="stock-name">{{ row.name }}</span><span class="stock-code num">{{ row.symbol }}</span></template>
+            </el-table-column>
+            <el-table-column prop="source" label="来源" min-width="120" />
+            <el-table-column prop="action_hint" label="判断" width="96" />
+            <el-table-column prop="glance" label="速判" min-width="220" />
+            <el-table-column prop="outcome" label="当日结果" min-width="150" />
+          </el-table>
+          <p v-if="data.judgments && data.judgments.length" class="muted">一行代表同一次研判；同一时刻同一股票的多条情景会合并展示，下面的“情景与对账”仍保留逐条明细。</p>
+        </el-card>
+
         <h3>告警</h3>
         <el-card v-if="!data.alerts.length" shadow="never"><span class="muted">这一天没有告警。</span></el-card>
         <el-card v-for="(a, i) in data.alerts" :key="i" shadow="never">

@@ -6,6 +6,7 @@
 """
 import json
 import re
+from collections import Counter
 from datetime import datetime
 
 import flow_recorder
@@ -18,6 +19,14 @@ DAY_RE = re.compile(r'\d{4}-\d{2}-\d{2}')
 SYMBOL_RE = re.compile(r'(sh|sz)\d{6}')
 HINT_LABEL = {'hold': '继续持有', 'add': '买入/加仓', 'reduce': '减仓', 'wait': '观望',
               't_sell_high': '高位做T', 't_buy_low': '低位做T'}
+TRIGGER_LABEL = {
+    'sentinel.stop_hit': '止损观察',
+    'sentinel.target_hit': '目标观察',
+    'sentinel.below_cost': '跌破成本',
+    'sentinel.node_0945': '09:45 节点',
+    'sentinel.node_1305': '13:05 节点',
+    'sentinel.node_1430': '14:30 节点',
+}
 
 
 def safe_day(raw):
@@ -87,6 +96,85 @@ def scenario_rows(scenarios, symbol=None):
     return rows
 
 
+def _pick_scenario(rows, direction):
+    items = [r['scenario'] for r in rows if r['scenario']['direction'] == direction]
+    if not items:
+        return None
+    last = rows[0]['price_at_issue']
+    if direction == 'up':
+        items = [sc for sc in items if sc['trigger_price'] > last]
+        return min(items, key=lambda sc: sc['trigger_price']) if items else None
+    items = [sc for sc in items if sc['trigger_price'] < last]
+    return max(items, key=lambda sc: sc['trigger_price']) if items else None
+
+
+def _glance(rows):
+    up = _pick_scenario(rows, 'up')
+    down = _pick_scenario(rows, 'down')
+    parts = []
+    if up:
+        parts.append('上破 %.2f 看 %.2f–%.2f' % (up['trigger_price'], up['target_low'], up['target_high']))
+    if down:
+        parts.append('下破 %.2f 转弱' % down['trigger_price'])
+    return '；'.join(parts) if parts else '暂无明确触发价'
+
+
+def _kind_label(kind):
+    if kind in TRIGGER_LABEL:
+        return TRIGGER_LABEL[kind]
+    tail = str(kind or '').split('.')[-1]
+    if tail.startswith('node_') and len(tail) == 9:
+        return '%s:%s 节点' % (tail[5:7], tail[7:9])
+    return tail.replace('_', ' ')
+
+
+def _source_label(rows):
+    kinds = []
+    for r in rows:
+        for kind in r.get('triggers') or [r.get('node')]:
+            if kind and kind not in kinds:
+                kinds.append(kind)
+    return ' + '.join(_kind_label(kind) for kind in kinds[:2]) if kinds else _kind_label(rows[0].get('node'))
+
+
+def _outcome_summary(rows):
+    counts = Counter(r.get('outcome') for r in rows)
+    if counts.get(None) and len(counts) == 1:
+        return '尚未对账'
+    parts = []
+    for key in scenario_ledger.OUTCOMES:
+        count = counts.get(key, 0)
+        if count:
+            parts.append('%d%s' % (count, scenario_ledger.OUTCOME_LABEL[key]))
+    if counts.get(None):
+        parts.append('%d尚未对账' % counts[None])
+    return ' / '.join(parts) if parts else '尚未对账'
+
+
+def judgment_rows(scenarios, symbol=None):
+    groups = {}
+    for r in sorted(scenarios, key=lambda r: (r['issued_at'], r['symbol'], r['id'])):
+        if symbol and r['symbol'] != symbol:
+            continue
+        key = (r['issued_at'], r['symbol'], r.get('node'))
+        groups.setdefault(key, []).append(r)
+    rows = []
+    for (_, _, _), items in groups.items():
+        first = items[0]
+        rows.append({
+            'time': first['issued_at'][11:19],
+            'name': first.get('name') or '',
+            'symbol': first['symbol'],
+            'source': _source_label(items),
+            'action_hint': HINT_LABEL.get(first['action_hint'], first['action_hint']),
+            'glance': _glance(items),
+            'outcome': _outcome_summary(items),
+            'confidence': first['confidence'],
+            'scenario_count': len(items),
+        })
+    return rows
+
+
 def collection(day, symbol=None, intraday_dir=None, now=None):
     """采集健康：盘中轮询跑了几轮、断了几次、为什么跳过，以及资金流采集了几次。不联网。"""
     d = _intraday(intraday_dir)
@@ -127,7 +215,7 @@ def sentinel_payload(day=None, directory=None, intraday_dir=None):
         coll = collection(day, None, intraday_dir)
     except Exception:
         coll = None
-    return {'day': day, 'alerts': alert_rows, 'scenarios': scenario_rows(scenarios), 'ai_calls': ai_calls,
+    return {'day': day, 'alerts': alert_rows, 'judgments': judgment_rows(scenarios), 'scenarios': scenario_rows(scenarios), 'ai_calls': ai_calls,
             'pending': pending, 'weekly': weekly or '', 'collection': coll}
 
 
@@ -207,5 +295,6 @@ def symbol_payload(symbol, day=None, directory=None, intraday_dir=None):
         coll = collection(day, symbol, intraday_dir)
     except Exception:
         coll = None
-    return {'symbol': symbol, 'day': day, 'alerts': alerts, 'scenarios': scenarios, 'collection': coll,
+    return {'symbol': symbol, 'day': day, 'judgments': judgment_rows(scenario_ledger.load_joined(directory, [day]), symbol),
+            'alerts': alerts, 'scenarios': scenarios, 'collection': coll,
             'flow_table': recorded_table(symbol, day, intraday_dir)}

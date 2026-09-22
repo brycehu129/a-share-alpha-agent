@@ -50,6 +50,57 @@ HINT_LABEL = {'hold': '继续持有', 'add': '可考虑买入/加仓', 'reduce':
 DISCLAIMER = '研究参考，不构成投资建议；系统只提醒、不下单，决定由你自己做。'
 
 
+def _pick_scenario(entry, direction, last):
+    items = [sc for sc in (entry.get('scenarios') or []) if sc.get('direction') == direction]
+    if direction == 'up':
+        items = [sc for sc in items if sc.get('trigger_price', 0) > last]
+        return min(items, key=lambda sc: sc['trigger_price']) if items else None
+    items = [sc for sc in items if sc.get('trigger_price', 0) < last]
+    return max(items, key=lambda sc: sc['trigger_price']) if items else None
+
+
+def _action_brief(hint):
+    return {
+        'hold': '偏持有',
+        'add': '偏等确认后再加',
+        'reduce': '偏先减仓',
+        'wait': '先观望',
+        't_sell_high': '偏高抛做T',
+        't_buy_low': '偏低吸做T',
+    }.get(hint, hint)
+
+
+def _watch_brief(entry):
+    watched = []
+    for text in entry.get('watch_metrics') or []:
+        if not text:
+            continue
+        watched.append(text.replace('是否', '').replace('得失', '').replace('变化', ''))
+        if len(watched) == 2:
+            break
+    return '、'.join(watched)
+
+
+def scenario_glance(entry, last):
+    up = _pick_scenario(entry, 'up', last)
+    down = _pick_scenario(entry, 'down', last)
+    parts = []
+    if up:
+        parts.append('上破 %.2f 看 %.2f–%.2f' % (up['trigger_price'], up['target_low'], up['target_high']))
+    if down:
+        parts.append('下破 %.2f 转弱' % down['trigger_price'])
+    return '；'.join(parts) if parts else '暂无明确触发价，先观望'
+
+
+def format_scenarios(entry, name, last):
+    lines = ['【情景研判】%s %s  现价 %.2f' % (name, entry['symbol'], last), '速判：' + scenario_glance(entry, last)]
+    lines.append('倾向：%s｜依据强度 %d/5（自评，不是胜率）' % (_action_brief(entry.get('action_hint')), entry['confidence']))
+    if entry.get('watch_metrics'):
+        lines.append('盯盘：' + '；'.join(entry['watch_metrics'][:2]))
+    lines.append('%s 情景已存档，后台可看完整价位与收盘对账。' % DISCLAIMER)
+    return '\n'.join(lines)
+
+
 def sdir(directory=None):
     return scenario_ledger.sentinel_dir(directory)
 
@@ -103,6 +154,16 @@ def format_alert(block):
     ctx = []
     if day.get('vwap'):
         ctx.append('均价线 %.2f' % day['vwap'])
+    if day.get('support') and day.get('resistance'):
+        ctx.append('支撑/阻力 %.2f / %.2f' % (day['support'], day['resistance']))
+    if day.get('macd_state'):
+        labels = {
+            'bullish_above_zero': 'MACD 多头且在零轴上',
+            'bullish_below_zero': 'MACD 多头但仍在零轴下',
+            'bearish_above_zero': 'MACD 转弱但仍在零轴上',
+            'bearish_below_zero': 'MACD 空头且在零轴下',
+        }
+        ctx.append(labels.get(day['macd_state'], 'MACD %s' % day['macd_state']))
     if day.get('day_low') and day.get('day_high'):
         ctx.append('日内 %.2f–%.2f' % (day['day_low'], day['day_high']))
     if q.get('volume_ratio'):
@@ -120,21 +181,6 @@ def format_alert(block):
         if h.get('target_price'):
             own.append('系统止盈位 %.2f' % h['target_price'])
         lines.append('｜'.join(own))
-    return '\n'.join(lines)
-
-
-def format_scenarios(entry, name, last):
-    lines = ['【情景研判】%s %s  现价 %.2f' % (name, entry['symbol'], last), '现状：' + entry['current_read']]
-    for i, sc in enumerate(entry['scenarios']):
-        arrow = '↑' if sc['direction'] == 'up' else '↓'
-        lines.append('情景%s %s %s：若%s %.2f → 目标 %.2f–%.2f；触及 %.2f 则判断失效%s' % (
-            'ABC'[i], arrow, sc['label'], '站上' if sc['direction'] == 'up' else '跌破', sc['trigger_price'],
-            sc['target_low'], sc['target_high'], sc['invalidate_price'],
-            '（' + sc['trigger_condition'] + '）' if sc.get('trigger_condition') else ''))
-    if entry.get('watch_metrics'):
-        lines.append('需要盯：' + '；'.join(entry['watch_metrics'][:3]))
-    lines.append('倾向：%s｜依据强度 %d/5（自评，不是胜率）' % (HINT_LABEL.get(entry['action_hint'], entry['action_hint']), entry['confidence']))
-    lines.append('%s 情景已存档，收盘后自动对账。' % DISCLAIMER)
     return '\n'.join(lines)
 
 
@@ -184,12 +230,13 @@ class Sentinel:
                 # 止损/止盈位与做T底仓由系统算（成本价来自买入记录），不再读用户声明。
                 h = book_levels.enrich({**h, 'name': name}, bars, q.get('quote_date'))
                 signals += sr.holding_signals(h, q, facts, limits)
+                try:
+                    minute = tick['minutes'](symbol)
+                except minute_data.MinuteError as exc:
+                    issues.append('分时数据不可用，盘中支撑阻力/做T提示不含均价线：%s' % exc)
+                day = sr.day_facts(q, minute)
+                signals += sr.intraday_reversal_signals(h, q, day)
                 if h['t_base_shares']:
-                    try:
-                        minute = tick['minutes'](symbol)
-                    except minute_data.MinuteError as exc:
-                        issues.append('分时数据不可用，做T提示不含均价线：%s' % exc)
-                    day = sr.day_facts(q, minute)
                     t = sr.t_evaluate(h, q, day, self._env_fn(symbol, q, tick), limits)
                     if t['unavailable']:
                         issues.append(t['unavailable'])

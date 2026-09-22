@@ -103,6 +103,20 @@ class HoldingSignalTests(unittest.TestCase):
         self.assertTrue(by_key(s, 'near-limit-down')['active'])
         self.assertFalse(by_key(s, 'near-limit-up')['active'])
 
+    def test_intraday_reversal_signals_need_a_cross_and_matching_macd_direction(self):
+        day = {'support': 9.7, 'resistance': 10.3, 'buy_cross_support': True, 'sell_cross_resistance': False,
+               'macd_state': 'bullish_above_zero'}
+        s = sr.intraday_reversal_signals(holding(t_base_shares=500), quote(last=9.85), day)
+        self.assertTrue(by_key(s, 'intraday-support-reclaim')['active'])
+        self.assertIn('低吸回补', by_key(s, 'intraday-support-reclaim')['detail'])
+        self.assertFalse(by_key(s, 'intraday-resistance-reject')['active'])
+
+        day2 = {'support': 9.7, 'resistance': 10.3, 'buy_cross_support': False, 'sell_cross_resistance': True,
+                'macd_state': 'bearish_below_zero'}
+        s2 = sr.intraday_reversal_signals(holding(), quote(last=10.1), day2)
+        self.assertTrue(by_key(s2, 'intraday-resistance-reject')['active'])
+        self.assertIn('减仓观察', by_key(s2, 'intraday-resistance-reject')['detail'])
+
 
 class WatchSignalTests(unittest.TestCase):
     W = {'symbol': 'sz000001', 'name': '测试'}
@@ -181,6 +195,14 @@ class DayFactsTests(unittest.TestCase):
 
     def test_flat_day_has_no_position(self):
         self.assertIsNone(sr.day_facts(quote(last=10, high=10, low=10), {'vwap': 10, 'high_close': 10, 'low_close': 10})['position_in_range'])
+
+    def test_intraday_formula_levels_are_merged_when_minute_data_exists(self):
+        minute = {'vwap': 10.0, 'high_close': 10.4, 'low_close': 9.7,
+                  'bars': [{'price': 9.8}, {'price': 9.7}, {'price': 10.3}], 'trade_date': '2026-09-21'}
+        facts = sr.day_facts(quote(last=10.3, prev=10.0, high=10.4, low=9.6), minute)
+        self.assertAlmostEqual(facts['support'], 9.6444, places=3)
+        self.assertAlmostEqual(facts['resistance'], 10.3111, places=3)
+        self.assertIn('macd_state', facts)
 
 
 FLOW_OUT = {'main': -3e7, 'main_30m': -1e7, 'as_of': '1030'}

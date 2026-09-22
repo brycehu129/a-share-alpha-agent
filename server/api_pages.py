@@ -85,16 +85,29 @@ def _alert_counts():
 
 
 def _row_verdicts(holdings, watchlist, quotes):
-    """每只股票的系统结论。只读本地日线 + 已取到的报价，不再联网。
-    单只算不出来就只影响那一行（给一个说明文案），绝不让整页失败。"""
+    """每只股票的系统结论。以本地日线 + 已取到的报价为主；持仓股在能取到当日分时的情况下
+    补充分时支撑/阻力与分钟级 MACD 观察。单只算不出来就只影响那一行（给一个说明文案），
+    绝不让整页失败。"""
     import book_levels
     import book_verdict
     import intraday_engine
     import live_check
+    import minute_data
     import t_context
     history = history_dir()
     flow_dir = intraday_engine.data_dir()
     pause = book_verdict.market_pause(history) if watchlist else None
+    minute_cache = {}
+
+    def minute_for(symbol, quote_date):
+        if symbol not in minute_cache:
+            try:
+                data = minute_data.fetch_minute(symbol)
+                minute_cache[symbol] = data if data.get("trade_date") == quote_date else None
+            except minute_data.MinuteError:
+                minute_cache[symbol] = None
+        return minute_cache[symbol]
+
     out = {}
     for kind, rows in (("holding", holdings), ("watch", watchlist)):
         for row in rows:
@@ -109,12 +122,13 @@ def _row_verdicts(holdings, watchlist, quotes):
                 limits = live_check.limit_facts(q)
                 if kind == "holding":
                     enriched = book_levels.enrich(row, bars, q.get("quote_date"))
+                    day = book_verdict.sr.day_facts(q, minute_for(row["symbol"], q.get("quote_date")))
                     # 做T 的环境（大盘/板块/资金流）懒取：只有价格位置满足时才联网，平时页面不多花一个请求。
                     env_fn = (lambda sym=row["symbol"], qd=q.get("quote_date"): t_context.build_env(
                         sym, quotes, qd,
                         lambda s_, d_: t_context.sector_change(history, s_, d_, cache_dir=flow_dir),
                         lambda s_, d_: t_context.flow_facts(flow_dir, s_, d_)))
-                    out[("holding", row["symbol"])] = book_verdict.holding_verdict(enriched, q, facts, limits, env_fn)
+                    out[("holding", row["symbol"])] = book_verdict.holding_verdict(enriched, q, facts, limits, env_fn, day=day)
                 else:
                     out[("watch", row["symbol"])] = book_verdict.watch_verdict(row, q, facts, limits, pause)
             except Exception as exc:     # 单只失败不拖垮整页；原因写进结论里，别静默

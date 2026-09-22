@@ -87,6 +87,18 @@ class EvaluateTests(unittest.TestCase):
         self.assertLessEqual({'below-cost', 'stop', 'vol-surge-down'}, keys(sigs, active=True))
         self.assertEqual(len({x['key'] for x in sigs}), len(sigs))              # key 不重复
 
+    def test_intraday_reversal_signals_can_fire_for_holdings_even_without_t_base(self):
+        h = Harness(holdings=[HOLD], series=bars())
+        minutes = lambda sym: {'trade_date': DAY, 'bars': [{'t': '0930', 'price': 9.7, 'vwap': 9.9, 'minute_volume_shares': 100,
+                                                             'cum_volume_shares': 100, 'cum_amount': 1.0},
+                                                            {'t': '0931', 'price': 9.6, 'vwap': 9.9, 'minute_volume_shares': 100,
+                                                             'cum_volume_shares': 200, 'cum_amount': 2.0},
+                                                            {'t': '0932', 'price': 10.1, 'vwap': 9.9, 'minute_volume_shares': 100,
+                                                             'cum_volume_shares': 300, 'cum_amount': 3.0}],
+                              'vwap': 9.9, 'high_close': 10.1, 'low_close': 9.6, 'complete': False, 'symbol': sym}
+        sigs = h.s.evaluate(tick([quote(last=10.1, high=10.1, low=9.6)], minutes=minutes))
+        self.assertIn('intraday-support-reclaim', keys(sigs, active=True))
+
     def test_stocks_without_a_fresh_quote_produce_nothing(self):
         self.assertEqual(Harness().s.evaluate(tick([])), [])
 
@@ -175,7 +187,7 @@ class AfterTickTests(unittest.TestCase):
         r = h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
         self.assertEqual(r['alerts'], 1)
         text = h.sent[0]
-        for needle in ('【紧急】', '测试股', 'sz000001', '9.40', '触及止损', '成本 10.00', '系统止损位 9.47', '不下单'):
+        for needle in ('【紧急】', '测试股', 'sz000001', '9.40', '触及止损', '成本 10.00', '系统止损位 9.47', '支撑/阻力', 'MACD', '不下单'):
             self.assertIn(needle, text)
 
     def test_only_sentinel_events_are_pushed(self):
@@ -342,11 +354,43 @@ class FormatTests(unittest.TestCase):
 
     def test_scenarios_carry_all_numbers_and_the_honest_caveats(self):
         t = sn.format_scenarios(self.ENTRY, '测试股', 9.4)
-        for needle in ('9.70', '9.90–10.00', '9.30', '↑', '↓', '不是胜率', '收盘后自动对账', '不构成投资建议'):
+        for needle in ('速判', '9.70', '9.90–10.00', '9.20', '不是胜率', '后台可看完整价位与收盘对账', '不构成投资建议'):
             self.assertIn(needle, t)
+        for absent in ('情景A', '现状：', '反抽', '破位'):
+            self.assertNotIn(absent, t)
 
     def test_no_percentage_win_rate_is_ever_printed(self):
         self.assertNotRegex(sn.format_scenarios(self.ENTRY, '测试股', 9.4), r'胜率\s*\d|概率\s*\d|\d+\s*%的')
+
+    def test_glance_line_surfaces_the_nearest_up_down_levels_and_action(self):
+        text = sn.scenario_glance({
+            'action_hint': 't_sell_high',
+            'watch_metrics': ['33.94突破位是否回补', '分时均价线33.295得失', '量比5.16能否维持'],
+            'scenarios': [
+                {'label': '远一点上攻', 'direction': 'up', 'trigger_price': 10.4, 'trigger_condition': 'c',
+                 'target_low': 10.6, 'target_high': 10.8, 'invalidate_price': 9.7},
+                {'label': '最近上攻', 'direction': 'up', 'trigger_price': 10.1, 'trigger_condition': 'c',
+                 'target_low': 10.3, 'target_high': 10.5, 'invalidate_price': 9.8},
+                {'label': '最近转弱', 'direction': 'down', 'trigger_price': 9.8, 'trigger_condition': 'c',
+                 'target_low': 9.5, 'target_high': 9.7, 'invalidate_price': 10.2},
+                {'label': '更低转弱', 'direction': 'down', 'trigger_price': 9.4, 'trigger_condition': 'c',
+                 'target_low': 9.0, 'target_high': 9.3, 'invalidate_price': 10.0},
+            ]
+        }, 10.0)
+        self.assertIn('上破 10.10 看 10.30–10.50', text)
+        self.assertIn('下破 9.80 转弱', text)
+        text = sn.format_scenarios({
+            'symbol': 'sz000001', 'action_hint': 't_sell_high', 'confidence': 3,
+            'watch_metrics': ['33.94突破位是否回补', '分时均价线33.295得失', '量比5.16能否维持'],
+            'scenarios': [
+                {'label': '最近上攻', 'direction': 'up', 'trigger_price': 10.1, 'trigger_condition': 'c',
+                 'target_low': 10.3, 'target_high': 10.5, 'invalidate_price': 9.8},
+                {'label': '最近转弱', 'direction': 'down', 'trigger_price': 9.8, 'trigger_condition': 'c',
+                 'target_low': 9.5, 'target_high': 9.7, 'invalidate_price': 10.2},
+            ]
+        }, '测试股', 10.0)
+        self.assertIn('倾向：偏高抛做T｜依据强度 3/5', text)
+        self.assertIn('盯盘：33.94突破位是否回补；分时均价线33.295得失', text)
 
 
 # --- 研判进程 ----------------------------------------------------------------

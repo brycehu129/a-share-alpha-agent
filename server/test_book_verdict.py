@@ -68,6 +68,9 @@ class HoldingVerdictTests(unittest.TestCase):
     def verdict(self, h, q, facts=CALM, limits=None):
         return bv.holding_verdict(h, q, facts, limits or {})
 
+    def verdict_day(self, h, q, day, facts=CALM, limits=None):
+        return bv.holding_verdict(h, q, facts, limits or {}, day=day)
+
     def test_quiet_holding_is_simply_held_and_shows_distance_to_the_systems_levels(self):
         v = self.verdict(holding(), quote(last=10.2))
         self.assertEqual((v['action'], v['label']), ('hold', '继续持有'))
@@ -146,6 +149,20 @@ class HoldingVerdictTests(unittest.TestCase):
     def test_nothing_reads_the_old_declared_fields(self):
         v = self.verdict(holding(hold_type='long'), quote(last=9.9), facts={**CALM, 'ma20': 10.5})
         self.assertEqual(v['action'], 'reduce')                                   # "长期"不再豁免 MA20
+
+    def test_intraday_support_reclaim_becomes_an_explicit_hold_reason(self):
+        day = {'support': 9.7, 'resistance': 10.3, 'buy_cross_support': True, 'sell_cross_resistance': False,
+               'macd_state': 'bullish_above_zero'}
+        v = self.verdict_day(holding(t_base_shares=500), quote(last=9.85, prev=10.0, high=10.0, low=9.6), day)
+        self.assertEqual(v['action'], 'hold')
+        self.assertIn('上穿盘中支撑', v['reasons'][0])
+
+    def test_intraday_resistance_reject_is_appended_to_reduce_reasons(self):
+        day = {'support': 9.7, 'resistance': 10.3, 'buy_cross_support': False, 'sell_cross_resistance': True,
+               'macd_state': 'bearish_below_zero'}
+        v = self.verdict_day(holding(), quote(last=9.9), day, facts={**CALM, 'ma20': 10.5})
+        self.assertEqual(v['action'], 'reduce')
+        self.assertTrue(any('跌回盘中阻力' in r for r in v['reasons']))
 
 
 class RulesDocTests(unittest.TestCase):

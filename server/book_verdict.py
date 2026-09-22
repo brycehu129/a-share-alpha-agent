@@ -20,6 +20,7 @@ import sentinel_rules as sr
 EXIT_KINDS = ('stop_hit', 'low20_break_volume', 'near_limit_down')
 REDUCE_KINDS = ('target_hit', 'ma20_break', 'ma60_break', 'volume_surge_down')
 T_KINDS = ('t_sell_high', 't_buy_low')
+INTRADAY_HINT_KINDS = ('intraday_support_reclaim', 'intraday_resistance_reject')
 
 WATCH_LABEL = {'buy': '具备买入信号', 'blocked': '暂不宜买入', 'wait': '暂无买入信号', 'nodata': '数据不足'}
 HOLDING_LABEL = {'exit': '建议彻底卖出', 'reduce': '可暂时卖出', 't': '具备做T条件', 'hold': '继续持有',
@@ -50,13 +51,14 @@ def watch_verdict(w, q, facts, limits, market_pause=None):
     return {'action': 'wait', 'label': WATCH_LABEL['wait'], 'track': track, 'reasons': reasons}
 
 
-def holding_verdict(h, q, facts, limits, env_fn=None):
+def holding_verdict(h, q, facts, limits, env_fn=None, day=None):
     """h：book_levels.enrich 之后的持仓行（带系统止损/止盈位与可做T底仓）。
     env_fn：做T 的环境（大盘/板块/资金流），只在价格位置满足时才会被调用（可能联网）。"""
     last = float(q['last'])
-    day = sr.day_facts(q)
+    day = day or sr.day_facts(q)
     t = sr.t_evaluate(h, q, day, env_fn, limits)
-    active = _active(sr.holding_signals(h, q, facts, limits) + sr.t_signals(h, q, day, evaluation=t))
+    active = _active(sr.holding_signals(h, q, facts, limits) + sr.intraday_reversal_signals(h, q, day)
+                     + sr.t_signals(h, q, day, evaluation=t))
     details = lambda kinds: [active[k]['detail'] for k in kinds if k in active]
 
     both_ma = 'ma20_break' in active and 'ma60_break' in active
@@ -71,7 +73,12 @@ def holding_verdict(h, q, facts, limits, env_fn=None):
         action, reasons = 't', details(T_KINDS)
     else:
         action = 'hold'
-        reasons = ['未触发任何卖出或做T条件'] + _t_notes(t)
+        reasons = details(INTRADAY_HINT_KINDS) or ['未触发任何卖出或做T条件']
+        reasons += _t_notes(t)
+    if action in ('reduce', 't', 'hold'):
+        for detail in details(INTRADAY_HINT_KINDS):
+            if detail not in reasons:
+                reasons.append(detail)
     if action != 'hold' and 'below_cost' in active:
         reasons.append(active['below_cost']['detail'])
     verdict = {'action': action, 'label': HOLDING_LABEL[action], 'reasons': reasons,
@@ -185,7 +192,7 @@ def rules_doc():
               ]},
          ]},
         {'action': 'hold', 'label': HOLDING_LABEL['hold'], 'when': '以上都不满足',
-         'intro': '页面会写明现价离系统止损位、止盈位还有多远；价格位置已到做T的高/低位、但环境不允许时，会写明是哪一项否决。',
+         'intro': '页面会写明现价离系统止损位、止盈位还有多远；价格位置已到做T的高/低位、但环境不允许时，会写明是哪一项否决。分时数据可用时，还会补充上穿支撑/跌回阻力下方这类盘中观察提示。',
          'rules': []},
     ]
     watch_groups = [

@@ -71,6 +71,26 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(s['outcome'], '触发且命中')
         self.assertEqual((s['symbol'], s['direction'], s['confidence']), ('sz000001', 'up', 3))
 
+    def test_judgments_group_one_analysis_into_one_summary_row(self):
+        rows = [
+            scenario_row(id='r1', issued_at='2026-09-21T10:00:30+08:00', price_at_issue=10.0,
+                         action_hint='t_sell_high', scenario={'label': '上攻', 'direction': 'up', 'trigger_price': 10.2,
+                                                              'trigger_condition': 'c', 'target_low': 10.4, 'target_high': 10.6,
+                                                              'invalidate_price': 9.8}, triggers=['sentinel.stop_hit', 'sentinel.node_0945']),
+            scenario_row(id='r2', issued_at='2026-09-21T10:00:30+08:00', price_at_issue=10.0,
+                         action_hint='t_sell_high', scenario={'label': '转弱', 'direction': 'down', 'trigger_price': 9.8,
+                                                              'trigger_condition': 'c', 'target_low': 9.5, 'target_high': 9.7,
+                                                              'invalidate_price': 10.2}, triggers=['sentinel.stop_hit', 'sentinel.node_0945'])]
+        (self.sdir / ('scenarios-%s.jsonl' % DAY)).write_text('\n'.join(json.dumps(r, ensure_ascii=False) for r in rows) + '\n')
+        (self.sdir / ('reconcile-%s.json' % DAY)).write_text(json.dumps(
+            {'results': [{'id': 'r1', 'outcome': 'triggered_and_hit'}, {'id': 'r2', 'outcome': 'not_triggered'}]}))
+        j = sv.sentinel_payload(DAY, self.dir)['judgments'][0]
+        self.assertEqual((j['symbol'], j['action_hint'], j['scenario_count']), ('sz000001', '高位做T', 2))
+        self.assertIn('止损观察 + 09:45 节点', j['source'])
+        self.assertIn('上破 10.20 看 10.40–10.60', j['glance'])
+        self.assertIn('下破 9.80 转弱', j['glance'])
+        self.assertEqual(j['outcome'], '1触发且命中 / 1未触发')
+
     def test_unreconciled_scenarios_say_so_instead_of_guessing(self):
         (self.sdir / ('scenarios-%s.jsonl' % DAY)).write_text(json.dumps(scenario_row()) + '\n')
         self.assertEqual(sv.sentinel_payload(DAY, self.dir)['scenarios'][0]['outcome'], '尚未对账')
@@ -153,6 +173,11 @@ class PerSymbolTests(unittest.TestCase):
         (self.sdir / ('scenarios-%s.jsonl' % DAY)).write_text(
             json.dumps(scenario_row()) + '\n' + json.dumps(scenario_row(id='r2', symbol='sz000002')) + '\n')
         self.assertEqual([s['symbol'] for s in self.payload()['scenarios']], ['sz000001'])
+
+    def test_judgments_are_filtered_to_the_symbol(self):
+        (self.sdir / ('scenarios-%s.jsonl' % DAY)).write_text(
+            json.dumps(scenario_row()) + '\n' + json.dumps(scenario_row(id='r2', symbol='sz000002')) + '\n')
+        self.assertEqual([s['symbol'] for s in self.payload()['judgments']], ['sz000001'])
 
 
 class CollectionAndFlowTableTests(unittest.TestCase):

@@ -10,6 +10,7 @@
 信号的 key 里带股票代码和类型，引擎据此做边沿/冷却去重；带 carry 的信号是"持续状态"
 （已跌破成本价、已跌破MA20），跨日继承，避免每天早上把同一个状态当成新事件再推一遍。
 """
+import intraday_formula
 import live_check
 
 NODES = ('0945', '1305', '1430')
@@ -34,6 +35,7 @@ T_SECTOR_DUMP = -2.0            # 板块中位涨幅≤-2%：板块杀跌
 T_SECTOR_FLAT = -0.5            # 板块没有明显走弱的下限
 T_OUTPERFORM_PP = 1.5           # 个股比板块多涨这么多个百分点：个股脉冲
 T_NEAR_LIMIT_PCT = 3.0          # 距涨停/跌停不足 3%：单边行情，不做T
+INTRADAY_SIGNAL_REARM_S = 900   # 分时支撑/阻力穿越属于观察级提示，15 分钟内不重复刷屏
 # 成本价、系统止损位、止盈位是最关心的位置，价格常常在它附近来回磨蹭。默认 5 分钟的重新武装
 # 间隔下，茅台在止损位 1250 附近的一天里触发了 4 次紧急推送——都是真实的穿越，但已经是刷屏。
 # 这类状态型信号放宽到 30 分钟：真的又跌回去了，半小时后你会再收到；磨蹭期间不会。
@@ -58,6 +60,8 @@ def day_facts(quote, minute=None):
         facts['position_in_range'] = round((last - low) / (high - low), 4) if high > low else None
     if facts['vwap']:
         facts['vs_vwap_pct'] = round((last / facts['vwap'] - 1) * 100, 4)
+    if minute:
+        facts.update(intraday_formula.intraday_facts(quote, minute))
     return facts
 
 
@@ -115,6 +119,31 @@ def holding_signals(h, q, facts, limits):
                        '%s 逼近涨停：距涨停 %.2f%%' % (name, limits['to_limit_up_pct'])))
     out.append(high20_signal(s, name, last, ratio, facts))
     return [x for x in out if x]
+
+
+def intraday_reversal_signals(h, q, day):
+    """分时辅助信号：只做盘中观察，不替代主策略的止损/止盈规则。"""
+    if not day or not day.get('support') or not day.get('resistance'):
+        return []
+    s, name = h['symbol'], h.get('name') or h['symbol']
+    last = float(q['last'])
+    macd_state = day.get('macd_state') or ''
+    bullish = macd_state.startswith('bullish')
+    bearish = macd_state.startswith('bearish')
+    support = day['support']
+    resistance = day['resistance']
+    support_note = '可留意低吸回补观察' if h.get('t_base_shares') else '可留意分时企稳观察'
+    sell_note = '可留意盘中减仓观察'
+    return [
+        sig('intraday-support-reclaim', s, 'intraday_support_reclaim',
+            bool(day.get('buy_cross_support')) and bullish,
+            '%s 上穿盘中支撑 %.2f（现价 %.2f，MACD 转多），%s' % (name, support, last, support_note),
+            rearm_s=INTRADAY_SIGNAL_REARM_S),
+        sig('intraday-resistance-reject', s, 'intraday_resistance_reject',
+            bool(day.get('sell_cross_resistance')) and bearish,
+            '%s 跌回盘中阻力 %.2f 下方（现价 %.2f，MACD 转弱），%s' % (name, resistance, last, sell_note),
+            rearm_s=INTRADAY_SIGNAL_REARM_S),
+    ]
 
 
 TRACK_LABEL = {'breakout': '突破', 'pullback': '回调反弹'}

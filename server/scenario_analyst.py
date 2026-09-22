@@ -105,6 +105,7 @@ def key_levels(quote, facts, day, holding=None, limits=None):
         return float(v) if v not in (None, '') else None
     levels = {'昨收': f(quote.get('previous_close')), '今开': f(quote.get('open')),
               '日内最高': day.get('day_high'), '日内最低': day.get('day_low'), '分时均价线': day.get('vwap'),
+              '盘中支撑': day.get('support'), '盘中阻力': day.get('resistance'),
               'MA5': facts.get('ma5'), 'MA20': facts.get('ma20'), 'MA60': facts.get('ma60'),
               '20日最高收盘': facts.get('high20_close'), '20日最低收盘': facts.get('low20_close'),
               '涨停价': (limits or {}).get('limit_up'), '跌停价': (limits or {}).get('limit_down')}
