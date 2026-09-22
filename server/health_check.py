@@ -420,10 +420,17 @@ def check_llm(ctx):
     import claude_client
     import llm_settings
     llm_settings.apply()
-    ok, why = claude_client.available()
-    if not ok:
-        return check('llm', title, WARN, '大模型不可用（%s）：盘后报告和情景研判不会有 AI 部分。' % why, ctx.now.isoformat())
-    return check('llm', title, OK, '后端 %s 已配置' % claude_client.provider(), ctx.now.isoformat())
+    problems, configured = [], []
+    for label, env in (('盘后报告', 'POSTCLOSE_MODEL'), ('盘中情景', 'SENTINEL_MODEL'), ('次日观察', 'NEXTDAY_MODEL')):
+        selected = os.environ.get(env) or None
+        ok, why = claude_client.available(selected)
+        if not ok:
+            problems.append('%s：%s' % (label, why))
+        else:
+            configured.append('%s=%s' % (label, claude_client.provider(selected)))
+    if problems:
+        return check('llm', title, WARN, '部分 AI 场景不可用；' + '；'.join(problems), ctx.now.isoformat())
+    return check('llm', title, OK, '后端已配置：' + '；'.join(configured), ctx.now.isoformat())
 
 
 CHECKS = [check_calendar, check_engine, check_quotes, check_evaluators, check_sentinel_queue, check_sentinel_ai,

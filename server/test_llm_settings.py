@@ -1,5 +1,6 @@
 import base64
 import http.client
+import importlib.util
 import json
 import os
 import stat
@@ -32,8 +33,8 @@ class Hermetic(unittest.TestCase):
                                       'CONFIG_PATH': os.path.join(self.dir, 'config.json')})
         env.start()
         self.addCleanup(env.stop)
-        for name in ('OPENROUTER_API_KEY', 'OPENROUTER_MODEL', 'SENTINEL_MODEL', 'LLM_PROVIDER',
-                     'ANTHROPIC_API_KEY', 'OPENROUTER_BASE_URL'):
+        for name in ('OPENROUTER_API_KEY', 'OPENROUTER_MODEL', 'SENTINEL_MODEL', 'POSTCLOSE_MODEL', 'NEXTDAY_MODEL', 'LLM_PROVIDER',
+                     'ANTHROPIC_API_KEY', 'OPENROUTER_BASE_URL', 'DEEPSEEK_API_KEY', 'DEEPSEEK_MODEL'):
             os.environ.pop(name, None)
         saved = dict(llm_settings._ORIGINALS)
         llm_settings._ORIGINALS.clear()
@@ -91,6 +92,21 @@ class StorageTests(Hermetic):
         llm_settings.save_models('m/one', '')
         llm_settings.clear_key()
         self.assertEqual(llm_settings.load()[0], {'model': 'm/one'})
+
+    def test_scene_models_roundtrip_apply_clear_and_legacy_save(self):
+        llm_settings.save_models('m/default', 'deepseek/deepseek-v3.2',
+                                 postclose_model='m/report', nextday_model='m/watch')
+        llm_settings.save_models('m/new-default', 'deepseek/deepseek-v3.2')
+        self.assertEqual(llm_settings.load()[0]['nextday_model'], 'm/watch')
+        env = {'POSTCLOSE_MODEL': 'm/env-report', 'NEXTDAY_MODEL': 'm/env-watch'}
+        memo = {}
+        llm_settings.apply(environ=env, memo=memo)
+        self.assertEqual(env['POSTCLOSE_MODEL'], 'm/report')
+        self.assertEqual(env['NEXTDAY_MODEL'], 'm/watch')
+        self.assertEqual(env['SENTINEL_MODEL'], 'deepseek/deepseek-v3.2')
+        llm_settings.save_models('', '', postclose_model='', nextday_model='')
+        llm_settings.apply(environ=env, memo=memo)
+        self.assertEqual(env, {'POSTCLOSE_MODEL': 'm/env-report', 'NEXTDAY_MODEL': 'm/env-watch'})
 
     def test_corrupt_file_is_reported_not_silently_treated_as_absent(self):
         with open(llm_settings.path(), 'w') as f:
@@ -244,6 +260,29 @@ class EntryPointTests(Hermetic):
             postclose_report.main()
         self.assertEqual(seen, {'ok': False, 'key': None})
 
+    def test_no_ai_also_disables_official_deepseek_with_a_stored_key(self):
+        llm_settings.save_key('sk-officialtest1234567890abcdef', provider='deepseek')
+        llm_settings.save_models('deepseek-flash', 'deepseek-v4-pro')
+        seen = {}
+
+        def fake_build(history, run_id):
+            seen['ok'] = claude_client.available('deepseek-flash')[0]
+            seen['key'] = os.environ.get('DEEPSEEK_API_KEY')
+            return {'status': 'empty', 'issues': []}
+        with patch.object(postclose_report, 'build', fake_build), \
+                patch('sys.argv', ['postclose_report.py', '--history', self.dir, '--no-ai', '--dry-run']):
+            postclose_report.main()
+        self.assertEqual(seen, {'ok': False, 'key': None})
+
+    def test_health_checks_official_scene_independently_of_default_key(self):
+        from datetime import datetime
+        from types import SimpleNamespace
+        import health_check
+        llm_settings.save_models('anthropic/claude-opus-5', 'deepseek-flash')
+        result = health_check.check_llm(SimpleNamespace(now=datetime.now()))
+        self.assertEqual(result['level'], health_check.WARN)
+        self.assertIn('DEEPSEEK_API_KEY', result['message'])
+
 
 class WebServer(Hermetic):
     def setUp(self):
@@ -270,6 +309,49 @@ class WebServer(Hermetic):
 
 
 class LlmRouteTests(WebServer):
+    def test_official_key_is_isolated_masked_and_clear_restores_environment(self):
+        official = 'sk-officialtest1234567890abcdef'
+        env_key = 'sk-officialenv1234567890abcdef'
+        os.environ['DEEPSEEK_API_KEY'] = env_key
+        self.request('POST', '/api/llm/key', {'api_key': KEY})
+        status, body, _ = self.request('POST', '/api/llm/key', {'provider': 'deepseek', 'api_key': official})
+        self.assertEqual(status, 200)
+        self.assertNotIn(official, body)
+        self.assertNotIn(env_key, body)
+        self.assertTrue(json.loads(body)['llm']['deepseek_key']['configured'])
+        self.assertEqual(os.environ['DEEPSEEK_API_KEY'], official)
+        self.assertEqual(os.environ['OPENROUTER_API_KEY'], KEY)
+        _, page, _ = self.request('GET', '/api/settings')
+        self.assertNotIn(official, page)
+        self.request('POST', '/api/llm/clear', {'provider': 'deepseek'})
+        self.assertEqual(os.environ['DEEPSEEK_API_KEY'], env_key)
+        self.assertEqual(llm_settings.load()[0], {'api_key': KEY})
+
+    @unittest.skipUnless(importlib.util.find_spec('jsonschema'), 'optional DeepSeek validator not installed')
+    def test_official_scene_check_routes_to_deepseek_not_openrouter(self):
+        from test_deepseek_client import response
+        self.request('POST', '/api/llm/key', {'provider': 'deepseek', 'api_key': 'sk-officialtest1234567890abcdef'})
+        _, body, _ = self.request('POST', '/api/llm/models', {'model': 'deepseek-flash', 'sentinel_model': 'deepseek-v4-pro'})
+        state = json.loads(body)['llm']
+        self.assertEqual(state['model']['effective'], 'deepseek-flash')
+        self.assertEqual(state['sentinel_model']['provider'], 'deepseek')
+        self.assertEqual(state['postclose_model']['effective'], 'deepseek-flash')
+        with patch('deepseek_client.urlopen', return_value=response('{"ok":true,"echo":"pong"}')) as send, \
+                patch('openrouter_client.complete_json') as router:
+            status, body, _ = self.request('POST', '/api/llm/check', {'field': 'sentinel_model'})
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)['check_ok'])
+        self.assertEqual(json.loads(send.call_args.args[0].data)['model'], 'deepseek-v4-pro')
+        self.assertEqual(send.call_args.args[0].full_url, 'https://api.deepseek.com/chat/completions')
+        router.assert_not_called()
+
+    def test_official_key_rejects_other_providers_and_unknown_provider(self):
+        for provider, value in [('deepseek', KEY), ('unknown', KEY), ('deepseek', 'sk-bad secret')]:
+            status, body, _ = self.request('POST', '/api/llm/key', {'provider': provider, 'api_key': value})
+            self.assertEqual(status, 400)
+            self.assertNotIn(value, body)
+        self.assertEqual(llm_settings.load()[0], {})
+
     def test_all_llm_routes_require_login(self):
         for path in ('/api/llm/key', '/api/llm/models', '/api/llm/check', '/api/llm/clear'):
             status, _, _ = self.request('POST', path, {'api_key': KEY}, auth=False)
@@ -325,6 +407,47 @@ class LlmRouteTests(WebServer):
         self.assertEqual(os.environ['OPENROUTER_API_KEY'], KEY)
         self.request('POST', '/api/llm/clear')
         self.assertEqual(os.environ['OPENROUTER_API_KEY'], OTHER)
+
+    def test_scene_models_api_roundtrip_effective_defaults_and_legacy_save(self):
+        self.request('POST', '/api/llm/key', {'api_key': KEY})
+        models = {'model': 'm/default', 'postclose_model': 'm/report',
+                  'sentinel_model': 'deepseek/deepseek-v3.2', 'nextday_model': 'm/watch'}
+        status, body, _ = self.request('POST', '/api/llm/models', models)
+        self.assertEqual(status, 200)
+        state = json.loads(body)['llm']
+        for field, value in models.items():
+            self.assertEqual(state[field]['page_value'], value)
+            self.assertEqual(state[field]['effective'], value)
+        self.assertIn('deepseek/deepseek-v3.2', [option['value'] for option in state['model_options']])
+        self.request('POST', '/api/llm/models', {'model': 'm/new', 'sentinel_model': ''})
+        self.assertEqual(llm_settings.load()[0]['nextday_model'], 'm/watch')
+        _, body, _ = self.request('POST', '/api/llm/models', {**models, 'nextday_model': '', 'sentinel_model': ''})
+        state = json.loads(body)['llm']
+        self.assertEqual(state['nextday_model']['effective'], 'm/default')
+        self.assertEqual(state['sentinel_model']['default'], 'm/default')
+
+    def test_invalid_scene_model_save_is_atomic(self):
+        llm_settings.save_models('m/old', '')
+        status, _, _ = self.request('POST', '/api/llm/models',
+                                    {'model': 'm/new', 'nextday_model': 'bad model'})
+        self.assertEqual(status, 400)
+        self.assertEqual(llm_settings.load()[0], {'model': 'm/old'})
+
+    def test_connection_check_uses_the_saved_scene_model_and_rejects_unknown_scene(self):
+        fake = FakeOpenRouter()
+        self.addCleanup(fake.close)
+        os.environ['OPENROUTER_BASE_URL'] = fake.url
+        self.request('POST', '/api/llm/key', {'api_key': KEY})
+        models = {'model': 'm/default', 'postclose_model': 'm/report',
+                  'sentinel_model': 'deepseek/deepseek-v3.2', 'nextday_model': 'm/watch'}
+        self.request('POST', '/api/llm/models', models)
+        for field, value in models.items():
+            status, _, _ = self.request('POST', '/api/llm/check', {'field': field})
+            self.assertEqual(status, 200)
+            self.assertEqual(fake.requests[-1]['body']['model'], value)
+        status, _, _ = self.request('POST', '/api/llm/check', {'field': 'unknown'})
+        self.assertEqual(status, 400)
+        self.assertEqual(len(fake.requests), 4)
 
     def test_anthropic_provider_override_is_called_out(self):
         os.environ['LLM_PROVIDER'] = 'anthropic'

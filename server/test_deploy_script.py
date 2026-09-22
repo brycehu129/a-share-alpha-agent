@@ -130,7 +130,8 @@ class DeployBehaviourTests(unittest.TestCase):
             else:
                 r, calls = self.sb.run(env_text=env_text)
             self.assertEqual(r.returncode, 0, (env_text, r.stderr))
-            self.assertEqual(any(c.startswith('pip3') for c in calls), expect, env_text)
+            self.assertEqual(any(c.startswith('pip3') and 'anthropic' in c for c in calls), expect, env_text)
+            self.assertTrue(any(c.startswith('pip3') and 'jsonschema' in c for c in calls), env_text)
 
     def test_a_failed_pip_install_does_not_abort_the_deployment(self):
         r, calls = self.sb.run(pip_fail=True)
@@ -146,6 +147,11 @@ class DeployBehaviourTests(unittest.TestCase):
 
 
 class ScriptShapeTests(unittest.TestCase):
+    def test_deepseek_validator_installed_before_webapp_restart(self):
+        text = SCRIPT.read_text()
+        self.assertIn("pip3 install --quiet 'jsonschema>=4.18,<5'", text)
+        self.assertLess(text.index('jsonschema>='), text.index('systemctl restart alpha-shadow-webapp'))
+
     def test_body_is_wrapped_in_a_function_and_ends_with_exit(self):
         """bash 会先把整个函数解析完，`exit` 之后不再读文件——即使文件在运行中被换掉也无所谓。"""
         text = SCRIPT.read_text()

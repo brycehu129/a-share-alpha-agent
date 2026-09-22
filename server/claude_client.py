@@ -1,14 +1,15 @@
 """大模型调用的统一入口。本仓库唯一一处调用大模型的地方。
 
-**两个后端，同一套接口**（`available()` / `complete_json()` / `ClaudeError`）：
+**三个后端，同一套接口**（`available()` / `complete_json()` / `ClaudeError`）：
 
 - `openrouter`：经 OpenRouter 调用（`openrouter_client.py`，只用标准库，**不需要装任何包**）。
+- `deepseek`：直连 DeepSeek 官方 API（`deepseek_client.py`），JSON mode 输出用 jsonschema 本地校验。
 - `anthropic`：直连 Anthropic SDK（本项目第一个第三方依赖，`import anthropic` 写在函数内部
   惰性导入——cron 脚本每次跑之前都会执行全量测试套件，包没装就在导入期报错会连带把日线
   流程和开盘观察一起弄挂，那两条是纯规则的，不该被 AI 层的依赖问题影响）。
 
-选择规则：环境变量 `LLM_PROVIDER` 显式指定；没指定时，配了 OPENROUTER_API_KEY 就用 OpenRouter，
-否则用 Anthropic。上层（ai_analyst / scenario_analyst / sentinel）只认这里的接口，切换后端
+选择规则：显式模型名决定渠道；默认后端由共享模型、LLM_PROVIDER 和可用 key 决定。
+LLM_PROVIDER=anthropic 保留旧的默认模型行为。上层只认这里的接口，切换后端
 不用改任何一行。模块名保留 claude_client 是为了不牵动大量引用，它现在是"LLM 入口"。
 
 凭证只通过环境变量读取，永远不写进日志、报告或归档；错误信息返回前统一做脱敏。
@@ -31,25 +32,54 @@ from llm_errors import ClaudeError  # noqa: E402,F401  重新导出，保持 cla
 
 def _redact(text):
     """把任何看起来像 API key 的串抹掉，再把可能被回显的真实 key 也抹掉。"""
-    text = re.sub(r'sk-(?:ant|or)-[A-Za-z0-9_\-]{8,}', '[REDACTED]', str(text))
-    for name in ('ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY'):
+    text = re.sub(r'sk-[A-Za-z0-9_\-]{8,}', '[REDACTED]', str(text))
+    for name in ('ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'DEEPSEEK_API_KEY'):
         key = os.environ.get(name, '')
         if key and len(key) > 8:
             text = text.replace(key, '[REDACTED]')
     return text[:800]
 
 
-def provider():
-    """当前使用哪个后端。LLM_PROVIDER 显式指定优先；否则有 OpenRouter 的 key 就用它。"""
+def provider(model=None):
+    """显式模型先按名称选渠道；未指定时使用默认配置，不跨渠道回退凭据。"""
+    if model:
+        if model.startswith('deepseek-'):
+            return 'deepseek'
+        if '/' in model:
+            return 'openrouter'
+        if model.startswith('claude-'):
+            return 'anthropic'
     chosen = os.environ.get('LLM_PROVIDER', '').strip().lower()
-    if chosen in ('openrouter', 'anthropic'):
+    shared = os.environ.get('OPENROUTER_MODEL', '')
+    if chosen != 'anthropic' and shared and ('/' in shared or shared.startswith(('deepseek-', 'claude-'))):
+        return provider(shared)
+    if chosen in ('openrouter', 'anthropic', 'deepseek'):
         return chosen
+    if not os.environ.get('OPENROUTER_API_KEY') and os.environ.get('DEEPSEEK_API_KEY'):
+        return 'deepseek'
     return 'openrouter' if os.environ.get('OPENROUTER_API_KEY') else 'anthropic'
 
 
-def available():
+def default_model():
+    shared = os.environ.get('OPENROUTER_MODEL', '')
+    if shared and os.environ.get('LLM_PROVIDER', '').strip().lower() != 'anthropic':
+        return shared
+    backend = provider()
+    if backend == 'deepseek':
+        import deepseek_client
+        return deepseek_client.default_model()
+    if backend == 'openrouter':
+        import openrouter_client
+        return openrouter_client.default_model()
+    return MODEL
+
+
+def available(model=None):
     """(能不能调用, 原因)。上层据此决定是只出规则报告还是带 AI 研判。"""
-    if provider() == 'openrouter':
+    if provider(model) == 'deepseek':
+        import deepseek_client
+        return deepseek_client.available()
+    if provider(model) == 'openrouter':
         import openrouter_client
         return openrouter_client.available()
     if not os.environ.get('ANTHROPIC_API_KEY'):
@@ -73,10 +103,15 @@ def complete_json(system, user_content, schema, model=None, effort=None,
     易变数据在 user 消息里。一天只调一次的话缓存（默认5分钟TTL）命中不了，
     真正省钱要等盘中哨兵那种高频调用，但现在就摆对位置，之后不用再改结构。
     """
-    ok, reason = available()
+    model = model or default_model()
+    ok, reason = available(model)
     if not ok:
         raise ClaudeError('unavailable', reason)
-    if provider() == 'openrouter':
+    if provider(model) == 'deepseek':
+        import deepseek_client
+        return deepseek_client.complete_json(system, user_content, schema, model=model, effort=effort or EFFORT,
+                                             max_tokens=max_tokens, timeout=timeout, max_retries=max_retries)
+    if provider(model) == 'openrouter':
         import openrouter_client
         return openrouter_client.complete_json(system, user_content, schema, model=model, effort=effort or EFFORT,
                                                max_tokens=max_tokens, timeout=timeout, max_retries=max_retries)
@@ -149,11 +184,15 @@ def check(model=None, effort='low'):
     花费约几分钱。没有 key 时不发请求。这是给你上线前自检用的——没配好就会在这里明确报错，
     而不是等到周一盘中哨兵触发时才发现研判一直静默失败。"""
     import time
-    lines = ['后端：%s' % provider()]
-    ok, why = available()
+    model = model or default_model()
+    backend = provider(model)
+    lines = ['后端：%s' % backend]
+    ok, why = available(model)
     if not ok:
         return False, lines + ['不可用：' + why]
-    if provider() == 'openrouter':
+    if backend == 'deepseek':
+        lines.append('模型：%s（DeepSeek 官方 API）' % model)
+    elif backend == 'openrouter':
         import openrouter_client
         lines.append('模型：%s（可用 OPENROUTER_MODEL 修改）' % (model or openrouter_client.default_model()))
     else:

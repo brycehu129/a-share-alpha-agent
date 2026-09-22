@@ -8,6 +8,7 @@ main() {
   cd "$R"
   git fetch origin master --quiet
   git reset --hard origin/master
+  pip3 install --quiet 'jsonschema>=4.18,<5' || echo "WARN: jsonschema 安装失败，DeepSeek 官方研判不可用"
   if ! { grep -q '^OPENROUTER_API_KEY=.' "$E" && ! grep -q '^LLM_PROVIDER=anthropic' "$E"; } 2>/dev/null; then
     pip3 install --quiet --upgrade anthropic || echo "WARN: anthropic 安装失败"
   fi

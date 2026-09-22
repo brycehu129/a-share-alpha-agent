@@ -11,6 +11,7 @@
   AI 研判的真实命中率（这也是后面复盘闭环的数据基础）。
 """
 import json
+import os
 
 from shortterm_model import BREAKOUT, PULLBACK, SHORT_POLICY, SELECTION_VERSION as STRATEGY_VERSION
 
@@ -200,7 +201,8 @@ def analyze(check_result, context, holdings, watchlist):
     meta = {'prompt_version': PROMPT_VERSION, 'strategy_version': STRATEGY_VERSION,
             'payload_stocks': len(payload['stocks'])}
     try:
-        data, call_meta = claude_client.complete_json(system_prompt(), user_content, SCHEMA)
+        data, call_meta = claude_client.complete_json(system_prompt(), user_content, SCHEMA,
+                                 model=os.environ.get('POSTCLOSE_MODEL') or None)
     except claude_client.ClaudeError as exc:
         meta.update(status=exc.status, error=exc.message)
         return None, meta

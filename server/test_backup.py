@@ -359,7 +359,12 @@ class WebTests(Base):
 
     def test_settings_api_reports_backup_health(self):
         import json
-        settings = lambda: json.loads(self.request('GET', '/api/settings')[1].decode())
+
+        def settings(when=NOW):
+            with patch.object(backup, 'datetime', wraps=datetime) as clock:
+                clock.now.return_value = when
+                return json.loads(self.request('GET', '/api/settings')[1].decode())
+
         first = settings()
         self.assertEqual(first['backup']['level'], 'none')
         self.assertIn('尚未运行', first['backup']['text'])
@@ -368,8 +373,8 @@ class WebTests(Base):
         second = settings()
         self.assertEqual(second['backup']['level'], 'ok')
         self.assertIn('最近成功快照', second['backup']['text'])
-        with patch.object(backup, 'STALE_HOURS', -100000):
-            self.assertEqual(settings()['backup']['level'], 'warn')
+        self.assertEqual(settings(NOW + timedelta(hours=backup.STALE_HOURS))['backup']['level'], 'ok')
+        self.assertEqual(settings(NOW + timedelta(hours=backup.STALE_HOURS + 1))['backup']['level'], 'warn')
 
 
 if __name__ == '__main__':

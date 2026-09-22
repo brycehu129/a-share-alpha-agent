@@ -370,7 +370,7 @@ def _analyze(d, directory, files, now, day, snapshot_fn, analyze_fn, send_fn, ai
         return {'processed': 0, 'expired': len(files)}
     if ai_ok_fn is None:
         import claude_client
-        ai_ok_fn = claude_client.available
+        ai_ok_fn = lambda: claude_client.available(os.environ.get('SENTINEL_MODEL') or None)
     ok, why = ai_ok_fn()
     if not ok:
         for p, _ in items:

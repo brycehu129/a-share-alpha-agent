@@ -67,7 +67,8 @@ class Base(unittest.TestCase):
         self.addCleanup(env.stop)
         # cron 每次先 source /etc/alpha-shadow.env 再跑全量测试：那里按文档会配 OPENROUTER_MODEL / SENTINEL_MODEL，
         # 断言"默认模型"的测试不能被它们影响，否则服务器上一配模型，日线流程就被测试失败连带中止。
-        for name in ('OPENROUTER_MODEL', 'SENTINEL_MODEL', 'OPENROUTER_SITE_URL', 'CLAUDE_MODEL'):
+        for name in ('OPENROUTER_MODEL', 'SENTINEL_MODEL', 'POSTCLOSE_MODEL', 'NEXTDAY_MODEL',
+                 'OPENROUTER_SITE_URL', 'CLAUDE_MODEL'):
             os.environ.pop(name, None)
         sleep = patch.object(orc.time, 'sleep')
         sleep.start()
@@ -408,6 +409,27 @@ class CheckCommandTests(Base):
 
 
 class SentinelModelTests(Base):
+    def test_each_scene_uses_its_model_and_falls_back_to_the_shared_default(self):
+        import ai_analyst
+        import next_day_watch
+        import scenario_analyst
+        scene_env = {'OPENROUTER_MODEL': 'm/default', 'POSTCLOSE_MODEL': 'm/report',
+                     'SENTINEL_MODEL': 'deepseek/deepseek-v3.2', 'NEXTDAY_MODEL': 'm/watch'}
+        with patch.object(ai_analyst, 'build_payload', return_value={'stocks': []}), \
+                patch.object(next_day_watch, 'build_payload', return_value={}), \
+                patch.object(next_day_watch, 'apply_ai', return_value=[]):
+            for overrides, expected in ((scene_env, ['m/report', 'deepseek/deepseek-v3.2', 'm/watch']),
+                                        ({name: '' for name in scene_env if name != 'OPENROUTER_MODEL'},
+                                         ['m/default'] * 3)):
+                with patch.dict(os.environ, {**scene_env, **overrides}):
+                    ai_analyst.analyze({'rows': []}, {}, [], [])
+                    scenario_analyst.analyze({'stocks': []})
+                    next_day_watch.analyze({'items': [{'symbol': 'sz000001'}]})
+                self.assertEqual([req['body']['model'] for req in self.fake.requests[-3:]], expected)
+                for req in self.fake.requests[-3:]:
+                    self.assertEqual(req['body']['response_format']['type'], 'json_schema')
+                    self.assertTrue(req['body']['provider']['require_parameters'])
+
     def test_sentinel_can_use_a_cheaper_model_than_the_postclose_report(self):
         import scenario_analyst
         stock = {'symbol': 'sz000001', 'current_read': 'x', 'scenarios': [], 'watch_metrics': [],

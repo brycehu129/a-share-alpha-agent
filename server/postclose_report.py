@@ -449,6 +449,7 @@ def main():
         # 用 environ 里的值直接删而不再 apply，所以页面保存的 key 也不会被重新放回来。
         os.environ.pop('ANTHROPIC_API_KEY', None)
         os.environ.pop('OPENROUTER_API_KEY', None)
+        os.environ.pop('DEEPSEEK_API_KEY', None)
 
     report = build(a.history, run_id)
     if report['status'] == 'empty':

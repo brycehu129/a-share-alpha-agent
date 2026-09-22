@@ -1,4 +1,4 @@
-"""大模型配置的页面存储：OpenRouter key、模型名。Python 3.9+，只用标准库。
+"""大模型配置的页面存储：OpenRouter / DeepSeek 官方 key、模型名。Python 3.9+，只用标准库。
 
 让你在后台"推送配置"页填 key，不用登服务器改 /etc/alpha-shadow.env。
 
@@ -12,8 +12,8 @@
    日线流程会被连带中止——和上次 OPENROUTER_API_KEY 那次是同一个坑。
 3. **优先级：页面保存的 > 环境变量。** 你刚在页面保存的东西必须立刻生效，不能被一个忘了的
    旧环境变量悄悄盖住；页面会显示当前生效的是哪个来源。清除页面保存的值后自动回落到环境变量。
-4. 只管 OpenRouter（`OPENROUTER_API_KEY` / `OPENROUTER_MODEL` / `SENTINEL_MODEL`）。
-   直连 Anthropic 的 key 仍只走环境变量。
+4. 管理 OpenRouter / DeepSeek 官方 key、默认模型，以及盘后报告/盘中情景/次日观察的独立模型。
+    直连 Anthropic 的 key 和默认模型仍只走环境变量；各场景可以使用不同渠道。
 """
 import json
 import os
@@ -23,9 +23,13 @@ import tempfile
 import portfolio_book
 
 # 存储字段 -> 它覆盖的环境变量
-ENV_NAMES = {'api_key': 'OPENROUTER_API_KEY', 'model': 'OPENROUTER_MODEL', 'sentinel_model': 'SENTINEL_MODEL'}
+MODEL_ENV_NAMES = {'model': 'OPENROUTER_MODEL', 'postclose_model': 'POSTCLOSE_MODEL',
+                   'sentinel_model': 'SENTINEL_MODEL', 'nextday_model': 'NEXTDAY_MODEL'}
+ENV_NAMES = {'api_key': 'OPENROUTER_API_KEY', 'deepseek_api_key': 'DEEPSEEK_API_KEY', **MODEL_ENV_NAMES}
 
 KEY_PATTERN = re.compile(r'sk-or-[A-Za-z0-9_\-]{16,200}')
+DEEPSEEK_KEY_PATTERN = re.compile(r'sk-(?!or-|ant-)[A-Za-z0-9_\-]{16,200}')
+KEY_FIELDS = {'openrouter': ('api_key', KEY_PATTERN), 'deepseek': ('deepseek_api_key', DEEPSEEK_KEY_PATTERN)}
 MODEL_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:/\-]{1,99}')
 
 # 进程内 {环境变量名: (被覆盖前的原值, 我们放进去的值)}。清除页面值时据此恢复；环境变量已被别人改掉就不碰。
@@ -40,11 +44,20 @@ def path(directory=None):
     return os.path.join(directory or portfolio_book.default_dir(), 'llm_settings.json')
 
 
-def validate_key(raw):
+def key_field(provider):
+    if provider not in KEY_FIELDS:
+        raise SettingsError('不支持的 API key 服务商')
+    return KEY_FIELDS[provider]
+
+
+def validate_key(raw, provider='openrouter'):
     key = (raw or '').strip()
     if not key:
         raise SettingsError('API key 不能为空')
-    if not KEY_PATTERN.fullmatch(key):
+    _, pattern = key_field(provider)
+    if provider == 'deepseek' and not pattern.fullmatch(key):
+        raise SettingsError('DeepSeek 官方 key 格式不对：应以 sk- 开头，不含空格或换行，不能使用 OpenRouter/Anthropic key')
+    if not pattern.fullmatch(key):
         raise SettingsError('格式不对：OpenRouter 的 key 以 sk-or- 开头，只含字母、数字、下划线和连字符，'
                             '且中间不能有空格或换行（请重新复制）')
     return key
@@ -73,9 +86,10 @@ def load(directory=None):
     if not isinstance(data, dict):
         return {}, '页面保存的配置文件内容异常，已忽略；请重新保存。'
     out = {}
-    if isinstance(data.get('api_key'), str) and KEY_PATTERN.fullmatch(data['api_key']):
-        out['api_key'] = data['api_key']
-    for name in ('model', 'sentinel_model'):
+    for field, pattern in KEY_FIELDS.values():
+        if isinstance(data.get(field), str) and pattern.fullmatch(data[field]):
+            out[field] = data[field]
+    for name in MODEL_ENV_NAMES:
         value = data.get(name)
         if isinstance(value, str) and MODEL_PATTERN.fullmatch(value):
             out[name] = value
@@ -99,16 +113,20 @@ def _write(settings, directory=None):
     os.chmod(p, 0o600)
 
 
-def save_key(raw, directory=None):
-    key = validate_key(raw)
+def save_key(raw, directory=None, *, provider='openrouter'):
+    field, _ = key_field(provider)
+    key = validate_key(raw, provider)
     settings, _ = load(directory)
-    settings['api_key'] = key
+    settings[field] = key
     _write(settings, directory)
 
 
-def save_models(model, sentinel_model, directory=None):
+def save_models(model, sentinel_model, directory=None, *, postclose_model=None, nextday_model=None):
     """空字符串 = 清除该项、用默认值。改模型不需要重新输入 key。"""
     values = {'model': validate_model(model), 'sentinel_model': validate_model(sentinel_model)}
+    for name, value in (('postclose_model', postclose_model), ('nextday_model', nextday_model)):
+        if value is not None:
+            values[name] = validate_model(value)
     settings, _ = load(directory)
     for name, value in values.items():
         if value:
@@ -118,9 +136,10 @@ def save_models(model, sentinel_model, directory=None):
     _write(settings, directory)
 
 
-def clear_key(directory=None):
+def clear_key(directory=None, *, provider='openrouter'):
+    field, _ = key_field(provider)
     settings, _ = load(directory)
-    settings.pop('api_key', None)
+    settings.pop(field, None)
     _write(settings, directory)
 
 
@@ -128,7 +147,7 @@ def mask_key(key):
     """页面展示用：只露前缀和末 4 位。"""
     if not key:
         return None
-    return 'sk-or-…' + key[-4:]
+    return ('sk-or-…' if key.startswith('sk-or-') else 'sk-…') + key[-4:]
 
 
 def apply(directory=None, environ=None, memo=None):
@@ -174,6 +193,6 @@ def describe(directory=None, environ=None):
             source, value = 'env', env_value
         else:
             source, value = 'none', None
-        out[field] = {'source': source, 'value': mask_key(value) if field == 'api_key' else value,
+        out[field] = {'source': source, 'value': mask_key(value) if field.endswith('api_key') else value,
                       'env_shadowed': field in settings and bool(env_value)}
     return out

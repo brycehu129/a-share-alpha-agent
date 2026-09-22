@@ -12,6 +12,7 @@
 """
 import argparse
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -278,7 +279,8 @@ def analyze(result):
         return meta
     user = '以下是今天的结构化事实，请按 schema 给出点评。\n\n' + json.dumps(build_payload(result), ensure_ascii=False, indent=1)
     try:
-        data, call_meta = claude_client.complete_json(SYSTEM, user, SCHEMA)
+        data, call_meta = claude_client.complete_json(SYSTEM, user, SCHEMA,
+                                 model=os.environ.get('NEXTDAY_MODEL') or None)
     except claude_client.ClaudeError as exc:
         meta.update(status=exc.status, error=exc.message)
         return meta

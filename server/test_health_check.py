@@ -270,7 +270,8 @@ class SystemTests(Base):
             self.assertEqual(hc.check_backup(self.ctx())['level'], hc.WARN)
         with patch.object(backup, 'health', return_value=('none', '尚未运行')):
             self.assertEqual(hc.check_backup(self.ctx())['level'], hc.SKIP)
-        with patch.dict(os.environ, {'OPENROUTER_API_KEY': '', 'ANTHROPIC_API_KEY': '', 'LLM_PROVIDER': ''}):
+        with patch.dict(os.environ, {'OPENROUTER_API_KEY': '', 'ANTHROPIC_API_KEY': '',
+                                     'DEEPSEEK_API_KEY': '', 'LLM_PROVIDER': ''}):
             self.assertEqual(hc.check_llm(self.ctx())['level'], hc.WARN)
 
     def test_each_check_reports_when_its_evidence_was_produced_and_when_it_is_scheduled_to_run(self):

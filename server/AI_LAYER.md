@@ -73,39 +73,48 @@ AI 调用失败（没配 key、没装包、限流、超时、被拒、输出截�
 
 ## 配置
 
-**两个后端，同一套接口**（`claude_client.py` 是统一入口，`ai_analyst`/`scenario_analyst`/哨兵不知道也不关心用的是哪个）。
-`/etc/alpha-shadow.env` 里二选一：
+**三个后端，同一套接口**（`claude_client.py` 是统一入口），各场景可以混用渠道。
+`/etc/alpha-shadow.env` 按需配置各渠道凭据：
 
 ```
 # 方案 A：OpenRouter（只用标准库，不需要装任何包）
 OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MODEL=anthropic/claude-opus-5        # 可选，默认就是它
+POSTCLOSE_MODEL=anthropic/claude-opus-5         # 可选：盘后报告；未设置时继承默认模型
 SENTINEL_MODEL=anthropic/claude-sonnet-5        # 可选：哨兵每天最多15次，可用比盘后报告更便宜的模型
+NEXTDAY_MODEL=deepseek/deepseek-v3.2            # 可选：次日观察；未设置时继承默认模型
 
 # 方案 B：直连 Anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 CLAUDE_MODEL=claude-opus-5                      # 可选
+
+# 方案 C：直连 DeepSeek 官方开放平台（需要 pip install 'jsonschema>=4.18,<5'）
+DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_MODEL=deepseek-flash                   # 可选，官方默认模型
+LLM_PROVIDER=deepseek                          # 可选，指定默认后端
+SENTINEL_MODEL=deepseek-v4-pro                  # 可选：仅情景研判使用官方模型
 ```
 
-选择规则：`LLM_PROVIDER=openrouter|anthropic` 显式指定优先；没指定时，配了 `OPENROUTER_API_KEY` 就用 OpenRouter，否则用 Anthropic。
-`SENTINEL_MODEL` 的模型 id 必须符合当前后端的写法（OpenRouter 用 `anthropic/claude-sonnet-5`，直连用 `claude-sonnet-5`）。
+显式模型 ID 决定渠道：`deepseek-*` 走官方 DeepSeek，含 `/` 的 ID 走 OpenRouter，`claude-*` 走直连 Anthropic。各渠道只使用自己的 key，缺失时明确报错，不自动换模型或借用另一家的 key。
+未设置场景模型时继承共享默认模型（兼容存于 `OPENROUTER_MODEL`）；没有共享模型时按 `LLM_PROVIDER=openrouter|anthropic|deepseek` 选择默认后端。未指定后端时优先 OpenRouter key，其次 DeepSeek key，否则 Anthropic。兼容旧配置：`LLM_PROVIDER=anthropic` 忽略共享默认模型，但显式场景模型仍按 ID 路由。
 其他可选：`OPENROUTER_SITE_URL`（归因用的站点 URL）、`OPENROUTER_BASE_URL`（代理或测试用）。
 
-**也可以在后台页面配置（推荐）**：`/` 的“推送配置”页有“大模型（OpenRouter）”一栏，可填 OpenRouter key、主模型、哨兵模型，
-带“测试连接”按钮（等价于下面的 `check`）和“清除”。规矩：
+**也可以在后台设置页面配置（推荐）**：“大模型”一栏分别保存 OpenRouter key 和 DeepSeek 官方 key，选择统一默认模型，以及盘后报告、盘中情景研判、次日观察各自的模型。
+下拉框提供 DeepSeek Flash（`deepseek-flash`）、DeepSeek V4 Pro（`deepseek-v4-pro`）官方选项，以及明确标注 OpenRouter / Anthropic 的选项，也支持自定义 ID。官方请求固定发送到 `https://api.deepseek.com/chat/completions`，使用 JSON mode 并按现有 JSON Schema 在本地验证，验证失败不进入后续分析。已有 `deepseek/deepseek-v3.2` 配置仍走 OpenRouter，不自动迁移；改为官方需另填官方 key 并选择官方模型。
+保存后可选择对应场景“测试连接”（会发一次真实付费请求，使用已保存的配置），以及“清除”页面保存的 key。规矩：
 
 - key 存 `server/data/private/llm_settings.json`（0600，不进 git）。**只写不读**：页面只显示末 4 位，输入框永远为空，错误提示不回显你提交的内容。
-- **优先级：页面保存的 > `/etc/alpha-shadow.env`**。页面保存后立即生效（不用重启服务），页面会标出当前生效的来源；点“清除”后自动回落到环境变量。只管 OpenRouter 的三项（`OPENROUTER_API_KEY` / `OPENROUTER_MODEL` / `SENTINEL_MODEL`），直连 Anthropic 的 key 仍只走环境变量；若服务器设了 `LLM_PROVIDER=anthropic`，页面会提示 OpenRouter key 不会被用到。
+- **优先级：页面保存的 > `/etc/alpha-shadow.env` > 默认模型**。页面保存后对后续调用生效（不用重启服务，不改变已在执行的请求），并显示实际模型及渠道；清空后回落到环境变量，仍未配置的场景继承默认模型。配置项为 `OPENROUTER_API_KEY` / `DEEPSEEK_API_KEY` / `OPENROUTER_MODEL` / `POSTCLOSE_MODEL` / `SENTINEL_MODEL` / `NEXTDAY_MODEL`。旧配置保持兼容。直连 Anthropic 的 key 和默认模型仍只走环境变量。
 - **只有程序入口读这个文件**（`llm_settings.apply()`：webapp、`sentinel.py`、`postclose_report.py`、`claude_client.py check`）。库代码只看环境变量——cron 每次先跑全量测试，库若自己读文件，服务器上一存了 key，“没配 key”的测试就会变样，连带中止日线流程。新增调用大模型的入口时记得也调用它。
 - **防跨站伪造（CSRF）**：所有 POST 校验 `Sec-Fetch-Site` / `Origin`，跨站请求返回 403。这一层同时保护 /book、/config、/postclose/run——后台用 Basic Auth，浏览器会替任何网页自动带上凭证，没有这层的话，你打开的任意网页都能替你改 key（换成对方的，之后你的持仓和止损位就流到对方账户的调用日志里）。
-- 后台是自签名 HTTPS，浏览器会有证书警告；不要在不信任的网络下提交 key。key 一旦怀疑泄露，去 OpenRouter 撤销重发，这里点“清除”再填新的。
-- 顺带修了一个隐患：`postclose_report.py --no-ai` 以前只去掉 Anthropic 的 key，配了 OpenRouter 时会照样调用并花钱。
+- 后台是自签名 HTTPS，浏览器会有证书警告；不要在不信任的网络下提交 key。key 一旦怀疑泄露，去对应服务商撤销重发，这里点“清除”再填新的。
+- `postclose_report.py --no-ai` 会移除三个渠道的 key，避免意外付费调用。
 
 **上线前先自检**（一次极小的真实请求，花费约几分钱；没配好会明确报错，而不是等周一盘中哨兵触发时才发现研判一直静默失败）：
 
 ```
 python3 server/claude_client.py check
-python3 server/claude_client.py check --model deepseek/deepseek-v4.1-flash   # 试别的模型
+python3 server/claude_client.py check --model deepseek-flash   # 官方 DeepSeek
 ```
 
 ### OpenRouter 的几个坑（都已在 `openrouter_client.py` 里处理）
