@@ -25,25 +25,37 @@
       "report_date": "2026-09-23",
       "expected_date": "2026-09-23",
       "started_at": "2026-09-23T17:17:42.993327+08:00",
-      "updated_at": "2026-09-23T17:17:42.993327+08:00",
-      "status": "running",
-      "data_date": null,
-      "issues": [],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260923091711"
+      "updated_at": "2026-09-23T17:29:49.227807+08:00",
+      "status": "partial",
+      "data_date": "2026-09-21",
+      "issues": [
+        "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
+        "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
+        "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。",
+        "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
+      ],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260923091711",
+      "finished_at": "2026-09-23T17:29:49.227807+08:00"
     }
   },
-  "updated_at": "2026-09-23T17:17:42.993327+08:00",
+  "updated_at": "2026-09-23T17:29:49.227807+08:00",
   "latest_run": {
     "id": "20260923091711-1",
     "slot": "close",
     "report_date": "2026-09-23",
     "expected_date": "2026-09-23",
     "started_at": "2026-09-23T17:17:42.993327+08:00",
-    "updated_at": "2026-09-23T17:17:42.993327+08:00",
-    "status": "running",
-    "data_date": null,
-    "issues": [],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260923091711"
+    "updated_at": "2026-09-23T17:29:49.227807+08:00",
+    "status": "partial",
+    "data_date": "2026-09-21",
+    "issues": [
+      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
+      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
+      "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。",
+      "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
+    ],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260923091711",
+    "finished_at": "2026-09-23T17:29:49.227807+08:00"
   },
   "calendar": [
     {
@@ -324,12 +336,12 @@
       "finished_at": "2026-09-23T15:28:45.055835+08:00"
     },
     "close": {
-      "id": "20260923081711-1",
+      "id": "20260923091711-1",
       "slot": "close",
       "report_date": "2026-09-23",
       "expected_date": "2026-09-23",
-      "started_at": "2026-09-23T16:17:45.055168+08:00",
-      "updated_at": "2026-09-23T16:30:06.827718+08:00",
+      "started_at": "2026-09-23T17:17:42.993327+08:00",
+      "updated_at": "2026-09-23T17:29:49.227807+08:00",
       "status": "partial",
       "data_date": "2026-09-21",
       "issues": [
@@ -338,8 +350,8 @@
         "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。",
         "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
       ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260923081711",
-      "finished_at": "2026-09-23T16:30:06.827718+08:00"
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260923091711",
+      "finished_at": "2026-09-23T17:29:49.227807+08:00"
     },
     "close_final": {
       "id": "20260921121711-1",
