@@ -141,7 +141,12 @@ class ExportTests(unittest.TestCase):
         from tushare_sync import save
         h = Path(tempfile.mkdtemp())
         report = alpha_engine.run(h, '20260922000000-3')
-        report.update(portfolio={'positions': [], 'trades': [], 'curve': [], 'valuation_status': 'current', 'paused': False,
+        # generated_at must be pinned, not alpha_engine.run's real datetime.now(): dashboard_export.latest()
+        # picks the file with the max generated_at, and the revision saved below hardcodes 16:00 on this same
+        # day — once real time passes that (as it now has), the unpinned "now" would sort after it and this
+        # first, exec02-less file would be picked instead, silently breaking this test forever.
+        report.update(generated_at='2026-09-22T08:00:00+08:00',
+                      portfolio={'positions': [], 'trades': [], 'curve': [], 'valuation_status': 'current', 'paused': False,
                                  'equity': 1, 'cash': 1, 'last_date': '2026-09-22', 'excess_pp': 0, 'max_drawdown_pct': 0,
                                  'trade_win_rate': None},
                       status='ready', screen=None, candidates=[], calibration=None, calibration_short=None)
