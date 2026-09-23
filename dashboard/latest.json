@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-23T16:29:25.344000+08:00",
+  "exported_at": "2026-09-23T17:28:55.862691+08:00",
   "market": {
-    "generated_at": "2026-09-23T16:18:26.814339+08:00",
+    "generated_at": "2026-09-23T17:18:28.946283+08:00",
     "status": "success",
     "summary": "源数据日期 2026-09-23：所监测6个指数中，0个上涨、6个下跌、0个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
     "quotes": [
@@ -65,7 +65,7 @@
     }
   },
   "research": {
-    "generated_at": "2026-09-23T16:22:45.010611+08:00",
+    "generated_at": "2026-09-23T17:22:19.991107+08:00",
     "status": "success",
     "factor_cutoff": "2026-09-22",
     "industry_provider": "新浪行业",
@@ -5303,8 +5303,8 @@
         "sz002565": "new_zzhy"
       }
     },
-    "source_id": "20260923081711-1",
-    "source_generated_at": "2026-09-23T16:18:26.814339+08:00",
+    "source_id": "20260923091711-1",
+    "source_generated_at": "2026-09-23T17:18:28.946283+08:00",
     "sample_count": 300,
     "factor_count": 293,
     "rankings": [
@@ -5733,7 +5733,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-23T16:17:47.456075+08:00",
+    "generated_at": "2026-09-23T17:17:45.388258+08:00",
     "status": "success",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5746,7 +5746,7 @@
     }
   },
   "analysis": {
-    "generated_at": "2026-09-23T16:24:51.821629+08:00",
+    "generated_at": "2026-09-23T17:24:23.949540+08:00",
     "status": "ready",
     "start_date": "20260825",
     "end_date": "20260922",
@@ -5999,43 +5999,43 @@
   "sources": [
     {
       "kind": "market",
-      "id": "20260923081711-1",
-      "generated_at": "2026-09-23T16:18:26.814339+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20260923081711-1.md"
+      "id": "20260923091711-1",
+      "generated_at": "2026-09-23T17:18:28.946283+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20260923091711-1.md"
     },
     {
       "kind": "research",
-      "id": "20260923081711-1",
-      "generated_at": "2026-09-23T16:22:45.010611+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260923081711-1.md"
+      "id": "20260923091711-1",
+      "generated_at": "2026-09-23T17:22:19.991107+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260923091711-1.md"
     },
     {
       "kind": "sync",
-      "id": "20260923081711-1",
-      "generated_at": "2026-09-23T16:17:47.456075+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260923081711-1.md"
+      "id": "20260923091711-1",
+      "generated_at": "2026-09-23T17:17:45.388258+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260923091711-1.md"
     },
     {
       "kind": "analysis",
-      "id": "20260923081711-1",
-      "generated_at": "2026-09-23T16:24:51.821629+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260923081711-1.md"
+      "id": "20260923091711-1",
+      "generated_at": "2026-09-23T17:24:23.949540+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260923091711-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "20260923081711-1",
-      "generated_at": "2026-09-23T16:29:04.519854+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260923081711-1.md"
+      "id": "20260923091711-1",
+      "generated_at": "2026-09-23T17:28:36.586952+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260923091711-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20260923081711-1",
-      "generated_at": "2026-09-23T16:29:03.977697+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260923081711-1.md"
+      "id": "20260923091711-1",
+      "generated_at": "2026-09-23T17:28:36.193958+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260923091711-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-23T16:29:03.977697+08:00",
+    "generated_at": "2026-09-23T17:28:36.193958+08:00",
     "version": "select-0.5",
     "status": "partial",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
@@ -9279,7 +9279,7 @@
       "plans": [],
       "plan_counts": {},
       "issues": [],
-      "snapshot_at": "2026-09-23T16:25:42.785129+08:00",
+      "snapshot_at": "2026-09-23T17:25:12.656659+08:00",
       "curve": [
         {
           "date": "2026-09-21",
