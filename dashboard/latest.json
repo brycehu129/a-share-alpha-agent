@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-23T09:27:01.194939+08:00",
+  "exported_at": "2026-09-23T09:31:39.214613+08:00",
   "market": {
     "generated_at": "2026-09-23T09:18:16.373139+08:00",
     "status": "success",
@@ -6023,20 +6023,18 @@
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20260923011703-1",
-      "generated_at": "2026-09-23T09:26:44.033081+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260923011703-1.md"
+      "id": "20260923013101-1",
+      "generated_at": "2026-09-23T09:31:39.005588+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260923013101-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-23T09:26:44.033081+08:00",
+    "generated_at": "2026-09-23T09:31:39.005588+08:00",
     "version": "select-0.5",
     "status": "partial",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
     "issues": [
-      "本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。",
-      "本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。",
-      "股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。"
+      "开盘观察执行记录；当日净值仍需收盘估值。未用当天完整日线决定成交。"
     ],
     "calibration": {
       "walk_forward_n": 0,
