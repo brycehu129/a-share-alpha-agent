@@ -52,6 +52,19 @@ SPECS = {
                  'day1_close_rule': False, 'hold_sessions': 5,
                  'breakeven_arm_frac': 0.5, 'breakeven_arm_pct': None, 'stop_floor': None},
     },
+    # select-rev-0.1（超跌反弹，只留档不成交，见 server/strategies/reversal_0_1.py）用的规格。
+    # 不追高，和 pullback 同形；但不设 void_below_ma20——这条 track 的候选按定义已经在 MA20
+    # 下方（超跌），拿"跌破MA20"当作废条件没有意义。这套规格目前只喂合约模拟/展示用的
+    # 止损止盈位，不进任何真实成交路径（TRADABLE=False）。
+    'reversal': {
+        'entry': {'kind': 'no_chase', 'min_pct': None, 'max_pct': 0.01, 'void_pct': None,
+                  'void_below_ma20': False, 'window': ['09:30', '14:30']},
+        'exit': {'stop_atr_mult': 1.5, 'stop_min_pct': 0.03, 'stop_max_pct': 0.08,
+                 'target_r': 1.5, 'target_max_pct': 0.12,
+                 'stop_pct': None, 'target_pct': None,
+                 'day1_close_rule': False, 'hold_sessions': 5,
+                 'breakeven_arm_frac': 0.5, 'breakeven_arm_pct': None, 'stop_floor': None},
+    },
 }
 
 

@@ -4,6 +4,7 @@ import html
 import json
 import os
 import re
+import time as _time
 from collections import Counter
 from datetime import datetime, timedelta, time
 from pathlib import Path
@@ -63,20 +64,25 @@ def tagged(outcome, f):
     return outcome
 
 
-def split_short_pools(outcomes):
+def split_short_pools(outcomes, version=SELECTION_VERSION):
     """3天窗口的验收分成 (当前选股版本, 其他版本) 两池，只有前者参与当前版本的概率估计。
 
     不能只靠 horizon 分：0.3 和 0.4 窗口都是3天但筛选规则不同，混池算出的胜率
-    哪个版本都不代表。其他版本的样本仍然保留计数（legacy），只是不参与估计。"""
-    live = [o for o in outcomes if o['horizon'] == 3 and o.get('selection_version') == SELECTION_VERSION]
-    other = [o for o in outcomes if o['horizon'] == 3 and o.get('selection_version') != SELECTION_VERSION]
+    哪个版本都不代表。其他版本的样本仍然保留计数（legacy），只是不参与估计。
+
+    `version` 默认当前主策略的 SELECTION_VERSION；多策略并行时（见 server/strategies/），
+    每个策略调一次、各自传自己的 STRATEGY_ID，样本池永不跨策略混合。"""
+    live = [o for o in outcomes if o['horizon'] == 3 and o.get('selection_version') == version]
+    other = [o for o in outcomes if o['horizon'] == 3 and o.get('selection_version') != version]
     return live, other
 
 
-def cutoff_slots(forecasts, cutoff):
+def cutoff_slots(forecasts, cutoff, version=SELECTION_VERSION):
     """该选股版本、该截止日已经留档了多少条、其中多少条允许模拟成交。
-    同一截止日会被重跑好几次，靠这个给留档条数和成交名额设上限。"""
-    same = [f for f in forecasts if selection_version_of(f) == SELECTION_VERSION and f['as_of'] == cutoff]
+    同一截止日会被重跑好几次，靠这个给留档条数和成交名额设上限。
+
+    `version` 同 split_short_pools：多策略并行时每个策略各自传自己的 id。"""
+    same = [f for f in forecasts if selection_version_of(f) == version and f['as_of'] == cutoff]
     return len(same), sum(bool(f['paper_eligible']) for f in same)
 
 
@@ -167,12 +173,24 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
     exec_version = execution_version((exec_revision or (0, {}))[0])
     now = datetime.now(CST)
     root = history / 'alpha_data'
+    # 08:40 流程必须在 09:20 前跑完（否则当天没有计划，健康检查会报警），耗时从未实测过。
+    # 这套埋点是加多策略之前的第一步：先量清楚现在单策略花多少时间，再决定能塞几个策略。
+    _timing_t0 = _time.perf_counter()
+    _timing_last = [_timing_t0]
+    timing = {}
+
+    def _lap(name):
+        t = _time.perf_counter()
+        timing[name] = round((t - _timing_last[0]) * 1000)
+        _timing_last[0] = t
+
     report = {'id': run_id, 'version': SELECTION_VERSION, 'selection_version': SELECTION_VERSION,
               'execution_version': exec_version, 'archive_size': ARCHIVE_SIZE,
               'generated_at': now.isoformat(), 'status': 'waiting_data',
               'target': TARGET, 'policy': POLICY, 'mid_policy': MID_POLICY, 'issues': [], 'screen': None,
               'candidates': [], 'calibration': None, 'calibration_short': None, 'portfolio': None,
-              'forecasts': [], 'outcomes': [], 'source_hashes': {}, 'evidence': None, 'exec02': None, 'baseline': None, 'news_check': None, 'new_forecast_ids': []}
+              'forecasts': [], 'outcomes': [], 'source_hashes': {}, 'evidence': None, 'exec02': None,
+              'baseline': None, 'news_check': None, 'new_forecast_ids': [], 'timing': timing}
     master_path = history / 'tushare_data/stock_basic.json'
     benchmark_path = root / 'series/sh000300.json'
     previous_path, previous = latest(history, 'agent')
@@ -180,6 +198,7 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
     if not master_path.exists() or not benchmark_path.exists():
         report['issues'].append('等待股票清单和沪深300历史日线；不补造候选或成交。')
         report['portfolio'] = previous.get('portfolio') if previous else None
+        timing['total'] = round((_time.perf_counter() - _timing_t0) * 1000)
         return report
     master, bench_source = read(master_path), read(benchmark_path)
     report['source_hashes']['stock_basic'] = sha(master)
@@ -193,12 +212,14 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
     if len(benchmark) < 21:
         report['issues'].append('基准不足21个已结束交易日。')
         report['portfolio'] = previous.get('portfolio') if previous else None
+        timing['total'] = round((_time.perf_counter() - _timing_t0) * 1000)
         return report
     if bridge:
         benchmark = [b for b in benchmark if b['date'] <= bridge['cutoff']]
         if len(benchmark) < 21:
             report['issues'].append('新源与基准共同窗口不足21日。')
             report['portfolio'] = previous.get('portfolio') if previous else None
+            timing['total'] = round((_time.perf_counter() - _timing_t0) * 1000)
             return report
     cutoff = benchmark[-1]['date']
     stocks = [s for s in master['rows'] if s['exchange'] in ('SSE', 'SZSE') and s['list_status'] == 'L']
@@ -218,8 +239,10 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
         report['issues'].append('本轮暂无游资明细数据（尚未同步到当日），打分未包含游资净买入维度。')
     if not hotmoney_availability['limit_list_d']:
         report['issues'].append('本轮暂无涨跌停数据（尚未同步到当日），突破track打分未包含涨停确认维度。')
+    _lap('data_load')
     screened = screen_short(stocks, series, benchmark, cutoff, tuning, hotmoney)
     report['screen'] = screened
+    _lap('screen')
     stale = (now - datetime.fromisoformat(master['fetched_at'])).days > 7 or (now - datetime.fromisoformat(bench_source['fetched_at'])).total_seconds() > 86400 or (now.date()-datetime.fromisoformat(cutoff).date()).days > 5
     if stale:
         report['issues'].append('股票清单超过7日、基准采集超过24小时或行情日期距今超过5日，只展示研究，不产生新虚拟计划。')
@@ -238,8 +261,10 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
     calibration = walk_forward(stocks, series, benchmark, cutoff, tuning)
     calibration_short = walk_forward_short(stocks, series, benchmark, cutoff, tuning,
                                             hotmoney_loader=lambda d: load_hotmoney(history, d)[0])
+    _lap('calibration')
     forecasts = [read(p) for p in sorted((history / 'predictions').glob('*.json'))]
     outcomes = resolve(forecasts, series, benchmark, now, history)
+    _lap('resolve')
     live_mid = [o for o in outcomes if o['horizon'] == 10]
     # 三层证据里的后两层（合约模拟/反事实）。这是**可选的研究层**：出任何问题都只记一条 issue，
     # 绝不能让必需的候选生成跟着失败。
@@ -249,6 +274,7 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
     except Exception as exc:
         report['evidence'] = None
         report['issues'].append('证据三层（合约模拟/反事实）本轮计算失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
+    _lap('evidence')
     # 随机基线：同样是可选研究层，出错只记 issue。抽样在这里冻结（盘前，用昨收数据），标签等日线走完才算。
     try:
         report['baseline'] = baseline.run_daily(history, stocks, series, benchmark, cutoff, screened['complete'] and freeze,
@@ -256,6 +282,7 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
     except Exception as exc:
         report['baseline'] = None
         report['issues'].append('随机基线本轮计算失败，已跳过：%s: %s' % (type(exc).__name__, str(exc)[:120]))
+    _lap('baseline')
     # 3天窗口的验收按**选股版本**再切一刀，不能只看 horizon：0.3 和 0.4 窗口相同，
     # 但筛选规则不同，混进一个池子算出的胜率哪个版本都不代表。
     live_short, legacy_short = split_short_pools(outcomes)
@@ -318,6 +345,7 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
     old_state = old_state or initial(cutoff, float(benchmark[-1]['close']), policy=POLICY)
     report['portfolio'] = advance(old_state, forecasts, raw_series, series, benchmark, cutoff, execute=False, policy=POLICY)
     report['issues'].extend(report['portfolio']['issues'])
+    _lap('raw_bars_and_portfolio')
     report['exec02'] = None
     if exec_account is not None:
         try:
@@ -388,14 +416,16 @@ def run(history, run_id, exec_revision=None, exec_account=None, announce_fn=None
         report['new_forecast_ids'].append(identity)
         archived_n += 1
         paper_n += int(can_trade)
+    _lap('freeze')
     report['forecasts'] = sorted(forecasts, key=lambda f: f['created_at'], reverse=True)
     report['outcomes'] = sorted(outcomes, key=lambda o: o['generated_at'], reverse=True)
     report['generated_at'] = datetime.now(CST).isoformat()
     report['status'] = 'ready' if screened['complete'] and not stale else 'partial'
+    timing['total'] = round((_time.perf_counter() - _timing_t0) * 1000)
     return report
 
 
-TRACK_LABEL = {'breakout': '突破', 'pullback': '回调反弹'}
+TRACK_LABEL = {'breakout': '突破', 'pullback': '回调反弹', 'reversal': '超跌反弹'}
 
 
 def render(r):

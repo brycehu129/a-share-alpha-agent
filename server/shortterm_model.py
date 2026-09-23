@@ -263,14 +263,19 @@ def screen_pullback(stocks, series, benchmark, cutoff, industry_rows, hotmoney=N
     return {'candidates': candidates, 'excluded': excluded, 'exclusion_counts': dict(Counter(excluded.values()))}
 
 
-def screen_short(stocks, series, benchmark, cutoff, tuning=None, hotmoney=None):
+def screen_short(stocks, series, benchmark, cutoff, tuning=None, hotmoney=None, mid=None):
     """Orchestrator: reuses alpha_model.screen() once for industry strength
     and market_score/coverage gating (both tracks share the same market-wide
     gate the mid-term strategy uses), then runs the two independent tracks.
     `hotmoney` is the same-day signal dict from hotmoney_features.load()
     (keyed by symbol); None/missing entries score as no signal, never as a
-    penalty -- see hotmoney_adjustment()'s docstring."""
-    mid = screen_mid(stocks, series, benchmark, cutoff, tuning)
+    penalty -- see hotmoney_adjustment()'s docstring.
+
+    `mid` lets a caller running several strategies side by side (see
+    server/strategies/) pass in an already-computed screen_mid() result so
+    the market-wide industry/coverage pass isn't repeated once per strategy.
+    Omit it (None) for standalone calls/tests -- behavior is unchanged."""
+    mid = mid if mid is not None else screen_mid(stocks, series, benchmark, cutoff, tuning)
     breakout = screen_breakout(stocks, series, benchmark, cutoff, mid['industries'], hotmoney)
     pullback = screen_pullback(stocks, series, benchmark, cutoff, mid['industries'], hotmoney)
     # Flat, merged exclusion_counts for callers (e.g. dashboard_export.py) that

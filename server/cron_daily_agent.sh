@@ -24,8 +24,13 @@ if ! grep -q '^run=true$' "$GH_OUTPUT"; then
 fi
 set -a; source "$GH_ENV"; set +a
 echo "Report slot: ${REPORT_SLOT:-?}  phase: ${REPORT_PHASE:-?}"
+_TS_SLOT_START=$SECONDS
 
+# 08:40 那一轮必须在 09:20 前跑完（否则当天没有计划），而这段测试套件的耗时和后面
+# alpha_engine 的耗时都从未实测过——先打印出来，攒几天 journalctl 就知道预算还剩多少。
+_TS0=$SECONDS
 python3 -m unittest discover -s server -p 'test_*.py' || { echo "FAILED: test suite" >&2; exit 1; }
+echo "TIMING test_suite $((SECONDS - _TS0))s"
 
 JOB_STATUS="success"
 fail_required() { echo "FAILED (required step): $*" >&2; JOB_STATUS="failure"; }
@@ -64,7 +69,9 @@ if [ "$JOB_STATUS" = "success" ]; then
 
   if [ "$JOB_STATUS" = "success" ] && [ "$COLLECT" = "true" ] && [ "${REPORT_SLOT:-}" != "prepare" ]; then
     python3 -u server/alpha_data.py --history "$HISTORY_DIR" --run-id "$REPORT_ID" --benchmark-only || warn_optional alpha_data--benchmark-only
+    _TS1=$SECONDS
     python3 -u server/alpha_engine.py --history "$HISTORY_DIR" --run-id "$REPORT_ID" || fail_required alpha_engine
+    echo "TIMING alpha_engine $((SECONDS - _TS1))s"
   fi
 
   if [ "$JOB_STATUS" = "success" ]; then
@@ -77,4 +84,5 @@ if [ "$JOB_STATUS" = "success" ]; then
   fi
 fi
 
+echo "TIMING slot_total $((SECONDS - _TS_SLOT_START))s"
 [ "$JOB_STATUS" = "success" ]

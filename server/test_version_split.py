@@ -72,6 +72,27 @@ class PoolSplitTests(unittest.TestCase):
         live, other = split_short_pools([{'horizon': 3, 'win': True}])
         self.assertEqual((len(live), len(other)), (0, 1))
 
+    def test_a_second_strategy_pools_independently_via_the_version_param(self):
+        """多策略并行（server/strategies/）：每个策略各自传自己的 version，同一批 outcomes
+        对 select-0.5 和 select-rev-0.1 各自过滤，互不污染对方的样本池——这是骨架能不能
+        真正支持多策略的关键断言，不是简单改个默认参数就完事。"""
+        outcomes = [
+            {'horizon': 3, 'selection_version': SELECTION_VERSION, 'win': True},
+            {'horizon': 3, 'selection_version': SELECTION_VERSION, 'win': True},
+            {'horizon': 3, 'selection_version': 'select-rev-0.1', 'win': False},
+            {'horizon': 3, 'selection_version': 'select-rev-0.1', 'win': False},
+            {'horizon': 3, 'selection_version': 'select-rev-0.1', 'win': True},
+        ]
+        select_live, select_other = split_short_pools(outcomes, version=SELECTION_VERSION)
+        reversal_live, reversal_other = split_short_pools(outcomes, version='select-rev-0.1')
+        self.assertEqual(len(select_live), 2)
+        self.assertEqual(len(reversal_live), 3)
+        # 对方版本的样本只出现在"other"计数里，绝不混进对方的 live 池。
+        self.assertTrue(all(o['selection_version'] == 'select-rev-0.1' for o in select_other))
+        self.assertTrue(all(o['selection_version'] == SELECTION_VERSION for o in reversal_other))
+        self.assertEqual(sum(o['win'] for o in select_live), 2)
+        self.assertEqual(sum(o['win'] for o in reversal_live), 1)
+
 
 class TaggingTests(unittest.TestCase):
     def test_tagging_fills_in_missing_fields_without_overwriting_present_ones(self):
@@ -146,6 +167,15 @@ class CutoffSlotsTests(unittest.TestCase):
         self.assertEqual(cutoff_slots(fs, '2026-09-18'), (2, 1))
         self.assertEqual(cutoff_slots(fs, '2026-09-17'), (1, 1))
         self.assertEqual(cutoff_slots(fs, '2026-09-19'), (0, 0))
+
+    def test_a_second_strategy_counts_independently_via_the_version_param(self):
+        fs = [
+            forecast('a', selection=SELECTION_VERSION, as_of='2026-09-18', paper=True),
+            forecast('b', selection='select-rev-0.1', as_of='2026-09-18', paper=False),
+            forecast('c', selection='select-rev-0.1', as_of='2026-09-18', paper=False),
+        ]
+        self.assertEqual(cutoff_slots(fs, '2026-09-18', version=SELECTION_VERSION), (1, 1))
+        self.assertEqual(cutoff_slots(fs, '2026-09-18', version='select-rev-0.1'), (2, 0))
 
     def test_archive_size_and_trade_slots_are_distinct_limits(self):
         self.assertGreater(ARCHIVE_SIZE, ae.POLICY['max_positions'])
