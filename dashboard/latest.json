@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-23T17:28:55.862691+08:00",
+  "exported_at": "2026-09-23T18:29:02.858953+08:00",
   "market": {
-    "generated_at": "2026-09-23T17:18:28.946283+08:00",
+    "generated_at": "2026-09-23T18:18:27.691565+08:00",
     "status": "success",
     "summary": "源数据日期 2026-09-23：所监测6个指数中，0个上涨、6个下跌、0个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
     "quotes": [
@@ -65,7 +65,7 @@
     }
   },
   "research": {
-    "generated_at": "2026-09-23T17:22:19.991107+08:00",
+    "generated_at": "2026-09-23T18:22:23.991381+08:00",
     "status": "success",
     "factor_cutoff": "2026-09-22",
     "industry_provider": "新浪行业",
@@ -5303,8 +5303,8 @@
         "sz002565": "new_zzhy"
       }
     },
-    "source_id": "20260923091711-1",
-    "source_generated_at": "2026-09-23T17:18:28.946283+08:00",
+    "source_id": "20260923101702-1",
+    "source_generated_at": "2026-09-23T18:18:27.691565+08:00",
     "sample_count": 300,
     "factor_count": 293,
     "rankings": [
@@ -5733,7 +5733,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-23T17:17:45.388258+08:00",
+    "generated_at": "2026-09-23T18:17:38.782448+08:00",
     "status": "success",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5746,7 +5746,7 @@
     }
   },
   "analysis": {
-    "generated_at": "2026-09-23T17:24:23.949540+08:00",
+    "generated_at": "2026-09-23T18:24:37.445823+08:00",
     "status": "ready",
     "start_date": "20260825",
     "end_date": "20260922",
@@ -5999,43 +5999,43 @@
   "sources": [
     {
       "kind": "market",
-      "id": "20260923091711-1",
-      "generated_at": "2026-09-23T17:18:28.946283+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20260923091711-1.md"
+      "id": "20260923101702-1",
+      "generated_at": "2026-09-23T18:18:27.691565+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20260923101702-1.md"
     },
     {
       "kind": "research",
-      "id": "20260923091711-1",
-      "generated_at": "2026-09-23T17:22:19.991107+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260923091711-1.md"
+      "id": "20260923101702-1",
+      "generated_at": "2026-09-23T18:22:23.991381+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260923101702-1.md"
     },
     {
       "kind": "sync",
-      "id": "20260923091711-1",
-      "generated_at": "2026-09-23T17:17:45.388258+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260923091711-1.md"
+      "id": "20260923101702-1",
+      "generated_at": "2026-09-23T18:17:38.782448+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260923101702-1.md"
     },
     {
       "kind": "analysis",
-      "id": "20260923091711-1",
-      "generated_at": "2026-09-23T17:24:23.949540+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260923091711-1.md"
+      "id": "20260923101702-1",
+      "generated_at": "2026-09-23T18:24:37.445823+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260923101702-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "20260923091711-1",
-      "generated_at": "2026-09-23T17:28:36.586952+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260923091711-1.md"
+      "id": "20260923101702-1",
+      "generated_at": "2026-09-23T18:28:43.900688+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260923101702-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20260923091711-1",
-      "generated_at": "2026-09-23T17:28:36.193958+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260923091711-1.md"
+      "id": "20260923101702-1",
+      "generated_at": "2026-09-23T18:28:43.448072+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260923101702-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-23T17:28:36.193958+08:00",
+    "generated_at": "2026-09-23T18:28:43.448072+08:00",
     "version": "select-0.5",
     "status": "partial",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
@@ -6095,7 +6095,7 @@
         "is_green": true,
         "prior_volume_ratio_5d": 1.104741676696064,
         "atr14": 0.02655474606694119,
-        "liquidity_pct": 74.7,
+        "liquidity_pct": 74.72,
         "strategy_type": "breakout",
         "score": 100,
         "raw_score": 116.3855,
@@ -6325,7 +6325,7 @@
         "is_green": true,
         "prior_volume_ratio_5d": 1.488086706069104,
         "atr14": 0.02815934065934063,
-        "liquidity_pct": 21.15,
+        "liquidity_pct": 21.17,
         "strategy_type": "breakout",
         "score": 100,
         "raw_score": 104.0524,
@@ -6355,14 +6355,14 @@
         "symbol": "sz301329",
         "name": "信音电子",
         "industry": "元器件",
-        "return20_pct": 10.50686378035901,
+        "return20_pct": 10.506863780359033,
         "return5_pct": 3.819444444444442,
-        "excess20_pp": 11.023176048473227,
+        "excess20_pp": 11.02317604847325,
         "deviation_pct": 5.268452156418957,
         "volume_ratio": 0.9637219732800264,
-        "liquidity_proxy": 789191.24996,
-        "reference_adjusted": 20.93,
-        "return1_pct": 0.23946360153257462,
+        "liquidity_proxy": 785446.3925529581,
+        "reference_adjusted": 20.83068330644396,
+        "return1_pct": 0.23946360153255242,
         "return2_pct": 0.0,
         "return3_pct": 1.3559322033898313,
         "ma5_deviation_pct": 0.6734006734006703,
@@ -6370,8 +6370,8 @@
         "high20_ratio": 1.0,
         "is_green": true,
         "prior_volume_ratio_5d": 0.8249072956551239,
-        "atr14": 0.029042386185243324,
-        "liquidity_pct": 32.88,
+        "atr14": 0.029042386185243334,
+        "liquidity_pct": 32.8,
         "strategy_type": "pullback",
         "score": 66.53,
         "raw_score": 66.5348,
@@ -6463,7 +6463,7 @@
         "is_green": true,
         "prior_volume_ratio_5d": 0.9845966823753606,
         "atr14": 0.03342716396903589,
-        "liquidity_pct": 20.95,
+        "liquidity_pct": 20.97,
         "strategy_type": "breakout",
         "score": 99.11,
         "raw_score": 99.1052,
@@ -6509,7 +6509,7 @@
         "is_green": true,
         "prior_volume_ratio_5d": 1.1382657738745978,
         "atr14": 0.03383733055265901,
-        "liquidity_pct": 21.66,
+        "liquidity_pct": 21.68,
         "strategy_type": "breakout",
         "score": 98.62,
         "raw_score": 98.6211,
@@ -6601,7 +6601,7 @@
         "is_green": true,
         "prior_volume_ratio_5d": 1.2073209221445655,
         "atr14": 0.031711822660098477,
-        "liquidity_pct": 21.07,
+        "liquidity_pct": 21.09,
         "strategy_type": "breakout",
         "score": 91.67,
         "raw_score": 91.6733,
@@ -6678,22 +6678,22 @@
         "name": "东方明珠",
         "industry": "影视音像",
         "return20_pct": 10.499999999999998,
-        "return5_pct": 5.363528009535146,
+        "return5_pct": 5.363528009535168,
         "excess20_pp": 11.016312268114214,
         "deviation_pct": 4.134762633996925,
         "volume_ratio": 1.4244252511714683,
-        "liquidity_proxy": 3304969.924045,
-        "reference_adjusted": 8.84,
+        "liquidity_proxy": 3286708.5120786363,
+        "reference_adjusted": 8.791155113210507,
         "return1_pct": 1.9607843137254832,
         "return2_pct": 4.8635824436536135,
         "return3_pct": 5.6152927120669105,
         "ma5_deviation_pct": 3.7558685446009488,
         "volume_ratio_5d": 1.9724923818366875,
-        "high20_ratio": 1.0126002290950744,
+        "high20_ratio": 1.0126002290950746,
         "is_green": true,
         "prior_volume_ratio_5d": 1.7726370479869864,
-        "atr14": 0.024321266968325834,
-        "liquidity_pct": 74.8,
+        "atr14": 0.024321266968325747,
+        "liquidity_pct": 74.66,
         "strategy_type": "breakout",
         "score": 87.8,
         "raw_score": 87.8014,
@@ -6831,7 +6831,7 @@
         "is_green": true,
         "prior_volume_ratio_5d": 1.1462150920519285,
         "atr14": 0.036943744752308987,
-        "liquidity_pct": 20.89,
+        "liquidity_pct": 20.91,
         "strategy_type": "breakout",
         "score": 87.05,
         "raw_score": 87.05,
@@ -9279,7 +9279,7 @@
       "plans": [],
       "plan_counts": {},
       "issues": [],
-      "snapshot_at": "2026-09-23T17:25:12.656659+08:00",
+      "snapshot_at": "2026-09-23T18:25:30.241162+08:00",
       "curve": [
         {
           "date": "2026-09-21",
