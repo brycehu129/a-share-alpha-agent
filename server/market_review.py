@@ -581,23 +581,56 @@ def _lhb_block(stored):
 
 
 def current_review(now=None, http=None, directory=None):
-    """页面用的复盘数据。涨跌停池优先给"今天"的：落盘的那份不是今天的、且已过 9:25 就现取；
-    龙虎榜（16:30 之后才有）、次日关注、上一交易日的兑现结果永远来自落盘文件，各自带着自己的日期。"""
-    now = now or datetime.now(CST)
+    """页面用的复盘数据，只读最近一次收盘后落盘的文件。
+
+    盘中不再用当天实时池覆盖：这样次日打开时，名单、连板数、封板时间等仍严格属于
+    上一交易日。当前行情由 ``with_current_quotes`` 另行补充，避免混淆两个日期的口径。
+    """
     stored = load_latest(directory)
-    today = now.strftime('%Y%m%d')
     out = {'source': 'stored', 'trade_date': None, 'date': None, 'fetched_at': None, 'pools': None,
            'errors': {}, 'lhb': _lhb_block(stored), 'next_day_watch': (stored or {}).get('next_day_watch'),
            'prev_watch': (stored or {}).get('prev_watch')}
     if stored:
         out.update(trade_date=stored['trade_date'], date=stored['date'], fetched_at=stored['fetched_at'],
                    pools=stored['pools'], errors=dict(stored.get('errors') or {}))
-    if now.weekday() < 5 and (now.hour, now.minute) >= (9, 25) and (not stored or stored['trade_date'] < today):
-        live = live_pools(today, http)
-        if live:
-            out.update(source='live', trade_date=today, date=iso_day(today), fetched_at=live['fetched_at'],
-                       pools=live['pools'], errors=live['errors'])
     return out
+
+
+def with_current_quotes(review, snapshot_fn=None):
+    """给落盘复盘的每只股票补充当前价/涨跌幅，不改动原始复盘字段和传入对象。"""
+    pools = (review or {}).get('pools')
+    if not pools:
+        return review
+    symbols = sorted({row.get('symbol') for pool in pools.values() if pool
+                      for row in (pool.get('rows') or []) if row.get('symbol', '')[:2] in ('sh', 'sz')})
+    if not symbols:
+        return review
+    try:
+        if snapshot_fn is None:
+            import live_quote
+            snapshot_fn = live_quote.snapshot
+        snap = snapshot_fn(symbols)
+        quotes = {q['symbol']: q for q in snap.get('quotes', [])}
+    except Exception as exc:
+        return {**review, 'current_quotes_at': None,
+                'current_quotes_error': '当前行情暂不可用：%s' % str(exc)[:120]}
+
+    enriched = {}
+    for kind, pool in pools.items():
+        if not pool:
+            enriched[kind] = pool
+            continue
+        rows = []
+        for row in pool.get('rows') or []:
+            q = quotes.get(row.get('symbol'))
+            rows.append({**row,
+                         'current_price': _num(q.get('last')) if q else None,
+                         'current_pct': _num(q.get('change_pct')) if q else None,
+                         'current_quote_at': q.get('quote_at') if q else None})
+        enriched[kind] = {**pool, 'rows': rows}
+    failures = snap.get('failures') or []
+    return {**review, 'pools': enriched, 'current_quotes_at': snap.get('fetched_at'),
+            'current_quotes_error': ('%d 只股票当前行情获取失败' % len(failures)) if failures else None}
 
 
 def build_review(now=None, day=None, http=None):

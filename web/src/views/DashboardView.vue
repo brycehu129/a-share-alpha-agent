@@ -32,7 +32,7 @@ watch(
 )
 
 // 指数/成交额/资金/涨跌家数是实时取数（服务端 30 秒缓存），页面每 30 秒静默刷新一次；
-// 涨跌停池与龙虎榜/次日关注走另一个接口，每分钟一次。
+// 收盘复盘名单与龙虎榜/次日关注走另一个接口；名单只读落盘文件，接口每分钟刷新一次当前行情。
 const { resp, d, agent, loading, error, refresh: refreshDashboard } = useDashboard({ intervalMs: 30000 })
 const { data: reviewResp, loading: reviewLoading, error: reviewError, reload: reloadReview } = useLoad(() => get('/api/market/review'), { intervalMs: 60000 })
 const review = computed(() => (reviewResp.value ? reviewResp.value.review : null))

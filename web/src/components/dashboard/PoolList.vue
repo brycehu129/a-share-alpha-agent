@@ -26,9 +26,12 @@ function detail(r, kind) {
       <button type="button" class="row" @click="openStock(r.symbol, r.name)">
         <span class="l1">
           <span class="name">{{ r.name }}<span v-if="r.industry" class="ind">{{ r.industry }}</span></span>
-          <RiseFall :value="r.pct" bare class="pct" />
+          <span class="changes">
+            <RiseFall :value="r.current_pct" bare class="pct" />
+            <span class="review-pct">复盘 {{ r.pct == null ? '—' : `${r.pct}%` }}</span>
+          </span>
         </span>
-        <span class="l2 num"><span>{{ r.code }}</span><span>{{ fmtPrice(r.price) }}</span></span>
+        <span class="l2 num"><span>{{ r.code }}</span><span>现 {{ fmtPrice(r.current_price) }} · 复盘 {{ fmtPrice(r.price) }}</span></span>
         <span class="l3"><span v-for="(d, i) in detail(r, kind)" :key="i">{{ d }}</span></span>
       </button>
     </li>
@@ -44,6 +47,8 @@ function detail(r, kind) {
 .name { font-weight: 650; font-size: 13.5px; min-width: 0; }
 .ind { margin-left: 6px; padding: 0 5px; font-size: 11px; font-weight: 500; color: var(--el-color-primary); background: var(--el-color-primary-light-9); border-radius: 3px; white-space: nowrap; }
 .pct { font-weight: 700; font-size: 13.5px; }
+.changes { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.review-pct { font-size: 10.5px; color: var(--as-muted); font-weight: 400; }
 .l2 { font-size: 12px; color: var(--as-muted); }
 .l3 { display: flex; flex-wrap: wrap; gap: 0 12px; font-size: 11.5px; color: var(--as-muted); }
 .empty { padding: 16px 12px; }

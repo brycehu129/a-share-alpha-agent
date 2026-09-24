@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { fmtTs } from '../../format'
 import { openStock } from '../../composables/useStockDetail'
 import PoolList from './PoolList.vue'
+import RiseFall from '../RiseFall.vue'
 
 // 涨跌停池：参照同花顺/东财复盘的多列版式——连板天梯、涨停板、跌停板、炸板、昨日涨停、强势股，横向并排，
 // 每列自己纵向滚动。窄屏时整排可横向滑动。数据来自东方财富涨跌停池（交易所口径，含 ST、北交所）。
@@ -41,7 +42,7 @@ const ladder = computed(() => {
 })
 
 const date = computed(() => (props.review && props.review.date) || '')
-const sourceLabel = computed(() => (props.review && props.review.source === 'live' ? '实时' : '收盘复盘'))
+const sourceLabel = computed(() => '收盘复盘')
 </script>
 
 <template>
@@ -49,12 +50,13 @@ const sourceLabel = computed(() => (props.review && props.review.source === 'liv
     <template #header>
       <div class="card-title">
         <span>涨跌停复盘 <span v-if="date" class="date num">{{ date }}</span></span>
-        <span class="sub">{{ review ? sourceLabel : '' }} · 数据时间 <span class="num">{{ review ? fmtTs(review.fetched_at) : '—' }}</span> · 东方财富涨跌停池，交易所口径</span>
+        <span class="sub">{{ review ? sourceLabel : '' }} · 落盘时间 <span class="num">{{ review ? fmtTs(review.fetched_at) : '—' }}</span> · 当前行情 <span class="num">{{ review && review.current_quotes_at ? fmtTs(review.current_quotes_at) : '—' }}</span></span>
       </div>
     </template>
 
-    <p v-if="!review || !review.pools" class="muted" style="margin: 0">涨跌停池暂无：还没有落盘过复盘数据，且现在取不到实时池（{{ (review && review.errors && review.errors.zt) || '休市或接口不可用' }}）。</p>
+    <p v-if="!review || !review.pools" class="muted" style="margin: 0">涨跌停复盘暂无：还没有收盘落盘数据。</p>
     <template v-else>
+      <div v-if="review.current_quotes_error" class="err muted">{{ review.current_quotes_error }}</div>
       <div v-if="Object.keys(errors).length" class="err muted">部分池子暂无：{{ Object.entries(errors).map(([k, v]) => `${k}（${v}）`).join('；') }}</div>
       <div class="strip">
         <!-- 连板天梯 -->
@@ -71,7 +73,7 @@ const sourceLabel = computed(() => (props.review && props.review.source === 'liv
               <div class="lv-tag">{{ lv.n }}板 <span class="num">{{ lv.list.length }}</span></div>
               <div class="chips">
                 <button v-for="r in lv.list" :key="r.symbol" type="button" class="chip" @click="openStock(r.symbol, r.name)">
-                  <span class="num t">{{ (r.first_seal || '').slice(0, 5) }}</span><span class="n">{{ r.name }}</span><span class="num c">{{ r.code }}</span>
+                  <span class="num t">{{ (r.first_seal || '').slice(0, 5) }}</span><span class="n">{{ r.name }}</span><RiseFall :value="r.current_pct" bare class="chip-pct" /><span class="num c">{{ r.code }}</span>
                 </button>
               </div>
             </div>
@@ -81,7 +83,7 @@ const sourceLabel = computed(() => (props.review && props.review.source === 'liv
                 <div class="ind-name">{{ g.industry }} <span class="num">{{ g.list.length }}</span></div>
                 <div class="chips">
                   <button v-for="r in g.list" :key="r.symbol" type="button" class="chip" @click="openStock(r.symbol, r.name)">
-                    <span class="num t">{{ (r.first_seal || '').slice(0, 5) }}</span><span class="n">{{ r.name }}</span><span class="num c">{{ r.code }}</span>
+                    <span class="num t">{{ (r.first_seal || '').slice(0, 5) }}</span><span class="n">{{ r.name }}</span><RiseFall :value="r.current_pct" bare class="chip-pct" /><span class="num c">{{ r.code }}</span>
                   </button>
                 </div>
               </div>
@@ -146,7 +148,8 @@ const sourceLabel = computed(() => (props.review && props.review.source === 'liv
 .chip:hover, .chip:focus-visible { border-color: var(--el-color-primary); outline: none; }
 .chip .t { font-size: 10.5px; color: var(--as-muted); }
 .chip .n { font-size: 12.5px; font-weight: 650; }
-.chip .c { font-size: 10.5px; color: var(--as-muted); }
+.chip .c, .chip-pct { font-size: 10.5px; }
+.chip .c { color: var(--as-muted); }
 .pad { padding: 12px; }
 .note { margin: 10px 0 0; }
 </style>

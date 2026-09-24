@@ -41,7 +41,7 @@ BaoStock 因明确返回黑名单错误暂停，保留已下载数据，需服�
 | 沪深北涨跌家数 | 东财 `push2 ulist.np`（f104/f105/f106） | 同上 | 60 秒 |
 | 沪深合计资金流向 | 东财 `push2 fflow/daykline`（主力=超大单+大单） | 同上 | 120 秒 |
 | 上一交易日成交额 | 东财 `push2his kline`（沪、深指数日 K） | 同上 | 1 小时 |
-| 涨停/跌停/炸板/昨日涨停/强势池 | 东财 `push2ex getTopic*Pool` | 盘中现取；16:30、17:30 落盘 | 60 秒 |
+| 涨停/跌停/炸板/昨日涨停/强势池 | 东财 `push2ex getTopic*Pool` | 16:30、17:30 落盘；页面只展示最近落盘名单 | 收盘更新 |
 | 龙虎榜个股汇总与席位 | 东财 `datacenter-web RPT_DAILYBILLBOARD_DETAILSNEW` / `RPT_BILLBOARD_DAILYDETAILS{BUY,SELL}` | 16:30、17:30 落盘；席位按需 | — |
 | 个股行情/日 K | 腾讯 `qt.gtimg.cn`、`fqkline`（前复权） | 点开个股时 | 60 秒 |
 | 公司资料/概念 | 东财 F10 `RPT_F10_ORG_BASICINFO` | 点开个股时 | 60 秒 |

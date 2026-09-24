@@ -46,7 +46,8 @@ def api_dashboard(query):
 def api_market_review(query):
     """涨停/跌停/炸板/昨日涨停/强势池 + 龙虎榜 + 次日关注 + 上一交易日次日关注的兑现结果。各块各带自己的日期和失败原因。"""
     import market_review
-    return {"review": market_review.current_review()}
+    review = market_review.current_review()
+    return {"review": market_review.with_current_quotes(review)}
 
 
 @get("/api/market/stock")

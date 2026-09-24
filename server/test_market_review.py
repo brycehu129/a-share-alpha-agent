@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import market_review as mr
 from collect_quotes import CST
@@ -311,15 +312,28 @@ class TimestampTests(unittest.TestCase):
         stored['lhb']['fetched_at'] = '2026-09-21T17:30:41+08:00'
         self.assertEqual(mr._lhb_block(stored)['fetched_at'], '2026-09-21T17:30:41+08:00')
 
-    def test_live_pools_carry_their_own_fetch_time(self):
-        mr._pools_cache.clear()
-        http = lambda url: json.dumps(pool_payload([zt_row()])).encode()
-        live = mr.live_pools('20260921', http, now_ts=1.0)
-        self.assertRegex(live['fetched_at'], r'T\d\d:\d\d:\d\d\+08:00$')
-        review = mr.current_review(now=datetime(2026, 9, 21, 10, 0, tzinfo=CST), http=http, directory=Path(tempfile.mkdtemp()))
-        self.assertEqual(review['source'], 'live')
-        self.assertRegex(review['fetched_at'], r'T\d\d:\d\d:\d\d\+08:00$')
-        mr._pools_cache.clear()
+    def test_current_review_never_replaces_stored_review_with_intraday_pool(self):
+        stored = {'trade_date': '20260918', 'date': '2026-09-18', 'fetched_at': 'saved',
+                  'pools': {'zt': {'total': 1, 'rows': [{'symbol': 'sh600000'}]}}, 'errors': {}}
+        def must_not_fetch(_url):
+            raise AssertionError('盘中不应抓取当天复盘池')
+        with patch('market_review.load_latest', return_value=stored):
+            review = mr.current_review(now=datetime(2026, 9, 21, 10, 0, tzinfo=CST),
+                                       http=must_not_fetch)
+        self.assertEqual(review['trade_date'], '20260918')
+        self.assertEqual(review['source'], 'stored')
+
+    def test_current_quotes_are_added_without_overwriting_review_values(self):
+        review = {'pools': {'zt': {'total': 1, 'rows': [
+            {'symbol': 'sh600000', 'price': 10.0, 'pct': 10.0}]}}}
+        snap = lambda _symbols: {'fetched_at': 'now', 'failures': [], 'quotes': [
+            {'symbol': 'sh600000', 'last': '10.50', 'change_pct': '5.00', 'quote_at': 'quote'}]}
+        out = mr.with_current_quotes(review, snap)
+        row = out['pools']['zt']['rows'][0]
+        self.assertEqual((row['price'], row['pct']), (10.0, 10.0))
+        self.assertEqual((row['current_price'], row['current_pct']), (10.5, 5.0))
+        self.assertEqual(out['current_quotes_at'], 'now')
+        self.assertNotIn('current_pct', review['pools']['zt']['rows'][0])
 
 
 class PersistTests(unittest.TestCase):
