@@ -4,12 +4,13 @@ import { fmtAmount, fmtFlow, fmtNum, fmtTs, fmtVolumeTrend, shortDate } from '..
 import StatTile from '../StatTile.vue'
 
 // 大盘脉搏：涨跌家数、涨跌停/炸板家数、两市成交额（较上一交易日放量/缩量）、大盘主力资金净流入。
-// 全部是实时取数（/api/dashboard 的 live 块）+ 涨跌停池；每一组各自缺失各自显示「暂无」，不影响别的组。
+// 实时统计来自 /api/dashboard 的 live 块；涨跌停池在进入市场行情或手动刷新时单独现取。
 const props = defineProps({
   live: { type: Object, default: null },
   pools: { type: Object, default: null }, // review.pools
   poolDate: { type: String, default: '' },
   poolTime: { type: String, default: '' }, // 涨跌停池的取数时间（精确到秒）
+  poolError: { type: String, default: '' },
 })
 
 const breadth = computed(() => (props.live && props.live.breadth) || null)
@@ -88,6 +89,7 @@ const tone = (v) => (v > 0 ? 'rise' : v < 0 ? 'fall' : 'flat')
       <template v-if="errors.turnover">成交额暂无：{{ errors.turnover }}。</template>
       <template v-if="errors.flow">资金流向暂无：{{ errors.flow }}。</template>
     </p>
+    <p v-if="poolError" class="muted note">盘中涨跌停统计暂无：{{ poolError }}</p>
     <!-- 每一组数据各自的时间，精确到秒：行情时间是交易所给的，取数时间是我们向数据源请求完成的时刻 -->
     <ul class="times num">
       <li>涨跌家数 <b>{{ breadth ? fmtTs(breadth.fetched_at) : '—' }}</b><i v-if="breadth && breadth.stale">（取数失败，沿用上一次）</i></li>

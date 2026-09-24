@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Refresh } from '@element-plus/icons-vue'
 import { get } from '../api'
@@ -36,9 +36,32 @@ watch(
 const { resp, d, agent, loading, error, refresh: refreshDashboard } = useDashboard({ intervalMs: 30000 })
 const { data: reviewResp, loading: reviewLoading, error: reviewError, reload: reloadReview } = useLoad(() => get('/api/market/review'), { intervalMs: 60000 })
 const review = computed(() => (reviewResp.value ? reviewResp.value.review : null))
+const pulsePools = ref(null)
+const pulsePoolsLoading = ref(false)
+const pulsePoolsError = ref('')
+const pulsePoolMessage = computed(() => {
+  if (pulsePoolsError.value) return pulsePoolsError.value
+  const errors = (pulsePools.value && pulsePools.value.errors) || {}
+  return errors.all || Object.entries(errors).map(([k, v]) => `${k}：${v}`).join('；')
+})
+async function reloadPulsePools() {
+  pulsePoolsLoading.value = true
+  try {
+    const resp = await get('/api/market/pulse-pools')
+    pulsePools.value = resp.pulse_pools
+    pulsePoolsError.value = ''
+  } catch (e) {
+    pulsePoolsError.value = e.message || String(e)
+  } finally {
+    pulsePoolsLoading.value = false
+  }
+}
+onMounted(() => { if (tab.value === 'market') reloadPulsePools() })
+watch(tab, (next, prev) => { if (next === 'market' && prev !== 'market') reloadPulsePools() })
 function refresh() {
   refreshDashboard()
   reloadReview()
+  if (tab.value === 'market') reloadPulsePools()
 }
 
 const SESSION = { weekend: '周末休市', pre_open: '盘前', call_auction: '集合竞价', morning: '上午盘中', lunch_break: '午间休市', afternoon: '下午盘中', closing: '收盘处理', post_close: '盘后' }
@@ -69,7 +92,7 @@ const today = todayStr()
         <el-tag v-if="d && tab === 'market'" :type="liveTag.type" round>{{ liveTag.text }}</el-tag>
         <el-tag v-if="failedParts.length && tab === 'market'" type="warning" effect="plain" round>暂无：{{ failedParts.join('、') }}</el-tag>
         <span v-if="live">页面数据更新于 <span class="num">{{ fmtTs(live.fetched_at) }}</span></span>
-        <el-button :icon="Refresh" round :loading="loading || reviewLoading" @click="refresh">刷新</el-button>
+        <el-button :icon="Refresh" round :loading="loading || reviewLoading || pulsePoolsLoading" @click="refresh">刷新</el-button>
       </div>
     </div>
 
@@ -78,8 +101,8 @@ const today = todayStr()
         <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px">
           <el-button size="small" @click="refresh">重试</el-button>
         </el-alert>
-        <el-alert v-if="reviewError" :title="`涨跌停数据加载失败：${reviewError}`" type="error" show-icon :closable="false" style="margin-bottom: 16px">
-          <el-button size="small" @click="reloadReview">重试</el-button>
+        <el-alert v-if="pulsePoolMessage" :title="`盘中涨跌停统计加载失败：${pulsePoolMessage}`" type="error" show-icon :closable="false" style="margin-bottom: 16px">
+          <el-button size="small" @click="reloadPulsePools">重试</el-button>
         </el-alert>
 
         <div v-loading="loading && !resp" style="min-height: 240px">
@@ -97,7 +120,14 @@ const today = todayStr()
             </section>
             <p v-if="screen && screen.cutoff" class="muted score-note">市场评分取自日级批处理（截至 {{ screen.cutoff }} 收盘，生成于 <span class="num">{{ fmtTs(agent && agent.generated_at) }}</span>），不随盘中行情变化。</p>
 
-            <MarketPulse :live="live" :pools="review && review.pools" :pool-date="review ? review.date : ''" :pool-time="review ? review.fetched_at : ''" />
+            <MarketPulse
+              v-loading="pulsePoolsLoading"
+              :live="live"
+              :pools="pulsePools && pulsePools.pools"
+              :pool-date="pulsePools ? pulsePools.date : ''"
+              :pool-time="pulsePools ? pulsePools.fetched_at : ''"
+              :pool-error="pulsePoolMessage"
+            />
           </div>
         </div>
       </el-tab-pane>

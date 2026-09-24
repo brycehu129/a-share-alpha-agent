@@ -306,6 +306,16 @@ class MarketStatsTests(unittest.TestCase):
 
 
 class TimestampTests(unittest.TestCase):
+    def test_pulse_pools_fetches_three_intraday_counts(self):
+        def http(url):
+            rows = [zt_row()] if 'getTopicZTPool' in url else ([zt_row()] * 2 if 'getTopicDTPool' in url else [zt_row()] * 3)
+            return json.dumps(pool_payload(rows)).encode()
+        out = mr.fetch_pulse_pools(datetime(2026, 9, 21, 10, 0, tzinfo=CST), http)
+        self.assertEqual(out['date'], '2026-09-21')
+        self.assertEqual({k: out['pools'][k]['total'] for k in ('zt', 'dt', 'zb')},
+                         {'zt': 1, 'dt': 2, 'zb': 3})
+        self.assertTrue(all(not out['pools'][k]['rows'] for k in ('zt', 'dt', 'zb')))
+
     def test_lhb_block_falls_back_to_the_review_time_for_old_files(self):
         stored = {'trade_date': '20260921', 'date': '2026-09-21', 'fetched_at': '2026-09-21T17:30:05+08:00', 'lhb': {'rows': []}}
         self.assertEqual(mr._lhb_block(stored)['fetched_at'], '2026-09-21T17:30:05+08:00')

@@ -226,6 +226,32 @@ def fetch_pools(day, http=None, first_zt=None):
     return out
 
 
+def fetch_pulse_pools(now=None, http=None):
+    """盘中大盘脉搏用的涨停/跌停/炸板统计；每次调用都重新向数据源请求。
+
+    只返回计数所需的轻量结构，不与收盘复盘文件或其缓存混用。三组并发且各自失败，
+    这样进入市场行情或手动刷新时能拿到当下统计，又不会改变复盘名单。
+    """
+    now = now or datetime.now(CST)
+    day = now.strftime('%Y%m%d')
+    results, errors = {}, {}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = {kind: pool.submit(fetch_pool, kind, day, http) for kind in ('zt', 'dt', 'zb')}
+        for kind, future in futures.items():
+            try:
+                value = future.result()
+                results[kind] = {'total': value['total'], 'rows': []}
+            except Exception as exc:
+                results[kind] = None
+                errors[kind] = str(exc)[:200]
+    # 休市/盘前接口通常三组均为空；不把它冒充为一个有效的“0 家”实时截面。
+    available = [v for v in results.values() if v is not None]
+    if available and not any(v['total'] for v in available):
+        return {'date': iso_day(day), 'fetched_at': _stamp(), 'pools': None,
+                'errors': {**errors, 'all': '当日涨跌停池尚无数据（盘前、休市或接口未更新）'}}
+    return {'date': iso_day(day), 'fetched_at': _stamp(), 'pools': results, 'errors': errors}
+
+
 # --- 龙虎榜 -------------------------------------------------------------------------------
 
 def _datacenter(report, columns, flt, sort_col, http, page_size=500):
