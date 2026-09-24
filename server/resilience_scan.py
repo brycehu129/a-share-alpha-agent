@@ -62,7 +62,13 @@ DEFAULTS = {
     'main_net_pct_min': 3.0,     # 个股主力净流入占比
     'require_holds_up': False,   # 是否要求个股本身不跌（change_pct >= 0）
     'require_sector': True,      # 是否要求所属板块命中强势集合且板块在涨
+    'exclude_one_word': True,    # 排除一字涨停：全天只有一个价，买不进
+    'exclude_st': True,          # 排除 ST/退市整理：候选池策略本来就排除，风险与涨跌幅限制都不同
 }
+
+# 涨停幅度按板块不同。ST 是 5%，但只有拿到名字才认得出来——market_context._limit_threshold
+# 明确写了它按涨跌幅近似、认不出 ST，这里因为有名字所以能认。留一点余量避免浮点与四舍五入。
+LIMIT_PCT = {'star': 19.5, 'main': 9.8, 'st': 4.8}
 
 _cache_lock = threading.Lock()
 _cache = {}
@@ -82,6 +88,38 @@ def benchmark_for(float_cap):
         if float_cap >= floor:
             return symbol, True
     return SMALL_CAP_BENCHMARK, True
+
+
+def is_st(name):
+    """ST / *ST / 退市整理。按名字认——clist 不给风险警示标志位，名字是唯一线索。
+    候选池策略（alpha_model）本来就排除 ST，这里保持一致。"""
+    upper = str(name or '').upper().replace(' ', '')
+    return 'ST' in upper or '退' in upper
+
+
+def limit_threshold(symbol, name):
+    """该股今日的涨停幅度（百分数）。"""
+    if is_st(name):
+        return LIMIT_PCT['st']
+    return LIMIT_PCT['star'] if symbol.startswith(('sz30', 'sh688')) else LIMIT_PCT['main']
+
+
+def limit_state(row):
+    """(是否涨停, 是否一字涨停)。
+
+    一字涨停的判据是**最高价 == 最低价** —— 全天只有一个价格，意味着从开盘就封死、
+    中途没有任何一笔在更低的价位成交过，也就买不进。只是"现在封着板"（盘中涨停）不算：
+    它更早的时候是能买的，而且可能炸板，属于有效信息，所以单独标记、不默认排除。
+
+    高低价缺失时**不**判为一字——缺失当成"满足条件"会凭空排除掉一批票。
+    """
+    change, high, low = row.get('change_pct'), row.get('high'), row.get('low')
+    if change is None:
+        return False, False
+    at_limit = change >= limit_threshold(row['symbol'], row.get('name'))
+    if not at_limit or high is None or low is None or high <= 0 or low <= 0:
+        return at_limit, False
+    return True, abs(high - low) < 1e-9
 
 
 def index_changes(snapshot):
@@ -107,9 +145,12 @@ def build_rows(stocks, sector_by_name, changes):
         if bench_change is None:                      # 同档基准取不到就退回主基准
             bench, bench_change, cap_known = PRIMARY, primary_change, False
         sector = sector_by_name.get(s.get('industry')) if s.get('industry') else None
+        at_limit, one_word = limit_state(s)
         row = {
             'symbol': s['symbol'], 'code': s['code'], 'name': s['name'],
             'price': s['price'], 'change_pct': s['change_pct'],
+            'high': s.get('high'), 'low': s.get('low'),
+            'is_st': is_st(s['name']), 'limit_up': at_limit, 'one_word_limit': one_word,
             'main_net': s['main_net'], 'main_net_pct': s['main_net_pct'],
             'float_cap': cap, 'industry': s.get('industry'),
             'benchmark': bench, 'benchmark_label': BENCHMARKS.get(bench),
@@ -144,8 +185,17 @@ def _score(row):
 
 
 def passes(row, thresholds=None):
-    """按阈值判断一行是否"命中"。阈值只是显示过滤器，留档不受影响。"""
+    """按阈值判断一行是否"命中"。阈值只是显示过滤器，留档不受影响。
+
+    结构性排除（ST / 一字板）放在最前面：这两类不是"分数不够"，是**买不进或不该买**，
+    和阈值高低无关。它们仍然留在 rows 里并带标志位，只是永远不进命中列表——
+    这样事后还能回答"被排除的那些后来怎么样了"。
+    """
     t = {**DEFAULTS, **(thresholds or {})}
+    if t['exclude_st'] and row.get('is_st'):
+        return False
+    if t['exclude_one_word'] and row.get('one_word_limit'):
+        return False
     if row['excess_pp'] is None or row['excess_pp'] < t['excess_min_pp']:
         return False
     if row['main_net'] is None or row['main_net'] <= 0:
@@ -187,16 +237,19 @@ def scan(now=None, http=None, quote_fn=None, now_ts=None, thresholds=None):
     quote_fn = quote_fn or live_quote.snapshot
     errors, stale = {}, []
 
+    # retries=0：东财按出口 IP 限流，请求越密封得越久。一轮已经要发 3 个请求，
+    # 失败时再重试只会把封禁拖长，而 stale 回退 + 5 分钟后的下一轮本来就兜得住。
     sectors = _with_cache('sectors',
-                          lambda: market_rankings.fetch_sector_rows('industry', http, fid='f184'),
+                          lambda: market_rankings.fetch_sector_rows('industry', http, fid='f184',
+                                                                    retries=0),
                           now_ts, errors, stale)
     by_amount = _with_cache('inflow_amount',
                             lambda: market_rankings.fetch_stocks('inflow', http, size=PAGE,
-                                                                 fid='f62', pz=PAGE),
+                                                                 fid='f62', pz=PAGE, retries=0),
                             now_ts, errors, stale)
     by_ratio = _with_cache('inflow_ratio',
                            lambda: market_rankings.fetch_stocks('inflow', http, size=PAGE,
-                                                                fid='f184', pz=PAGE),
+                                                                fid='f184', pz=PAGE, retries=0),
                            now_ts, errors, stale)
     quotes = _with_cache('indices', lambda: quote_fn(list(BENCHMARKS)), now_ts, errors, stale)
 

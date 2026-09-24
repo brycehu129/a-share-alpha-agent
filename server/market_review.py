@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
@@ -84,13 +84,20 @@ def get_json(url, http=None, retries=1):
 
     东财的 push2* 行情主机对个别出口 IP 会在 TLS 握手阶段直接断开连接（同一台机器上 http 明文却通），
     所以 https 失败后对这类主机再试一次 http。这些接口只返回公开行情、请求里不带任何凭证，明文可以接受；
-    并且只有在 https 已经失败之后才会降级，不是默认走明文。"""
+    并且只有在 https 已经失败之后才会降级，不是默认走明文。
+
+    **HTTP 状态码错误不走 http 降级。** 降级是为"TLS 握手被掐断"这一种传输层故障设计的；
+    收到 502 说明对端正常应答了一个错误状态，明文重来一次结果一样（2026-09-24 实测：限流期间
+    https 与 http 同时 502）。多打的那一次请求只会加重限流——东财是按出口 IP 限的，
+    请求越密封得越久。所以这里直接失败，让调用方走 stale 回退，等下一轮。
+    """
     http = http or http_get
     data, err = _try_json(url, http, retries)
     if err is None:
         return data
     host = urlsplit(url).hostname or ''
-    if url.startswith('https://') and re.match(r'(\d+\.)?push2[a-z]*\.eastmoney\.com$', host):
+    if (url.startswith('https://') and not isinstance(err, HTTPError)
+            and re.match(r'(\d+\.)?push2[a-z]*\.eastmoney\.com$', host)):
         data, err2 = _try_json('http://' + url[len('https://'):], http, 0)
         if err2 is None:
             return data

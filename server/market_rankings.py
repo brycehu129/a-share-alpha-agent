@@ -18,8 +18,10 @@ from collect_quotes import CST
 import market_review
 
 ENDPOINT = 'https://push2.eastmoney.com/api/qt/clist/get'
-# f20/f21=总市值/流通市值：抗跌度按市值分档配基准指数时要用（resilience_scan.py）。
-FIELDS = 'f12,f14,f2,f3,f62,f184,f100,f103,f104,f105,f106,f20,f21'
+# f20/f21=总市值/流通市值：抗跌度按市值分档配基准指数时要用。
+# f15/f16/f17/f18=最高/最低/今开/昨收：识别一字涨停（最高==最低 → 全天只有一个价，买不进）。
+# 两组都给 resilience_scan.py 用；其它调用方忽略多出来的字段即可。
+FIELDS = 'f12,f14,f2,f3,f62,f184,f100,f103,f104,f105,f106,f20,f21,f15,f16,f17,f18'
 BOARD_FILTERS = {'industry': 'm:90+t:2+f:!50', 'concept': 'm:90+t:3+f:!50'}
 STOCK_FILTER = 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23'
 DEFAULT_SIZE = 10
@@ -130,31 +132,35 @@ def parse_stocks(payload, label):
         industry = None if industry in ('', '-') else industry
         concepts = [x.strip() for x in str(raw.get('f103') or '').replace('，', ',').split(',')
                     if x.strip() and x.strip() != '-']
-        # 市值缺失就是缺失，不当 0——按市值分档配基准指数时，0 会把大盘股错判成微盘股。
+        # 市值/高低开收缺失就是缺失，不当 0——0 会把大盘股错判成微盘股，
+        # 也会让"最高==最低"这个一字板判据凭空成立。
         out.append({'symbol': symbol, 'code': code, 'name': name, 'industry': industry, 'concepts': concepts,
                     'price': round(price, 3),
                     'change_pct': round(change, 2), 'main_net': main_net, 'main_net_pct': round(ratio, 2),
-                    'total_cap': _num(raw.get('f20')), 'float_cap': _num(raw.get('f21'))})
+                    'total_cap': _num(raw.get('f20')), 'float_cap': _num(raw.get('f21')),
+                    'high': _num(raw.get('f15')), 'low': _num(raw.get('f16')),
+                    'open': _num(raw.get('f17')), 'previous_close': _num(raw.get('f18'))})
     return out
 
 
-def _fetch(params, http=None):
+def _fetch(params, http=None, retries=1):
     # pz 超过 PAGE_MAX 没有意义（服务端只回 100 行），夹住是为了让调用方读代码时就知道上限，
     # 而不是以为自己拿到了 500 行。
     params = {**params, 'pz': min(int(params.get('pz', PAGE_MAX)), PAGE_MAX)}
     query = {'pn': 1, 'np': 1, 'fltt': 2, 'invt': 2, 'fields': FIELDS, **params}
-    return market_review.get_json(ENDPOINT + '?' + urlencode(query), http)
+    return market_review.get_json(ENDPOINT + '?' + urlencode(query), http, retries=retries)
 
 
 FID_LABEL = {'f3': '涨幅', 'f184': '主力净流入占比', 'f62': '主力净流入额'}
 
 
-def fetch_sector_rows(kind, http=None, fid='f3'):
+def fetch_sector_rows(kind, http=None, fid='f3', retries=1):
     """取一页板块并打分，**不截断到 top N**。返回 (scored_rows, total, scope)。
 
-    resilience_scan 需要整页做"这只股票的板块在不在强势集合里"的查表，所以不能只拿 10 条。
+    resilience_scan 需要整页做"这只股票的板块在不在强势集合里"的查表，所以不能只拿 10 条，
+    并且传 retries=0——它每轮要发 3 个请求，限流期间多打一次只会把封禁拖长。
     """
-    payload = _fetch({'pz': PAGE_MAX, 'po': 1, 'fid': fid, 'fs': BOARD_FILTERS[kind]}, http)
+    payload = _fetch({'pz': PAGE_MAX, 'po': 1, 'fid': fid, 'fs': BOARD_FILTERS[kind]}, http, retries)
     rows = score_sectors(parse_sectors(payload, kind))
     scope = '按%s降序的前 %d 个板块' % (FID_LABEL.get(fid, fid), len(rows))
     return rows, _total(payload), scope
@@ -168,14 +174,14 @@ def fetch_sector(kind, http=None, fid='f3', size=DEFAULT_SIZE):
             'fetched': len(rows), 'total': total if total is not None else len(rows), 'scope': scope}
 
 
-def fetch_stocks(direction, http=None, size=DEFAULT_SIZE, fid='f62', pz=None):
+def fetch_stocks(direction, http=None, size=DEFAULT_SIZE, fid='f62', pz=None, retries=1):
     """direction 决定排序方向（inflow=降序取流入最多，outflow=升序取流出最多）。
 
     fid 可改：`f62` 是主力净流入**额**（偏大盘股），`f184` 是净流入**占比**（对中小票友好）。
     resilience_scan 两个都取再取并集——pz 上限 100 之下，只按额排会系统性漏掉中小强势票。
     """
     payload = _fetch({'pz': pz or max(size * 2, 20), 'po': 1 if direction == 'inflow' else 0,
-                      'fid': fid, 'fs': STOCK_FILTER}, http)
+                      'fid': fid, 'fs': STOCK_FILTER}, http, retries)
     rows = parse_stocks(payload, direction)
     key = 'main_net' if fid == 'f62' else 'main_net_pct'
     rows.sort(key=lambda x: (-x[key], x['code']) if direction == 'inflow' else (x[key], x['code']))

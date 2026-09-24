@@ -1,3 +1,4 @@
+import io
 import json
 import unittest
 from datetime import datetime
@@ -81,6 +82,39 @@ class RankingTests(unittest.TestCase):
         self.assertIsNone(out['sectors']['concept'])
         self.assertIn('concept', out['errors'])
         self.assertEqual(out['stocks']['inflow'][0]['name'], '个股')
+
+    def test_http_downgrade_is_skipped_for_status_errors(self):
+        """http 降级是为"TLS 握手被掐断"设计的。收到 502 说明对端正常应答了错误状态，
+        明文重来一次结果一样（实测限流期间两条路同时 502），多打的那次只会加重限流。"""
+        import market_review
+        from urllib.error import HTTPError
+        seen = []
+
+        def http(url):
+            seen.append(url)
+            # 传一个真的 fp：fp=None 时 HTTPError 会自己开一个临时文件，留下 ResourceWarning。
+            raise HTTPError(url, 502, 'Bad Gateway', {}, io.BytesIO(b''))
+
+        with self.assertRaises(market_review.ReviewError):
+            market_review.get_json('https://push2.eastmoney.com/x', http, retries=0)
+        self.assertEqual(len(seen), 1, '502 不该再打一次 http')
+        self.assertTrue(seen[0].startswith('https://'))
+
+    def test_http_downgrade_still_happens_for_transport_failures(self):
+        """传输层被掐断（TLS 握手失败）时降级照常——那正是它存在的理由。"""
+        import market_review
+        seen = []
+
+        def http(url):
+            seen.append(url)
+            if url.startswith('https://'):
+                raise OSError('TLS handshake aborted')
+            return b'{"ok": 1}'
+
+        self.assertEqual(market_review.get_json('https://push2.eastmoney.com/x', http, retries=0),
+                         {'ok': 1})
+        self.assertEqual(len(seen), 2)
+        self.assertTrue(seen[1].startswith('http://'))
 
     def test_recent_success_is_used_when_a_source_temporarily_returns_502(self):
         boards = [sector('BK1', '板块', 1, 6, 4, 0, 2)]

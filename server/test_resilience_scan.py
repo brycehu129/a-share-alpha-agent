@@ -16,9 +16,10 @@ def sector(name, change, flow_pct, up=6, down=4, flat=0):
             'f104': up, 'f105': down, 'f106': flat, 'f2': 100}
 
 
-def stock(code, name, change, flow, flow_pct, industry='半导体', cap=80e8):
+def stock(code, name, change, flow, flow_pct, industry='半导体', cap=80e8, high=10.8, low=10.2):
     return {'f12': code, 'f14': name, 'f2': 10.5, 'f3': change, 'f62': flow, 'f184': flow_pct,
-            'f100': industry, 'f103': '芯片', 'f20': cap * 1.2, 'f21': cap}
+            'f100': industry, 'f103': '芯片', 'f20': cap * 1.2, 'f21': cap,
+            'f15': high, 'f16': low, 'f17': 10.3, 'f18': 10.0}
 
 
 def quotes(hs300=-1.5, zz500=-1.2, zz1000=-1.0, sse=-1.4):
@@ -107,10 +108,64 @@ class BuildRowTests(unittest.TestCase):
         self.assertIsNone(row['score'])
 
 
+class ExclusionTests(unittest.TestCase):
+    def test_st_is_recognised_from_the_name(self):
+        for name in ('*ST尔雅', 'ST明诚', '退市海润', 'ＳＴ 康美'.replace('Ｓ', 'S').replace('Ｔ', 'T')):
+            self.assertTrue(rs.is_st(name), name)
+        for name in ('国瓷材料', '中国海油', '华茂股份'):
+            self.assertFalse(rs.is_st(name), name)
+
+    def test_limit_threshold_differs_by_board_and_for_st(self):
+        self.assertEqual(rs.limit_threshold('sz300001', '甲'), 19.5)
+        self.assertEqual(rs.limit_threshold('sh688001', '甲'), 19.5)
+        self.assertEqual(rs.limit_threshold('sh600001', '甲'), 9.8)
+        self.assertEqual(rs.limit_threshold('sh600107', '*ST尔雅'), 4.8)
+
+    def test_one_word_limit_needs_high_to_equal_low(self):
+        """一字板 = 全天只有一个价，买不进。只是盘中封板（有过更低成交）不算。"""
+        one_word = {'symbol': 'sh600001', 'name': '甲', 'change_pct': 10.0, 'high': 11.0, 'low': 11.0}
+        self.assertEqual(rs.limit_state(one_word), (True, True))
+        sealed = {'symbol': 'sh600001', 'name': '甲', 'change_pct': 10.0, 'high': 11.0, 'low': 10.2}
+        self.assertEqual(rs.limit_state(sealed), (True, False))
+
+    def test_missing_high_low_is_not_treated_as_one_word(self):
+        """高低价缺失当成"满足条件"会凭空排除一批票——缺失就是缺失。"""
+        self.assertEqual(rs.limit_state(
+            {'symbol': 'sh600001', 'name': '甲', 'change_pct': 10.0, 'high': None, 'low': None}),
+            (True, False))
+
+    def test_st_and_one_word_are_kept_in_rows_but_never_hit(self):
+        """结构性排除的票仍要留档并带标志位，否则事后无法回答
+        "被排除的那些后来怎么样了"。"""
+        parsed = mr.parse_stocks({'data': {'diff': [
+            stock('600107', '*ST尔雅', 4.9, 3e8, 30.0, high=10.5, low=10.1),
+            stock('600001', '一字板', 10.0, 9e8, 20.0, high=11.0, low=11.0),
+            stock('600002', '正常票', 1.0, 9e8, 8.0),
+        ]}}, 'x')
+        scored = mr.score_sectors(mr.parse_sectors(
+            {'data': {'diff': [sector('半导体', 1.8, 6.0)]}}, 'industry'))
+        rows = rs.build_rows(parsed, {r['name']: r for r in scored},
+                             {'sh000300': -1.5, 'sh000852': -1.0})
+        self.assertEqual(len(rows), 3)                                  # 全都留档
+        by_name = {r['name']: r for r in rows}
+        self.assertTrue(by_name['*ST尔雅']['is_st'])
+        self.assertTrue(by_name['一字板']['one_word_limit'])
+        self.assertFalse(by_name['正常票']['is_st'])
+        hits = [r['name'] for r in rows if rs.passes(r)]
+        self.assertEqual(hits, ['正常票'])                                # 但只有正常票命中
+
+    def test_exclusions_can_be_turned_off_as_display_filters(self):
+        row = {'is_st': True, 'one_word_limit': False, 'excess_pp': 5.0, 'main_net': 3e8,
+               'main_net_pct': 30.0, 'holds_up': True, 'sector_matched': True, 'sector_change_pct': 1.8}
+        self.assertFalse(rs.passes(row))
+        self.assertTrue(rs.passes(row, {'exclude_st': False}))
+
+
 class ThresholdTests(unittest.TestCase):
     def row(self, **kw):
         base = {'excess_pp': 3.0, 'main_net': 3e8, 'main_net_pct': 8.0, 'holds_up': True,
-                'sector_matched': True, 'sector_change_pct': 1.8}
+                'sector_matched': True, 'sector_change_pct': 1.8,
+                'is_st': False, 'one_word_limit': False}
         return {**base, **kw}
 
     def test_default_thresholds_accept_a_clean_hit(self):

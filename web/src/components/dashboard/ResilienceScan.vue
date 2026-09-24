@@ -19,6 +19,10 @@ const excessMin = ref(2.0)
 const flowMin = ref(3.0)
 const requireSector = ref(true)
 const requireHoldsUp = ref(false)
+// 一字涨停买不进、ST 风险与涨跌幅限制都不同（候选池策略本来就排除 ST）。
+// 这两个是结构性排除，不是「分数不够」，所以默认开着；关掉只影响看到什么，留档一直是全量。
+const excludeOneWord = ref(true)
+const excludeSt = ref(true)
 const view = ref('hits')
 
 function apply() {
@@ -27,6 +31,8 @@ function apply() {
     main_net_pct_min: flowMin.value,
     require_sector: requireSector.value ? '1' : '0',
     require_holds_up: requireHoldsUp.value ? '1' : '0',
+    exclude_one_word: excludeOneWord.value ? '1' : '0',
+    exclude_st: excludeSt.value ? '1' : '0',
   })
 }
 
@@ -93,12 +99,17 @@ const marketTag = computed(() => {
       </span>
       <el-checkbox v-model="requireSector" size="small" @change="apply">板块也在吸金且在涨</el-checkbox>
       <el-checkbox v-model="requireHoldsUp" size="small" @change="apply">个股本身不跌</el-checkbox>
+      <el-checkbox v-model="excludeOneWord" size="small" @change="apply">排除一字涨停</el-checkbox>
+      <el-checkbox v-model="excludeSt" size="small" @change="apply">排除 ST</el-checkbox>
       <el-radio-group v-model="view" size="small">
         <el-radio-button value="hits">命中 {{ (scan && scan.hits && scan.hits.length) || 0 }}</el-radio-button>
         <el-radio-button value="all">全部 {{ (scan && scan.rows && scan.rows.length) || 0 }}</el-radio-button>
       </el-radio-group>
     </div>
-    <p class="muted caveat">阈值未经任何验证，只是显示过滤器 —— 留档永远保存全量原始值，改阈值不影响留档，历史时间线会按新阈值重算。这是观察工具，不是买入信号。</p>
+    <p class="muted caveat">
+      阈值未经任何验证，只是显示过滤器 —— 留档永远保存全量原始值（含被排除的 ST 与一字板，带标志位），改阈值不影响留档，历史时间线会按新阈值重算。这是观察工具，不是买入信号。
+      「涨停」标签指盘中封板（更早时候能买、也可能炸板），和买不进的「一字板」是两回事。
+    </p>
 
     <el-table :data="rows" size="small" stripe @row-click="(row) => openStock(row.symbol, row.name)">
       <el-table-column type="index" label="#" width="42" />
@@ -108,6 +119,9 @@ const marketTag = computed(() => {
           <div class="tags">
             <el-tag v-if="row.industry" size="small" type="info" effect="plain">{{ row.industry }}</el-tag>
             <el-tag v-if="!row.sector_matched" size="small" type="warning" effect="plain">板块未匹配</el-tag>
+            <el-tag v-if="row.is_st" size="small" type="danger" effect="plain">ST</el-tag>
+            <el-tag v-if="row.one_word_limit" size="small" type="danger" effect="plain">一字板</el-tag>
+            <el-tag v-else-if="row.limit_up" size="small" type="warning" effect="plain">涨停</el-tag>
           </div>
         </template>
       </el-table-column>

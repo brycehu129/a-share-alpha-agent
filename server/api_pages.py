@@ -91,7 +91,7 @@ def api_market_resilience(query):
         value = _num(name)
         if value is not None:
             thresholds[name] = value
-    for name in ("require_holds_up", "require_sector"):
+    for name in ("require_holds_up", "require_sector", "exclude_one_word", "exclude_st"):
         if query.get(name) in ("0", "1"):
             thresholds[name] = query.get(name) == "1"
 
