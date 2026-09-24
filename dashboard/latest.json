@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-24T15:46:51.714712+08:00",
+  "exported_at": "2026-09-24T16:29:18.583209+08:00",
   "market": {
-    "generated_at": "2026-09-24T15:36:03.288411+08:00",
+    "generated_at": "2026-09-24T16:18:17.341455+08:00",
     "status": "success",
     "summary": "源数据日期 2026-09-24：所监测6个指数中，0个上涨、6个下跌、0个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
     "quotes": [
@@ -11,42 +11,42 @@
         "symbol": "sh000001",
         "last": "3888.37",
         "change_pct": "-1.22%",
-        "quote_at": "2026-09-24T15:35:01+08:00"
+        "quote_at": "2026-09-24T16:14:01+08:00"
       },
       {
         "name": "沪深300",
         "symbol": "sh000300",
         "last": "4439.14",
         "change_pct": "-1.73%",
-        "quote_at": "2026-09-24T15:35:13+08:00"
+        "quote_at": "2026-09-24T16:14:13+08:00"
       },
       {
         "name": "科创50",
         "symbol": "sh000688",
         "last": "1621.87",
         "change_pct": "-2.35%",
-        "quote_at": "2026-09-24T15:35:13+08:00"
+        "quote_at": "2026-09-24T16:14:13+08:00"
       },
       {
         "name": "中证1000",
         "symbol": "sh000852",
         "last": "7570.14",
         "change_pct": "-2.26%",
-        "quote_at": "2026-09-24T15:35:01+08:00"
+        "quote_at": "2026-09-24T16:14:01+08:00"
       },
       {
         "name": "深证成指",
         "symbol": "sz399001",
         "last": "13316.97",
         "change_pct": "-2.34%",
-        "quote_at": "2026-09-24T15:35:21+08:00"
+        "quote_at": "2026-09-24T16:14:21+08:00"
       },
       {
         "name": "创业板指",
         "symbol": "sz399006",
         "last": "3288.95",
         "change_pct": "-2.68%",
-        "quote_at": "2026-09-24T15:35:36+08:00"
+        "quote_at": "2026-09-24T16:14:36+08:00"
       }
     ],
     "universe": {
@@ -65,7 +65,7 @@
     }
   },
   "research": {
-    "generated_at": "2026-09-24T15:40:03.973003+08:00",
+    "generated_at": "2026-09-24T16:22:20.160423+08:00",
     "status": "success",
     "factor_cutoff": "2026-09-23",
     "industry_provider": "新浪行业",
@@ -5303,8 +5303,8 @@
         "sz002565": "new_zzhy"
       }
     },
-    "source_id": "20260924073502-1",
-    "source_generated_at": "2026-09-24T15:36:03.288411+08:00",
+    "source_id": "20260924081711-1",
+    "source_generated_at": "2026-09-24T16:18:17.341455+08:00",
     "sample_count": 300,
     "factor_count": 293,
     "rankings": [
@@ -5733,7 +5733,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-24T15:35:37.305725+08:00",
+    "generated_at": "2026-09-24T16:17:50.212636+08:00",
     "status": "partial",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5747,7 +5747,7 @@
     "stock_counts": null
   },
   "analysis": {
-    "generated_at": "2026-09-24T15:42:13.655831+08:00",
+    "generated_at": "2026-09-24T16:24:30.716622+08:00",
     "status": "ready",
     "start_date": "20260826",
     "end_date": "20260923",
@@ -6000,43 +6000,43 @@
   "sources": [
     {
       "kind": "market",
-      "id": "20260924073502-1",
-      "generated_at": "2026-09-24T15:36:03.288411+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20260924073502-1.md"
+      "id": "20260924081711-1",
+      "generated_at": "2026-09-24T16:18:17.341455+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20260924081711-1.md"
     },
     {
       "kind": "research",
-      "id": "20260924073502-1",
-      "generated_at": "2026-09-24T15:40:03.973003+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260924073502-1.md"
+      "id": "20260924081711-1",
+      "generated_at": "2026-09-24T16:22:20.160423+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20260924081711-1.md"
     },
     {
       "kind": "sync",
-      "id": "20260924073502-1",
-      "generated_at": "2026-09-24T15:35:37.305725+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260924073502-1.md"
+      "id": "20260924081711-1",
+      "generated_at": "2026-09-24T16:17:50.212636+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260924081711-1.md"
     },
     {
       "kind": "analysis",
-      "id": "20260924073502-1",
-      "generated_at": "2026-09-24T15:42:13.655831+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260924073502-1.md"
+      "id": "20260924081711-1",
+      "generated_at": "2026-09-24T16:24:30.716622+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260924081711-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "20260924073502-1",
-      "generated_at": "2026-09-24T15:46:25.127793+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260924073502-1.md"
+      "id": "20260924081711-1",
+      "generated_at": "2026-09-24T16:28:51.244547+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260924081711-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20260924073502-1",
-      "generated_at": "2026-09-24T15:46:24.604025+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260924073502-1.md"
+      "id": "20260924081711-1",
+      "generated_at": "2026-09-24T16:28:50.787116+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20260924081711-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-09-24T15:46:24.604025+08:00",
+    "generated_at": "2026-09-24T16:28:50.787116+08:00",
     "version": "select-0.5",
     "status": "ready",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
@@ -11481,7 +11481,7 @@
       "plans": [],
       "plan_counts": {},
       "issues": [],
-      "snapshot_at": "2026-09-24T15:43:01.292648+08:00",
+      "snapshot_at": "2026-09-24T16:25:21.835918+08:00",
       "curve": [
         {
           "date": "2026-09-21",
