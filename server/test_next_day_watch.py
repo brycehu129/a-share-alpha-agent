@@ -57,6 +57,13 @@ class ScoringTests(unittest.TestCase):
         self.assertIn('一字', tags)
         self.assertTrue(any('一字板' in r for r in risks))
 
+    def test_first_board_one_word_is_now_detected(self):
+        # rules-1 的 bug：要求 boards>=2，首板一字完全漏判。rules-2 去掉了这个条件。
+        row = zt(boards=1, first='09:25:00', open_times=0, turn=0.8)
+        self.assertTrue(nw._is_one_word(row))
+        _, tags, _, _ = self.score(row)
+        self.assertIn('一字', tags)
+
     def test_score_is_clamped(self):
         s, *_ = self.score(zt(boards=3, first='09:25:00', fund=1e9, cap=1e9, turn=10), {'电力': 20}, 5e8)
         self.assertLessEqual(s, 100)
@@ -66,6 +73,50 @@ class ScoringTests(unittest.TestCase):
         row = zt(fund=None, cap=None, turn=None, first=None)
         s, tags, _, _ = self.score(row)
         self.assertIsInstance(s, int)
+
+    def test_cooling_phase_halves_board_bonus(self):
+        steady, _, reasons_s, _ = nw.score_row(zt(boards=3), {'电力': 1}, None, 'steady')
+        cooling, _, reasons_c, _ = nw.score_row(zt(boards=3), {'电力': 1}, None, 'cooling')
+        self.assertLess(cooling, steady)
+        self.assertTrue(any('情绪退潮已折半' in r for r in reasons_c))
+        self.assertFalse(any('情绪退潮已折半' in r for r in reasons_s))
+
+
+class PositionTests(unittest.TestCase):
+    def bars(self, closes, ma20=None, ma60=None):
+        out = [{'close': c} for c in closes]
+        out[-1]['ma20'] = ma20
+        out[-1]['ma60'] = ma60
+        return out
+
+    def test_too_few_bars_gives_no_position(self):
+        self.assertIsNone(nw.position(self.bars([10.0] * 10)))
+
+    def test_run_up_and_bias_and_below_ma60(self):
+        closes = [10.0] * 50 + [20.0]  # 100% 的 10 日涨幅，远高于 ma20
+        pos = nw.position(self.bars(closes, ma20=15.0, ma60=25.0))
+        self.assertAlmostEqual(pos['run_up_10'], 100.0)
+        self.assertTrue(pos['ma20_bias'] > 0)
+        self.assertTrue(pos['below_ma60'])
+        self.assertTrue(pos['new_high_60'])
+
+    def test_score_position_high_run_up_is_risk_not_bonus(self):
+        pos = {'run_up_10': 90.0, 'ma20_bias': 40.0, 'run_up_20': 90.0, 'new_high_60': True, 'below_ma60': False}
+        delta, reasons, risks, tags = nw.score_position(pos)
+        self.assertLess(delta, 0)
+        self.assertTrue(risks)
+        self.assertFalse(reasons)
+
+    def test_score_position_calm_start_and_fresh_break_are_bonus(self):
+        pos = {'run_up_10': 12.0, 'ma20_bias': 5.0, 'run_up_20': 15.0, 'new_high_60': True, 'below_ma60': False}
+        delta, reasons, risks, tags = nw.score_position(pos)
+        self.assertGreater(delta, 0)
+        self.assertIn('平台突破', tags)
+
+    def test_missing_position_is_neutral_and_labelled(self):
+        delta, reasons, risks, tags = nw.score_position(None)
+        self.assertEqual(delta, 0)
+        self.assertEqual(tags, ['位置未知'])
 
 
 class RankTests(unittest.TestCase):
@@ -97,6 +148,47 @@ class RankTests(unittest.TestCase):
         self.assertEqual(len(out['items']), 1)
         self.assertIn('zt', out['items'][0]['source_kinds'])
         self.assertIn('qs', out['items'][0]['source_kinds'])
+
+    def test_high_board_goes_to_high_bucket_not_main_board(self):
+        rows = [zt('sz000001', '龙头', boards=5, first='09:30:00'),
+                zt('sz000002', '普通', boards=2, first='09:31:00')]
+        out = nw.rank(review(rows))
+        by = {i['name']: i for i in out['items']}
+        self.assertEqual(by['龙头']['bucket'], 'high')
+        self.assertEqual(by['普通']['bucket'], 'core')
+
+    def test_one_word_goes_to_unbuyable_bucket_not_main_board(self):
+        rows = [zt('sz000001', '一字股', boards=2, first='09:25:00', open_times=0, turn=0.5),
+                zt('sz000002', '普通', boards=2, first='09:31:00')]
+        out = nw.rank(review(rows))
+        by = {i['name']: i for i in out['items']}
+        self.assertEqual(by['一字股']['bucket'], 'unbuyable')
+        self.assertEqual(by['普通']['bucket'], 'core')
+
+    def test_position_fn_only_scores_run_up_when_supplied(self):
+        rows = [zt('sz000001', '高位股', boards=2, first='09:31:00')]
+        fake_positions = lambda symbols, http=None: {'sz000001': {'run_up_10': 90.0, 'ma20_bias': None,
+                                                                    'run_up_20': None, 'new_high_60': False,
+                                                                    'below_ma60': False}}
+        out = nw.rank(review(rows), position_fn=fake_positions)
+        it = out['items'][0]
+        self.assertEqual(it['bucket'], 'high')  # 10 日涨幅 90% 超过 high_run_up_10 阈值
+        self.assertTrue(any('位置偏高' in r for r in it['risks']))
+
+    def test_no_position_fn_marks_position_unknown(self):
+        out = nw.rank(review([zt()]))
+        self.assertIn('位置未知', out['items'][0]['tags'])
+        self.assertIsNone(out['items'][0]['position'])
+
+    def test_cooling_phase_shrinks_high_and_core_quota(self):
+        rows = [zt('sz%06d' % i, '股%d' % i, boards=2, first='09:%02d:00' % (30 + i)) for i in range(10)]
+        rows += [zt('sz900001', '高位1', boards=5), zt('sz900002', '高位2', boards=5), zt('sz900003', '高位3', boards=5), zt('sz900004', '高位4', boards=5)]
+        pools = {'zt': {'total': len(rows), 'rows': rows}, 'dt': {'rows': [{}] * 25}, 'zb': {'rows': []}}
+        out = nw.rank({'trade_date': '20260921', 'date': '2026-09-21', 'pools': pools, 'lhb': {'rows': []}})
+        self.assertEqual(out['phase'], 'cooling')
+        self.assertLessEqual(out['buckets']['core'], 5)
+        self.assertLessEqual(out['buckets']['high'], 1)
+        self.assertIn('退潮', out['note'])
 
     def test_sentiment_metrics(self):
         pools = {'zt': {'rows': [zt(boards=2, name='高'), zt(boards=1, name='低')]}, 'zb': {'rows': [zt()]},
@@ -165,20 +257,29 @@ class RunTests(unittest.TestCase):
         base = review([zt('sz000001', '甲', boards=3)])
         base.update(fetched_at='t', errors={})
         mr.save_review(base, d)
-        first = nw.run(d, ai=False)
+        first = nw.run(d, ai=False, position_fn=None)
         self.assertIsNone(first['ai_meta'])
         # 模拟 17:30 的 AI 点评已落盘，再来一次 16:30 风格的不带 AI 的运行：点评不能丢
         saved = mr.load_latest(d)
         saved['next_day_watch']['items'][0]['ai'] = {'verdict': 'focus', 'view': 'v', 'plan': 'p', 'risk': 'r'}
         saved['next_day_watch']['ai'] = {'market_view': 'mv'}
         mr.save_review(saved, d)
-        again = nw.run(d, ai=False)
+        again = nw.run(d, ai=False, position_fn=None)
         self.assertEqual(again['items'][0]['ai']['verdict'], 'focus')
         self.assertEqual(mr.load_latest(d)['next_day_watch']['ai']['market_view'], 'mv')
 
     def test_run_without_review_raises(self):
         with self.assertRaises(mr.ReviewError):
-            nw.run(Path(tempfile.mkdtemp()) / 'none')
+            nw.run(Path(tempfile.mkdtemp()) / 'none', position_fn=None)
+
+    def test_run_never_touches_network_when_position_fn_is_none(self):
+        # main() 里 --no-position 用的就是这条路径；这里保证它确实不会调 fetch_positions。
+        d = Path(tempfile.mkdtemp())
+        base = review([zt('sz000001', '甲', boards=3)])
+        base.update(fetched_at='t', errors={})
+        mr.save_review(base, d)
+        with patch('next_day_watch.fetch_positions', side_effect=AssertionError('不应该被调用')):
+            nw.run(d, ai=False, position_fn=None)
 
 
 if __name__ == '__main__':

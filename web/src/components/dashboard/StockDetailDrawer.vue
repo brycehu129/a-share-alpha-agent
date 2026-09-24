@@ -81,6 +81,16 @@ const poolBadges = computed(() => {
   })
 })
 const VERDICT = { focus: '重点关注', watch: '观察', avoid: '回避' }
+const RESULT_LABEL = { one_word: '一字板', limit_up: '再涨停', broke: '炸板', limit_down: '跌停', up: '收涨', flat: '横盘', down: '收跌' }
+const OUTCOME_VERDICT = { unbuyable: { text: '买不进', type: 'warning' }, hit: { text: '接得住', type: 'success' },
+                          miss: { text: '未接住', type: 'danger' }, flat: { text: '持平', type: 'info' }, unknown: { text: '未知', type: 'info' } }
+function outcomeLine(o) {
+  if (!o) return ''
+  const parts = []
+  if (o.close_pct !== null && o.close_pct !== undefined) parts.push(`收 ${fmtPct(o.close_pct, 1)}`)
+  if (o.close_vs_open !== null && o.close_vs_open !== undefined) parts.push(`相对开盘 ${fmtPct(o.close_vs_open, 1)}`)
+  return parts.join(' · ')
+}
 const seatGroups = computed(() => (data.value && data.value.seats) || [])
 const groupTab = ref(0)
 watch(seatGroups, () => { groupTab.value = 0 })
@@ -122,7 +132,7 @@ const shortReason = (rs) => rs.map((r) => r.replace(/^有价格涨跌幅限制�
         </section>
 
         <!-- 复盘位置：这只股票在今天的涨跌停池、龙虎榜、次日关注里的情况 -->
-        <section v-if="ctx && (poolBadges.length || ctx.lhb || ctx.watch)">
+        <section v-if="ctx && (poolBadges.length || ctx.lhb || ctx.watch || ctx.prev_watch)">
           <h3>盘后复盘 <span class="sub num">{{ ctx.date }}<template v-if="ctx.fetched_at"> · 取数 {{ fmtTs(ctx.fetched_at) }}</template></span></h3>
           <div class="badges">
             <div v-for="b in poolBadges" :key="b.k" class="badge"><el-tag :type="b.type" size="small">{{ b.label }}</el-tag><span class="muted">{{ b.extra }}</span></div>
@@ -140,6 +150,20 @@ const shortReason = (rs) => rs.map((r) => r.replace(/^有价格涨跌幅限制�
               <p class="line"><b>思路</b> {{ ctx.watch.ai.plan }}</p>
               <p class="line"><b>风险</b> {{ ctx.watch.ai.risk }}</p>
             </template>
+          </div>
+          <div v-if="ctx.prev_watch" class="watch">
+            <div>
+              <el-tag size="small" type="primary" effect="plain">上一交易日兑现（{{ ctx.prev_watch.date }}）</el-tag>
+              <template v-if="ctx.prev_watch.item.outcome">
+                <el-tag size="small" style="margin-left: 6px">{{ RESULT_LABEL[ctx.prev_watch.item.outcome.result] || '未知' }}</el-tag>
+                <el-tag size="small" effect="plain" :type="(OUTCOME_VERDICT[ctx.prev_watch.item.outcome.verdict] || {}).type || 'info'" style="margin-left: 4px">
+                  {{ (OUTCOME_VERDICT[ctx.prev_watch.item.outcome.verdict] || {}).text || '未知' }}
+                </el-tag>
+              </template>
+            </div>
+            <p v-if="outcomeLine(ctx.prev_watch.item.outcome)" class="line num">{{ outcomeLine(ctx.prev_watch.item.outcome) }}</p>
+            <p v-if="ctx.prev_watch.item.outcome && ctx.prev_watch.item.outcome.path" class="line">{{ ctx.prev_watch.item.outcome.path }}</p>
+            <p v-if="ctx.prev_watch.item.outcome && ctx.prev_watch.item.outcome.ai_review" class="line"><b>AI 复盘</b> {{ ctx.prev_watch.item.outcome.ai_review }}</p>
           </div>
         </section>
 

@@ -346,6 +346,20 @@ class PersistTests(unittest.TestCase):
         self.assertEqual(r['next_day_watch'], {'items': [1]})
         self.assertEqual(mr.load_latest(d)['pools']['zt']['total'], 1)
 
+    def test_run_keeps_existing_prev_watch(self):
+        # watch_outcome.py 把上一交易日的兑现结果写进今天的文件后，17:30 的 market_review.run()
+        # 不能把它冲掉——否则页面的「上一交易日兑现」会在 16:30→17:30 之间闪没。
+        d = Path(tempfile.mkdtemp())
+        mr.save_review({'trade_date': '20260921', 'prev_watch': {'date': '2026-09-20', 'items': [1]}}, d)
+        http = lambda url: json.dumps(pool_payload([zt_row()])).encode() if 'push2ex' in url else b'{"result":null}'
+        orig = mr.http_get
+        mr.http_get = http
+        try:
+            r = mr.run(day='20260921', directory=d)
+        finally:
+            mr.http_get = orig
+        self.assertEqual(r['prev_watch'], {'date': '2026-09-20', 'items': [1]})
+
 
 if __name__ == '__main__':
     unittest.main()

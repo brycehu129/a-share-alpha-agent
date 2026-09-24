@@ -47,9 +47,17 @@ BaoStock 因明确返回黑名单错误暂停，保留已下载数据，需服�
 | 公司资料/概念 | 东财 F10 `RPT_F10_ORG_BASICINFO` | 点开个股时 | 60 秒 |
 
 - 落盘文件：`server/data/market_review/<YYYYMMDD>.json`（`MARKET_REVIEW_DIR` 可改；带校验和；公开行情，**不进 git**）。
-  由 `alpha-shadow-review.timer`（工作日 16:30、17:30）调 `cron_review.sh` 生成：先 `market_review.py`（抓取），再 `next_day_watch.py`（规则打分；17:30 那次加 `--ai` 点评）。
-  `health_check` 的「市场复盘数据」在 17:45 之后检查当天文件是否齐全。
+  由 `alpha-shadow-review.timer`（工作日 16:30、17:30）调 `cron_review.sh` 生成：先 `market_review.py`（抓取），
+  再 `watch_outcome.py`（结算上一交易日「次日关注」名单的兑现情况，写进那份旧文件自己的 `next_day_watch.items[].outcome`
+  和今天这份文件的 `prev_watch`），最后 `next_day_watch.py`（规则打分；17:30 那次两个脚本都加 `--ai`）。
+  `health_check` 的「市场复盘数据」在 17:45 之后检查当天文件是否齐全（含 `prev_watch`，仅当存在待结算的上一交易日名单时才要求）。
 - 东财是非官方接口，字段可能变；解析集中在 `market_review.parse_*`，形状不对就当该组失败，看板对应块显示「暂无 + 原因」，其它块照常。
   东财对个别出口 IP 会在短时间密集请求后断开 push2* 的连接（本地开发时出现过）：所以慢变化的数据各有缓存，`push2*` 主机 https 失败后会再试一次 http（只返回公开行情、不带凭证）。
 - 涨跌停家数 = 涨跌停池长度（交易所口径，含 ST/北交所）。`market_context.py` 里按涨跌幅阈值近似的那份仅供盘后 AI 的市场背景使用，看板不再用。
-- 「次日关注」是**短线情绪视图**（`next_day_watch.py`，规则版本 `nextday-rules-1`），独立于「候选池」的策略选股，不影响其回测口径。
+- 「次日关注」是**短线情绪视图**（`next_day_watch.py`，规则版本 `nextday-rules-2`），独立于「候选池」的策略选股，不影响其回测口径。
+  rules-2 把候选按 `bucket` 分三组（`core` 可参与主榜 / `high` 高位只观察 / `unbuyable` 一字买不进），并对强度排名前 30 的
+  候选补取前复权日 K（`stock_detail.fetch_kline`）算位置/空间指标（近 10 日累计涨幅、对 20 日线乖离等）；日 K 取不到的
+  那只不做位置加减分，只标「位置未知」，不猜。
+- 「上一交易日兑现」（`watch_outcome.py`）用次日开盘价作为参与成本，判定每只票是继续涨停/一字/炸板/跌停还是按开盘价
+  涨跌分类；一字板单独算「买不进」，不计入命中率。所需行情来自 `live_quote.snapshot()`（批量快照，只支持 sh/sz，
+  北交所代码直接标 `quote_missing`）和 `minute_data.fetch_minute()`（逐只、尽力而为的日内路径一句话，单只失败不影响其它只）。

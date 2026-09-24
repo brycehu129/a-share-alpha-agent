@@ -582,12 +582,13 @@ def _lhb_block(stored):
 
 def current_review(now=None, http=None, directory=None):
     """页面用的复盘数据。涨跌停池优先给"今天"的：落盘的那份不是今天的、且已过 9:25 就现取；
-    龙虎榜（16:30 之后才有）和次日关注永远来自落盘文件，各自带着自己的日期。"""
+    龙虎榜（16:30 之后才有）、次日关注、上一交易日的兑现结果永远来自落盘文件，各自带着自己的日期。"""
     now = now or datetime.now(CST)
     stored = load_latest(directory)
     today = now.strftime('%Y%m%d')
     out = {'source': 'stored', 'trade_date': None, 'date': None, 'fetched_at': None, 'pools': None,
-           'errors': {}, 'lhb': _lhb_block(stored), 'next_day_watch': (stored or {}).get('next_day_watch')}
+           'errors': {}, 'lhb': _lhb_block(stored), 'next_day_watch': (stored or {}).get('next_day_watch'),
+           'prev_watch': (stored or {}).get('prev_watch')}
     if stored:
         out.update(trade_date=stored['trade_date'], date=stored['date'], fetched_at=stored['fetched_at'],
                    pools=stored['pools'], errors=dict(stored.get('errors') or {}))
@@ -620,11 +621,15 @@ def build_review(now=None, day=None, http=None):
 
 def run(day=None, directory=None, now=None):
     """定时任务入口：抓取并落盘。17:30 那次会覆盖 16:30 的（龙虎榜 16:30~17:30 才陆续补全）。
-    已有的 next_day_watch 留着不丢——它由盘后分析写入，这里只更新原始数据。"""
+    已有的 next_day_watch、prev_watch 留着不丢——它们由盘后分析（next_day_watch.py / watch_outcome.py）
+    写入，这里只更新原始数据。"""
     review = build_review(now=now, day=day)
     prior = load_latest(directory)
-    if prior and prior.get('trade_date') == review['trade_date'] and prior.get('next_day_watch'):
-        review['next_day_watch'] = prior['next_day_watch']
+    if prior and prior.get('trade_date') == review['trade_date']:
+        if prior.get('next_day_watch'):
+            review['next_day_watch'] = prior['next_day_watch']
+        if prior.get('prev_watch'):
+            review['prev_watch'] = prior['prev_watch']
     save_review(review, directory)
     return review
 

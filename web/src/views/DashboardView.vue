@@ -98,7 +98,7 @@ const today = todayStr()
             <p v-if="screen && screen.cutoff" class="muted score-note">市场评分取自日级批处理（截至 {{ screen.cutoff }} 收盘，生成于 <span class="num">{{ fmtTs(agent && agent.generated_at) }}</span>），不随盘中行情变化。</p>
 
             <MarketPulse :live="live" :pools="review && review.pools" :pool-date="review ? review.date : ''" :pool-time="review ? review.fetched_at : ''" />
-            <NextDayWatch :watch="review && review.next_day_watch" />
+            <NextDayWatch :watch="review && review.next_day_watch" :prev-watch="review && review.prev_watch" />
           </div>
         </div>
       </el-tab-pane>

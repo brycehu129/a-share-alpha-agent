@@ -307,6 +307,29 @@ class BookApiTests(ServerCase):
         self.assertEqual(book["trades"][0]["realized_pnl"], 10000.0)
         self.assertEqual(self.json("POST", "/api/book/watch/remove", {"symbol": "sh600519"})[0], 200)
 
+    def test_account_starts_unset_and_round_trips_through_save(self):
+        status, payload = self.json("GET", "/api/book/account")
+        self.assertEqual((status, payload["account"]), (200, None))
+        status, payload = self.json("POST", "/api/book/account", {"equity_base": "100000", "cash": "30000"})
+        self.assertEqual(status, 200)
+        status, payload = self.json("GET", "/api/book/account")
+        self.assertEqual((payload["account"]["equity_base"], payload["account"]["cash"]), (100000, 30000))
+
+    def test_account_rejects_cash_over_equity(self):
+        status, payload = self.json("POST", "/api/book/account", {"equity_base": "100000", "cash": "200000"})
+        self.assertEqual(status, 400)
+
+    def test_combined_pnl_reflects_realized_gains_from_a_partial_sell(self):
+        self.watch()
+        self.assertEqual(self.buy(shares=200, price="1300", date="2026-09-01")[0], 200)
+        self.assertEqual(self.json("POST", "/api/book/sell", {"symbol": "600519", "shares": 100, "price": "1400"})[0], 200)
+        _, book = self.book(live(last="1300", prev="1300", change_pct="0"))    # 现价回到成本价，浮动盈亏为 0
+        h = book["holdings"][0]
+        self.assertEqual(h["realized_trades"], 1)
+        self.assertGreater(h["realized_pnl"], 0)
+        self.assertGreater(h["combined_pnl"], 0)                                # 综合盈亏靠已实现的部分为正
+        self.assertLess(h["effective_cost"], h["cost_price"])                   # 等效成本低于账面成本价
+
     def test_the_old_direct_holding_entry_is_gone(self):
         """持仓不能凭空录入：只能从自选买入、从持仓卖出。"""
         status, _ = self.json("POST", "/api/book/holding", {"symbol": "600519", "shares": 100, "cost_price": "1300"})
@@ -627,7 +650,7 @@ class DashboardApiTests(ServerCase):
 
 class MarketReviewApiTests(ServerCase):
     REVIEW = {"source": "stored", "trade_date": "20260921", "date": "2026-09-21", "pools": {"zt": {"total": 0, "rows": []}},
-              "errors": {}, "lhb": None, "next_day_watch": None, "fetched_at": "t"}
+              "errors": {}, "lhb": None, "next_day_watch": None, "prev_watch": None, "fetched_at": "t"}
 
     def test_review_endpoint_returns_the_current_review(self):
         with patch("market_review.current_review", return_value=self.REVIEW):

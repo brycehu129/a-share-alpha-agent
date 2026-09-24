@@ -63,8 +63,17 @@ class DetailTests(unittest.TestCase):
         self.assertEqual(ctx['pools']['zt']['boards'], 1)
         self.assertEqual(ctx['lhb']['net'], 1.0)
         self.assertEqual(ctx['watch']['score'], 70)
+        self.assertIsNone(ctx['prev_watch'])
         self.assertIsNone(sd.review_context('sh600721', None))
         self.assertEqual(sd.review_context('sz000001', self.review)['pools'], {})
+
+    def test_review_context_carries_prev_watch_outcome_for_matching_symbol(self):
+        review = dict(self.review, prev_watch={'date': '2026-09-20', 'items': [
+            {'symbol': 'sh600721', 'score': 81, 'outcome': {'result': 'limit_up', 'verdict': 'hit'}}]})
+        ctx = sd.review_context('sh600721', review)
+        self.assertEqual(ctx['prev_watch']['date'], '2026-09-20')
+        self.assertEqual(ctx['prev_watch']['item']['outcome']['verdict'], 'hit')
+        self.assertIsNone(sd.review_context('sz000001', review)['prev_watch'])
 
     def test_detail_isolates_failures_and_fetches_seats_only_for_lhb_stocks(self):
         sd._cache.clear()

@@ -34,7 +34,10 @@ class ReviewUnitTests(unittest.TestCase):
         self.assertIn('set -euo pipefail', text)
         self.assertNotIn('commit_and_push', text)          # 公开行情、落本地文件，不进 market-data 分支
         self.assertIn('market_review.py', text)
+        self.assertIn('watch_outcome.py', text)
         self.assertIn('next_day_watch.py', text)
+        # 结算必须在生成当日新名单之前跑，否则读不到"结算前"的 pools 原始数据
+        self.assertLess(text.index('watch_outcome.py'), text.index('next_day_watch.py'))
 
 
 if __name__ == '__main__':

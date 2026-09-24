@@ -424,7 +424,7 @@ class SentinelModelTests(Base):
                 with patch.dict(os.environ, {**scene_env, **overrides}):
                     ai_analyst.analyze({'rows': []}, {}, [], [])
                     scenario_analyst.analyze({'stocks': []})
-                    next_day_watch.analyze({'items': [{'symbol': 'sz000001'}]})
+                    next_day_watch.analyze({'items': [{'symbol': 'sz000001', 'bucket': 'core'}]})
                 self.assertEqual([req['body']['model'] for req in self.fake.requests[-3:]], expected)
                 for req in self.fake.requests[-3:]:
                     self.assertEqual(req['body']['response_format']['type'], 'json_schema')

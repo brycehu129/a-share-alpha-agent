@@ -221,6 +221,22 @@ class PipelineTests(Base):
         self.assertIn('龙虎榜', r['message'])
         review['lhb'] = {'rows': [1]}
         market_review.save_review(review, d)
+        # 20260918.json 带着 next_day_watch.items，是「待结算的上一交易日」——今天的文件没有
+        # prev_watch 就该 WARN，这正是它要抓的漏跑场景。
+        r = hc.check_review(self.ctx('17:50:00'))
+        self.assertEqual(r['level'], hc.WARN)
+        self.assertIn('兑现结算', r['message'])
+        review['prev_watch'] = {'date': '2026-09-18', 'items': [1]}
+        market_review.save_review(review, d)
+        self.assertEqual(hc.check_review(self.ctx('17:50:00'))['level'], hc.OK)
+
+    def test_review_data_ok_without_prior_watch_when_none_exists(self):
+        # 首次上线/长假后：没有「带 next_day_watch.items 的更早文件」可结算，不该因为缺 prev_watch 而 WARN。
+        import market_review
+        d = self.private.parent / 'market_review'
+        review = {'trade_date': '20260921', 'date': '2026-09-21', 'fetched_at': 't',
+                  'pools': {'zt': {'total': 5, 'rows': []}}, 'lhb': {'rows': [1]}, 'next_day_watch': {'items': [1]}}
+        market_review.save_review(review, d)
         self.assertEqual(hc.check_review(self.ctx('17:50:00'))['level'], hc.OK)
 
     def test_reconcile_record_expected_after_the_close(self):
@@ -229,6 +245,21 @@ class PipelineTests(Base):
         (self.private / 'sentinel').mkdir()
         (self.private / 'sentinel' / 'reconcile-2026-09-21.json').write_text('{}')
         self.assertEqual(hc.check_reconcile(self.ctx('16:00:00'))['level'], hc.OK)
+
+    def test_alert_audit_mismatches_are_a_crit_not_a_warn(self):
+        """机制核对的不一致意味着代码本身有 bug（事件丢了/重了、价格对不上……），不是"数据不够"，
+        所以要比"今天没有记录"更严重。"""
+        self.assertEqual(hc.check_alert_audit(self.ctx('15:30:00'))['level'], hc.SKIP)
+        self.assertEqual(hc.check_alert_audit(self.ctx('16:00:00'))['level'], hc.WARN)
+        (self.private / 'sentinel').mkdir()
+        (self.private / 'sentinel' / 'alert_audit-2026-09-21.json').write_text(
+            json.dumps({'audit': {'checked': 5, 'mismatches': []}, 'outcomes': []}))
+        self.assertEqual(hc.check_alert_audit(self.ctx('16:00:00'))['level'], hc.OK)
+        (self.private / 'sentinel' / 'alert_audit-2026-09-21.json').write_text(
+            json.dumps({'audit': {'checked': 5, 'mismatches': [{'key': 'x', 'why': '对不上'}]}, 'outcomes': []}))
+        r = hc.check_alert_audit(self.ctx('16:00:00'))
+        self.assertEqual(r['level'], hc.CRIT)
+        self.assertIn('对不上', r['message'])
 
     def test_calendar_unreadable_on_a_weekday_is_flagged_but_not_on_weekends(self):
         self.assertEqual(hc.check_calendar(self.ctx(state='unknown'))['level'], hc.WARN)

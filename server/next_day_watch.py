@@ -9,23 +9,48 @@
   只写「什么条件下关注、什么信号说明该放弃」。
 - 排除：ST/退市整理、次新（N/C 开头）——涨跌幅限制和交易规则不同，套同一套打分没有意义。
 - 打分只用当日收盘后的数据，所有阈值集中在 WEIGHTS，改口径改这里并升 RULES_VERSION。
+
+rules-2（2026-09-24）针对 rules-1 的结构性缺陷做了三件事，起因是榜首长期被「次日买不进」和
+「次日崩盘」这两类没有参考价值的票占满：
+
+1. **分组（bucket）**。rules-1 只有一个按强度排的榜，而当天最强的极值形态恰好是一字板和高位连板。
+   现在每只候选归三组之一——`core`（可参与，主榜）、`high`（高位，只做观察）、`unbuyable`（一字，买不进），
+   各有独立名额，主榜不可能被后两类占满。一字判定也修正了：rules-1 要求 `boards >= 2`，首板一字整个漏掉。
+2. **位置/空间维度**。rules-1 只看当天表现，不看这只票涨到哪了。现在对强度前 POSITION_N 只补取前复权日 K，
+   按 10 日累计涨幅、对 20 日线乖离、是否低位平台突破、是否还在 60 日线下方加减分。
+   日 K 取不到的那只**不做任何位置加减分**并标注「位置未知」——不猜。
+3. **情绪自适应**。rules-1 的情绪指标只喂给 AI，分数本身不随退潮变化。现在 `sentiment()` 给出 phase，
+   退潮时连板加分折半、高位组名额和主榜条数一起收缩。
+
+兑现结果由 watch_outcome.py 在次日收盘后回填到 items[].outcome，统计按 rules_version 分组，
+所以改口径必须升版本号，否则新旧口径的兑现率会被混在一起比。
 """
 import argparse
 import json
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
 import market_review
 from collect_quotes import CST
 
-RULES_VERSION = 'nextday-rules-1'
+RULES_VERSION = 'nextday-rules-2'
 PROMPT_VERSION = 'nextday-analyst-1'
-TOP_N = 12          # 页面展示的规则筛选结果条数
-AI_TOP_N = 8        # 送给 AI 点评的条数
+AI_TOP_N = 8        # 送给 AI 点评的条数（只从 core 组取）
+POSITION_N = 30     # 补取日 K 算「位置」的条数：只给强度排前面的，避免给上百只候选打接口
+POSITION_WORKERS = 6
 VERDICTS = ['focus', 'watch', 'avoid']
 VERDICT_LABEL = {'focus': '重点关注', 'watch': '观察', 'avoid': '回避'}
+
+BUCKETS = ('core', 'high', 'unbuyable')
+BUCKET_ORDER = {'core': 0, 'high': 1, 'unbuyable': 2}
+BUCKET_LABEL = {'core': '可参与', 'high': '高位 · 只做观察', 'unbuyable': '一字 · 买不进'}
+# 每组展示名额。退潮时高位组和主榜一起收缩——情绪转弱的时候高标是最先出事的。
+QUOTA = {'steady': {'core': 8, 'high': 3, 'unbuyable': 3},
+         'heating': {'core': 8, 'high': 3, 'unbuyable': 3},
+         'cooling': {'core': 5, 'high': 1, 'unbuyable': 3}}
 
 WEIGHTS = {
     'base': 40,
@@ -48,8 +73,20 @@ WEIGHTS = {
     'lhb_net_big': (5e7, 8),
     'lhb_net_pos': 4,
     'lhb_net_neg': -8,
-    # 一字/秒板：次日大概率买不进，分数照给但扣一点并标注
-    'one_word_penalty': -6,
+    # --- 位置 / 空间（rules-2 新增，数据来自前复权日 K）---
+    'run_up_10': [(80, -14), (50, -9), (30, -4)],   # 10 日累计涨幅越大，次日回落空间越大
+    'run_up_10_calm': (20.0, 4),                    # 10 日涨幅在 0~20% 之间：启动温和
+    'ma20_bias': (30.0, -6),                        # 对 20 日线乖离过大
+    'fresh_break': 6,                               # 创 60 日新高但 20 日涨幅不大：低位平台突破
+    'fresh_break_max_run_up_20': 25.0,
+    'heating_break_bonus': 2,
+    'below_ma60': -4,                               # 还在 60 日线下方：弱势反弹
+    # --- 分组阈值 ---
+    'high_boards': 4,
+    'high_run_up_10': 50.0,
+    # 一字板：开盘即封死、全天没开过、换手极低
+    'one_word_first_seal': '09:26:00',
+    'one_word_turnover': 2.0,
 }
 
 
@@ -59,9 +96,24 @@ def _excluded(name):
 
 
 def _is_one_word(row):
-    """一字板：开盘即封死、全天没开过、换手很低。次日大概率还是一字，散户排不上队。"""
-    return (row.get('open_times') == 0 and (row.get('first_seal') or '99') <= '09:30:00'
-            and row.get('turnover') is not None and row['turnover'] < 1.5 and row.get('boards', 1) >= 2)
+    """一字板：集合竞价就封死、全天没开过、换手极低。次日大概率还是一字，散户排不上队。
+
+    rules-1 这里还要求 `boards >= 2`，结果首板一字完全漏判、照样排在榜首；换手阈值 1.5% 也偏严。
+    现在只看形态不看板数：竞价封板(fbt=09:25) + 未开板 + 换手 < 2%。
+    """
+    return (row.get('open_times') == 0
+            and (row.get('first_seal') or '99') <= WEIGHTS['one_word_first_seal']
+            and row.get('turnover') is not None and row['turnover'] < WEIGHTS['one_word_turnover'])
+
+
+def _phase(s):
+    """短线情绪所处的阶段。任何一个指标缺失就按 steady——不拿残缺数据推"退潮"。"""
+    avg, seal, dt = s.get('yzt_avg_pct'), s.get('seal_rate'), s.get('dt')
+    if (avg is not None and avg < 0) or (seal is not None and seal < 60) or (dt is not None and dt >= 20):
+        return 'cooling'
+    if avg is not None and seal is not None and avg > 2 and seal >= 75:
+        return 'heating'
+    return 'steady'
 
 
 def sentiment(pools):
@@ -84,21 +136,117 @@ def sentiment(pools):
     if pcts:
         out['yzt_avg_pct'] = round(sum(pcts) / len(pcts), 2)
         out['yzt_down_pct'] = round(sum(p < 0 for p in pcts) / len(pcts) * 100, 1)
+    out['phase'] = _phase(out)
     return out
 
 
-def score_row(row, industry_counts, lhb_net):
-    """→ (分数, 标签, 理由, 风险)。每一项加减分都写进理由，保证可复核。"""
+# --- 位置 / 空间 --------------------------------------------------------------------------
+
+def position(bars):
+    """前复权日 K → 位置指标。最后一根是当日（收盘后抓的）。不足 21 根不下结论，返回 None。"""
+    if not bars or len(bars) < 21:
+        return None
+    closes = [b['close'] for b in bars]
+    last = closes[-1]
+
+    def run_up(n):
+        if len(closes) <= n or closes[-1 - n] <= 0:
+            return None
+        return round((last / closes[-1 - n] - 1) * 100, 1)
+
+    win = closes[-60:]
+    high60 = max(win)
+    ma20, ma60 = bars[-1].get('ma20'), bars[-1].get('ma60')
+    return {'run_up_5': run_up(5), 'run_up_10': run_up(10), 'run_up_20': run_up(20),
+            'from_high_60': round((last / high60 - 1) * 100, 1) if high60 > 0 else None,
+            'ma20_bias': round((last / ma20 - 1) * 100, 1) if ma20 else None,
+            'below_ma60': bool(ma60 and last < ma60),
+            'new_high_60': bool(last >= high60), 'bars': len(bars)}
+
+
+def _one_position(symbol, http=None):
+    import stock_detail
+    try:
+        return position(stock_detail.fetch_kline(symbol, http))
+    except Exception:            # 单只日 K 取不到就是没有位置数据，不影响其它只
+        return None
+
+
+def fetch_positions(symbols, http=None):
+    """并发取日 K 并提炼位置指标 → {symbol: pos|None}。整体失败也只是全体"位置未知"。"""
+    out = {}
+    if not symbols:
+        return out
+    with ThreadPoolExecutor(max_workers=POSITION_WORKERS) as pool:
+        futures = {pool.submit(_one_position, s, http): s for s in symbols}
+        for f in as_completed(futures):
+            out[futures[f]] = f.result()
+    return out
+
+
+def score_position(pos, phase='steady'):
+    """位置/空间的加减分 → (分数增量, 理由, 风险, 标签)。pos 为空就一分不动，只标注「位置未知」。"""
+    w = WEIGHTS
+    if not pos:
+        return 0, [], [], ['位置未知']
+    delta, reasons, risks, tags = 0, [], [], []
+    r10 = pos.get('run_up_10')
+    if r10 is not None:
+        hit = next((p for th, p in w['run_up_10'] if r10 >= th), 0)
+        if hit:
+            delta += hit
+            risks.append('10 日累计涨幅 %.0f%%，位置偏高，次日回落空间大（%+d）' % (r10, hit))
+        elif 0 < r10 <= w['run_up_10_calm'][0]:
+            delta += w['run_up_10_calm'][1]
+            reasons.append('10 日累计涨幅 %.0f%%，启动温和（%+d）' % (r10, w['run_up_10_calm'][1]))
+    bias = pos.get('ma20_bias')
+    if bias is not None and bias >= w['ma20_bias'][0]:
+        delta += w['ma20_bias'][1]
+        risks.append('高于 20 日线 %.0f%%，乖离过大（%+d）' % (bias, w['ma20_bias'][1]))
+    r20 = pos.get('run_up_20')
+    if pos.get('new_high_60') and r20 is not None and r20 < w['fresh_break_max_run_up_20']:
+        add = w['fresh_break'] + (w['heating_break_bonus'] if phase == 'heating' else 0)
+        delta += add
+        reasons.append('创 60 日新高且 20 日涨幅仅 %.0f%%，低位平台突破（%+d）' % (r20, add))
+        tags.append('平台突破')
+    if pos.get('below_ma60'):
+        delta += w['below_ma60']
+        risks.append('仍在 60 日线下方，属于弱势反弹（%+d）' % w['below_ma60'])
+    return delta, reasons, risks, tags
+
+
+def bucket_of(row, pos):
+    """三组之一。一字优先——它是"买不进"，和"高位"是两种不同的没参考价值。"""
+    if _is_one_word(row):
+        return 'unbuyable'
+    if (row.get('boards') or 1) >= WEIGHTS['high_boards']:
+        return 'high'
+    if pos and (pos.get('run_up_10') or 0) >= WEIGHTS['high_run_up_10']:
+        return 'high'
+    return 'core'
+
+
+# --- 规则打分 -----------------------------------------------------------------------------
+
+def score_row(row, industry_counts, lhb_net, phase='steady'):
+    """→ (分数, 标签, 理由, 风险)。每一项加减分都写进理由，保证可复核。
+
+    只用池子里的当日数据；位置/空间在 score_position 里单算（那部分要额外取日 K）。
+    """
     w = WEIGHTS
     score, tags, reasons, risks = w['base'], [], [], []
     boards = row.get('boards', 1)
     add = w['boards'].get(boards, w['boards_high'])
+    note = ''
+    # 退潮期高标最先出事，连板加分折半。折扣写进理由里，不藏着。
+    if phase == 'cooling' and boards >= 3 and add > 0:
+        add, note = add // 2, '，情绪退潮已折半'
     score += add
     tags.append('首板' if boards == 1 else '%d连板' % boards)
     if boards >= 5:
         risks.append('%d 连板，高位接力风险大，分歧转一致后容易断板' % boards)
     else:
-        reasons.append('%d 板（%+d）' % (boards, add))
+        reasons.append('%d 板（%+d%s）' % (boards, add, note))
 
     cap, fund = row.get('float_cap'), row.get('seal_fund')
     ratio = fund / cap if cap and fund is not None else None
@@ -123,16 +271,18 @@ def score_row(row, industry_counts, lhb_net):
             score += w['first_seal_late'][1]
             risks.append('首封时间 %s，偏晚，资金态度不坚决' % fs[:5])
 
-    ot = row.get('open_times') or 0
-    if ot >= 2:
-        score += w['open_times_many']
-        risks.append('盘中炸板 %d 次，分歧大' % ot)
-    else:
-        hit = w['open_times'][ot]
-        score += hit
-        if hit:
-            reasons.append('全天未开板（%+d）' % hit)
-            tags.append('封死')
+    # open_times 只有涨停池的行才有。强势股池的行没封过板，不能白拿"全天未开板"的分。
+    ot = row.get('open_times')
+    if ot is not None:
+        if ot >= 2:
+            score += w['open_times_many']
+            risks.append('盘中炸板 %d 次，分歧大' % ot)
+        else:
+            hit = w['open_times'][ot]
+            score += hit
+            if hit:
+                reasons.append('全天未开板（%+d）' % hit)
+                tags.append('封死')
 
     turn = row.get('turnover')
     if turn is not None:
@@ -167,19 +317,24 @@ def score_row(row, industry_counts, lhb_net):
             tags.append('龙虎榜净卖')
 
     if _is_one_word(row):
-        score += w['one_word_penalty']
-        risks.append('一字板，次日大概率仍是一字，难以买入')
+        risks.append('一字板，次日大概率仍是一字，正常买不进')
         tags.append('一字')
     return max(0, min(100, score)), tags, reasons, risks
 
 
-def rank(review, top_n=TOP_N):
-    """→ {'items': [...], 'sentiment': {...}}。涨停池/强势股池都缺失就没有可排的东西。"""
+def rank(review, position_fn=None):
+    """→ {'items': [...], 'sentiment': {...}}。涨停池/强势股池都缺失就没有可排的东西。
+
+    两阶段：先用池内数据打强度分，再只给前 POSITION_N 只补位置数据重算。position_fn 为 None
+    时全体"位置未知"（单元测试与离线场景），生产由 run() 传入 fetch_positions。
+    """
     pools = review.get('pools') or {}
     zt = pools.get('zt')
     qs = pools.get('qs')
-    out = {'rules_version': RULES_VERSION, 'date': review.get('date'), 'sentiment': sentiment(pools), 'items': [],
-           'note': None}
+    sent = sentiment(pools)
+    phase = sent['phase']
+    out = {'rules_version': RULES_VERSION, 'date': review.get('date'), 'sentiment': sent, 'phase': phase,
+           'items': [], 'note': None, 'buckets': {}}
     zt_rows = (zt or {}).get('rows') or []
     qs_rows = (qs or {}).get('rows') or []
     if not zt_rows and not qs_rows:
@@ -203,12 +358,13 @@ def rank(review, top_n=TOP_N):
         item = dict(r)
         item['source_kinds'] = ['qs']
         merged[symbol] = item
-    items = []
+
+    staged = []
     for r in merged.values():
         if _excluded(r['name']):
             continue
         l = lhb.get(r['symbol'])
-        score, tags, reasons, risks = score_row(r, counts, l['net'] if l else None)
+        score, tags, reasons, risks = score_row(r, counts, l['net'] if l else None, phase)
         if 'qs' in r.get('source_kinds', []):
             tags.append('强势股')
             new_high = r.get('new_high') or 0
@@ -217,15 +373,43 @@ def rank(review, top_n=TOP_N):
                 reasons.append('%d 日新高' % new_high)
             if volume_ratio is not None and volume_ratio >= 1.5:
                 reasons.append('量比 %.2f' % volume_ratio)
-        items.append({'symbol': r['symbol'], 'name': r['name'], 'score': score, 'boards': r.get('boards', 1),
+        staged.append({'row': r, 'base': score, 'tags': tags, 'reasons': reasons, 'risks': risks,
+                       'lhb_net': l['net'] if l else None})
+    staged.sort(key=lambda s: (-s['base'], -(s['row'].get('boards') or 0), -(s['row'].get('seal_fund') or 0)))
+
+    positions = {}
+    if position_fn:
+        positions = position_fn([s['row']['symbol'] for s in staged[:POSITION_N]]) or {}
+
+    items = []
+    for s in staged:
+        r = s['row']
+        pos = positions.get(r['symbol'])
+        delta, prs, pks, ptags = score_position(pos, phase)
+        items.append({'symbol': r['symbol'], 'name': r['name'], 'score': max(0, min(100, s['base'] + delta)),
+                      'bucket': bucket_of(r, pos), 'boards': r.get('boards', 1),
                       'industry': r.get('industry'), 'price': r.get('price'), 'pct': r.get('pct'),
                       'first_seal': r.get('first_seal'), 'seal_fund': r.get('seal_fund'), 'float_cap': r.get('float_cap'),
                       'open_times': r.get('open_times'), 'turnover': r.get('turnover'), 'new_high': r.get('new_high'),
                       'volume_ratio': r.get('volume_ratio'), 'source_kinds': r.get('source_kinds', []),
-                      'lhb_net': l['net'] if l else None, 'tags': tags, 'reasons': reasons, 'risks': risks})
-    items.sort(key=lambda x: (-x['score'], -x['boards'], -(x['seal_fund'] or 0)))
-    out['items'] = items[:top_n]
+                      'lhb_net': s['lhb_net'], 'position': pos, 'tags': s['tags'] + ptags,
+                      'reasons': s['reasons'] + prs, 'risks': s['risks'] + pks})
+
+    items.sort(key=lambda x: (BUCKET_ORDER[x['bucket']], -x['score'], -(x['boards'] or 0), -(x['seal_fund'] or 0)))
+    quota = QUOTA[phase]
+    picked, used = [], {b: 0 for b in BUCKETS}
+    for it in items:
+        b = it['bucket']
+        if used[b] >= quota[b]:
+            continue
+        used[b] += 1
+        picked.append(it)
+    out['items'] = picked
     out['candidates'] = len(items)
+    out['buckets'] = used
+    out['quota'] = dict(quota)
+    if phase == 'cooling':
+        out['note'] = '情绪退潮（封板率或昨日涨停今日表现转弱），连板加分已折半、高位组与主榜名额同时收缩。'
     return out
 
 
@@ -255,26 +439,32 @@ SYSTEM = """你是一个A股短线情绪复盘助手。用户给你当天涨停�
 
 硬性要求：
 1. 只能依据输入里的数据。输入**不含任何新闻、公告、研报、业绩、政策**，禁止提及或暗示消息面（不要写"利好""题材发酵的原因"等你并不知道的内容）。
-2. view 必须引用输入里的具体数值（连板数、封单占比、首封时间、换手、龙虎榜净买额、板块涨停家数等）。
+2. view 必须引用输入里的具体数值（连板数、封单占比、首封时间、换手、龙虎榜净买额、板块涨停家数、近 10 日累计涨幅等）。
 3. 不给具体买入/止损/目标价位；plan 只写条件（例如"竞价是否高开、开盘后是否被大单砸开、板块是否继续有涨停"），risk 写清什么信号说明该放弃。
 4. 规则分数不是胜率，你的 verdict 也不是——不要出现任何胜率/概率数字，不要用"必涨""稳了"之类的措辞。
-5. 情绪指标（封板率低、昨日涨停今日平均收跌、跌停增多）转弱时，要相应降低 focus 的数量，甚至全部给 watch/avoid，并在 market_view 里点明。
-6. items 里每一只都要给判断，symbol 原样照抄。用中文，措辞克制，这是研究参考，不是投资建议。"""
+5. 情绪指标（封板率低、昨日涨停今日平均收跌、跌停增多）转弱时，要相应降低 focus 的数量，甚至全部给 watch/avoid，并在 market_view 里点明。输入里的 phase 字段就是规则判定的情绪阶段（heating/steady/cooling）。
+6. position 是这只票的位置数据（近 N 日累计涨幅、对 20 日线乖离等）。位置越高，次日回落空间越大，verdict 要更保守；position 为空表示没取到，不要假装知道。
+7. items 里每一只都要给判断，symbol 原样照抄。用中文，措辞克制，这是研究参考，不是投资建议。"""
+
+
+def core_items(result, n=AI_TOP_N):
+    """送给 AI 的只有 core 组：高位组和一字组本来就标着"只观察/买不进"，不值得再花 token 背书。"""
+    return [it for it in result['items'] if it.get('bucket') == 'core'][:n]
 
 
 def build_payload(result, n=AI_TOP_N):
     items = []
-    for it in result['items'][:n]:
+    for it in core_items(result, n):
         items.append({k: it[k] for k in ('symbol', 'name', 'score', 'boards', 'industry', 'pct', 'first_seal', 'open_times',
-                                         'turnover', 'lhb_net', 'tags', 'reasons', 'risks')}
+                                         'turnover', 'lhb_net', 'position', 'tags', 'reasons', 'risks')}
                      | {'seal_ratio_pct': round(it['seal_fund'] / it['float_cap'] * 100, 2)
                         if it.get('seal_fund') is not None and it.get('float_cap') else None})
-    return {'date': result['date'], 'sentiment': result['sentiment'], 'stocks': items}
+    return {'date': result['date'], 'phase': result.get('phase'), 'sentiment': result['sentiment'], 'stocks': items}
 
 
 def apply_ai(result, data):
     """把模型的输出并进 items。只认我们送进去的 symbol；返回校验问题列表。"""
-    sent = {it['symbol'] for it in result['items'][:AI_TOP_N]}
+    sent = {it['symbol'] for it in core_items(result)}
     by = {}
     issues = []
     for r in data.get('items') or []:
@@ -299,8 +489,8 @@ def analyze(result):
     """调用 AI 点评。失败不抛出：次日关注要能降级成纯规则版。返回 meta。"""
     import claude_client
     meta = {'prompt_version': PROMPT_VERSION}
-    if not result['items']:
-        meta.update(status='skipped', error='没有候选')
+    if not core_items(result):
+        meta.update(status='skipped', error='没有可参与的候选')
         return meta
     user = '以下是今天的结构化事实，请按 schema 给出点评。\n\n' + json.dumps(build_payload(result), ensure_ascii=False, indent=1)
     try:
@@ -313,12 +503,12 @@ def analyze(result):
     return meta
 
 
-def run(directory=None, ai=False, now=None):
+def run(directory=None, ai=False, now=None, position_fn=fetch_positions):
     """读最近一次落盘的复盘 → 规则打分（→ AI 点评）→ 写回同一个文件的 next_day_watch。"""
     review = market_review.load_latest(directory)
     if review is None:
         raise market_review.ReviewError('还没有落盘的市场复盘数据，先运行 market_review.py')
-    result = rank(review)
+    result = rank(review, position_fn=position_fn)
     result['generated_at'] = (now or datetime.now(CST)).isoformat()
     result['ai_meta'] = None
     if ai:
@@ -340,19 +530,22 @@ def run(directory=None, ai=False, now=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--ai', action='store_true', help='同时调用大模型点评（需要已配置 key）')
+    p.add_argument('--no-position', action='store_true', help='不取日 K 的位置数据（离线调试用）')
     p.add_argument('--dir', type=Path)
     a = p.parse_args()
     if a.ai:
         import llm_settings
         llm_settings.apply()
     try:
-        r = run(a.dir, ai=a.ai)
+        r = run(a.dir, ai=a.ai, position_fn=None if a.no_position else fetch_positions)
     except market_review.ReviewError as exc:
         print('次日关注生成失败: %s' % exc)
         return 1
     meta = r.get('ai_meta') or {}
-    print('次日关注 %s：候选 %s 只，展示 %s 只 · AI %s' % (
-        r['date'], r.get('candidates', 0), len(r['items']), meta.get('status') or '未调用'))
+    print('次日关注 %s：候选 %s 只，展示 %s 只（%s）· 情绪 %s · AI %s' % (
+        r['date'], r.get('candidates', 0), len(r['items']),
+        '、'.join('%s %d' % (BUCKET_LABEL[b], n) for b, n in (r.get('buckets') or {}).items() if n),
+        r.get('phase'), meta.get('status') or '未调用'))
     if meta.get('error'):
         print('AI 未生成：%s' % meta['error'])
     return 0

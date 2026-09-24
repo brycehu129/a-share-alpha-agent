@@ -44,7 +44,7 @@ def api_dashboard(query):
 
 @get("/api/market/review")
 def api_market_review(query):
-    """涨停/跌停/炸板/昨日涨停/强势池 + 龙虎榜 + 次日关注。各块各带自己的日期和失败原因。"""
+    """涨停/跌停/炸板/昨日涨停/强势池 + 龙虎榜 + 次日关注 + 上一交易日次日关注的兑现结果。各块各带自己的日期和失败原因。"""
     import market_review
     return {"review": market_review.current_review()}
 
@@ -89,11 +89,14 @@ def _row_verdicts(holdings, watchlist, quotes):
     补充分时支撑/阻力与分钟级 MACD 观察。单只算不出来就只影响那一行（给一个说明文案），
     绝不让整页失败。"""
     import book_levels
+    import book_state
     import book_verdict
     import intraday_engine
     import live_check
     import minute_data
     import t_context
+    from collect_quotes import CST
+    from datetime import datetime
     history = history_dir()
     flow_dir = intraday_engine.data_dir()
     pause = book_verdict.market_pause(history) if watchlist else None
@@ -121,7 +124,8 @@ def _row_verdicts(holdings, watchlist, quotes):
                     facts = {}
                 limits = live_check.limit_facts(q)
                 if kind == "holding":
-                    enriched = book_levels.enrich(row, bars, q.get("quote_date"))
+                    peak = book_state.touch_peak(row["symbol"], float(q["last"]), datetime.now(CST), bars, row.get("opened_on"))
+                    enriched = book_levels.enrich(row, bars, q.get("quote_date"), peak_price=peak)
                     day = book_verdict.sr.day_facts(q, minute_for(row["symbol"], q.get("quote_date")))
                     # 做T 的环境（大盘/板块/资金流）懒取：只有价格位置满足时才联网，平时页面不多花一个请求。
                     env_fn = (lambda sym=row["symbol"], qd=q.get("quote_date"): t_context.build_env(
@@ -164,14 +168,21 @@ def api_book(query):
     alerts = _alert_counts()
     verdicts = _row_verdicts(holdings, watchlist, quotes)
     held = {h["symbol"]: h for h in holdings}
-    rows, total_cost, total_value, today_pnl = [], 0.0, 0.0, 0.0
+    import book_pnl
+    rows, total_cost, total_value, today_pnl, total_realized_net = [], 0.0, 0.0, 0.0, 0.0
     for h in holdings:
         q = quotes.get(h["symbol"])
         last = float(q["last"]) if q else None
         total_cost += h["cost_price"] * h["shares"]
+        realized = book_pnl.realized_pnl(trades, h["symbol"])
+        total_realized_net += realized["net"]
+        pnl_fields = {"realized_pnl": realized["gross"], "realized_pnl_net": realized["net"],
+                     "realized_trades": realized["trades"], "combined_pnl": None, "combined_pct": None,
+                     "effective_cost": h["cost_price"], "to_breakeven_pct": None}
         if last:
             total_value += last * h["shares"]
             today_pnl += (last - float(q["previous_close"])) * h["shares"]
+            pnl_fields.update(book_pnl.combined(h, q, realized))
         rows.append({"symbol": h["symbol"], "name": h.get("name") or "", "shares": h["shares"],
                      "sellable": h["sellable_shares"], "cost_price": h["cost_price"], "opened_on": h.get("opened_on"),
                      "last": last, "change_pct": float(q["change_pct"]) if q else None,
@@ -179,12 +190,15 @@ def api_book(query):
                      "pnl": (last - h["cost_price"]) * h["shares"] if last else None,
                      "pct": (last / h["cost_price"] - 1) * 100 if last else None,
                      "limit_up": q.get("limit_up") if q else None, "limit_down": q.get("limit_down") if q else None,
-                     "verdict": verdicts.get(("holding", h["symbol"])), "alerts": alerts.get(h["symbol"], NO_ALERTS)})
+                     "verdict": verdicts.get(("holding", h["symbol"])), "alerts": alerts.get(h["symbol"], NO_ALERTS),
+                     **pnl_fields})
     summary = None
     if total_cost and total_value:
         pnl = total_value - total_cost
+        combined_total = pnl + total_realized_net
         summary = {"cost": total_cost, "value": total_value, "pnl": pnl, "pnl_pct": pnl / total_cost * 100,
-                   "today_pnl": today_pnl}
+                   "today_pnl": today_pnl, "realized_total": round(total_realized_net, 2),
+                   "combined_total": round(combined_total, 2), "combined_pct": combined_total / total_cost * 100}
 
     watch_rows = []
     for w in watchlist:
@@ -216,6 +230,22 @@ def api_book_rules(query):
     """页面上「判断规则」抽屉的内容。数字全部取自代码里在用的常量，改了阈值说明自动跟着变。"""
     import book_verdict
     return book_verdict.rules_doc()
+
+
+@get("/api/book/account")
+def api_book_account(query):
+    """账户资金（权益基数、可用现金）。没填过就返回 None——补仓/分批减仓这类需要算股数的功能
+    据此明说「未填写账户资金，无法给出股数建议」，不猜一个默认值。"""
+    import portfolio_book
+    return {"account": portfolio_book.load_account()}
+
+
+@post("/api/book/account")
+def api_book_account_save(body):
+    import portfolio_book
+    form = _strings(body)
+    return _book_action(lambda: portfolio_book.save_account(form.get("equity_base"), form.get("cash")),
+                        "账户资金已保存。")
 
 
 @get("/api/book/search")

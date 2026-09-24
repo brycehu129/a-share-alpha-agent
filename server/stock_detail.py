@@ -114,7 +114,8 @@ def fetch_quote(symbol, snapshot=None):
 
 
 def review_context(symbol, review):
-    """这只股票在最近一次盘后复盘里的位置：在哪些池子里、龙虎榜行、涨停/炸板细节。"""
+    """这只股票在最近一次盘后复盘里的位置：在哪些池子里、龙虎榜行、涨停/炸板细节、
+    今天的次日关注、以及（如果它在上一交易日的名单里）那批名单的兑现结果。"""
     if not review:
         return None
     ctx = {'date': review.get('date'), 'pools': {}, 'lhb': None, 'lhb_date': (review.get('lhb') or {}).get('date'),
@@ -130,6 +131,9 @@ def review_context(symbol, review):
         ctx['lhb'] = next((r for r in lhb['rows'] if r['symbol'] == symbol), None)
     watch = (review.get('next_day_watch') or {}).get('items') or []
     ctx['watch'] = next((w for w in watch if w.get('symbol') == symbol), None)
+    prev_watch = (review.get('prev_watch') or {}).get('items') or []
+    prev_item = next((w for w in prev_watch if w.get('symbol') == symbol), None)
+    ctx['prev_watch'] = {'date': review['prev_watch']['date'], 'item': prev_item} if prev_item else None
     return ctx
 
 

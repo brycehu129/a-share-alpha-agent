@@ -106,6 +106,7 @@ SCHEDULES = {
     'postclose': '工作日 16:30',
     'review': '工作日 16:30、17:30',
     'reconcile': '工作日 15:20',
+    'alert_audit': '工作日 15:20',
     'backup': '每天 17:30',
     'units': '每次检查时实时查询',
     'disk': '每次检查时实时读取',
@@ -329,13 +330,15 @@ def check_postclose(ctx):
 
 
 def check_review(ctx):
-    """市场复盘数据（涨跌停池、龙虎榜、次日关注）。看板这一块曾因为数据源要手动同步而长期缺失，
-    所以 17:30 那轮之后必须有今天的文件，且涨停池、龙虎榜都不是空的。"""
+    """市场复盘数据（涨跌停池、龙虎榜、次日关注、上一交易日的兑现结算）。看板这一块曾因为数据源要手动
+    同步而长期缺失，所以 17:30 那轮之后必须有今天的文件，且涨停池、龙虎榜都不是空的。"""
     title = '市场复盘数据（16:30 / 17:30）'
     if ctx.calendar_state() != 'open' or ctx.now.time() < clock_time(17, 45):
         return check('review', title, SKIP, '尚未到检查时间或非交易日')
     import market_review
-    review = market_review.load_latest(ctx.private.parent / 'market_review')
+    import watch_outcome
+    directory = ctx.private.parent / 'market_review'
+    review = market_review.load_latest(directory)
     generated_at = (review or {}).get('fetched_at') or None
     if not review or review.get('trade_date') != ctx.now.strftime('%Y%m%d'):
         return check('review', title, WARN, '今天的市场复盘数据没有生成：看板的涨跌停池、龙虎榜会停在旧的一天。'
@@ -343,9 +346,14 @@ def check_review(ctx):
     missing = [name for name, ok in (('涨停池', (review['pools'].get('zt') or {}).get('total')),
                                      ('龙虎榜', ((review.get('lhb') or {}).get('rows'))),
                                      ('次日关注', (review.get('next_day_watch') or {}).get('items'))) if not ok]
+    # 只有存在「待结算的上一交易日名单」时才要求今天的 prev_watch；首次上线/长假后没有可结算的
+    # 上一天，静默跳过，不告警。
+    prior = watch_outcome.prior_watch_file(directory, review['trade_date'])
+    if prior is not None and not (review.get('prev_watch') or {}).get('items'):
+        missing.append('上一交易日兑现结算')
     if missing:
         return check('review', title, WARN, '今天的复盘数据缺：%s（接口失败或尚未发布）。' % '、'.join(missing), generated_at)
-    return check('review', title, OK, '已生成，涨停池、龙虎榜、次日关注齐全', generated_at)
+    return check('review', title, OK, '已生成，涨停池、龙虎榜、次日关注、上一交易日兑现结算齐全', generated_at)
 
 
 def check_reconcile(ctx):
@@ -356,6 +364,29 @@ def check_reconcile(ctx):
     if done.exists():
         return check('reconcile', title, OK, '今天已对账', _cst_iso(datetime.fromtimestamp(done.stat().st_mtime, timezone.utc)))
     return check('reconcile', title, WARN, '今天没有情景对账记录：命中率统计会缺一天。')
+
+
+def check_alert_audit(ctx):
+    """规则层告警的机制核对（alert_ledger.py，和情景对账同一个 15:20 窗口）。任何不一致
+    都意味着代码本身有 bug（事件丢了/重了、推送文字对不上观测价、watch 档漏刷屏、重新武装
+    间隔被违反），不是"数据不够"，所以升级成 CRIT，而不是像结果标签那样只是 WARN。"""
+    title = '哨兵告警核对（15:20）'
+    if ctx.calendar_state() != 'open' or ctx.now.time() < clock_time(15, 45):
+        return check('alert_audit', title, SKIP, '尚未到检查时间或非交易日')
+    path = ctx.private / 'sentinel' / ('alert_audit-%s.json' % ctx.today)
+    if not path.exists():
+        return check('alert_audit', title, WARN, '今天没有告警核对记录：机制核对和结果标签都会缺一天。')
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except ValueError:
+        return check('alert_audit', title, WARN, '告警核对文件损坏，读不出来。')
+    at = _cst_iso(datetime.fromtimestamp(path.stat().st_mtime, timezone.utc))
+    mismatches = (data.get('audit') or {}).get('mismatches') or []
+    if mismatches:
+        return check('alert_audit', title, CRIT, '发现 %d 处不一致（%s……），告警管线本身有 bug，不是数据不够。'
+                     % (len(mismatches), mismatches[0].get('why', '')[:60]), at)
+    checked = (data.get('audit') or {}).get('checked', 0)
+    return check('alert_audit', title, OK, '今天核对 %d 条告警，全部一致' % checked, at)
 
 
 def check_backup(ctx):
@@ -444,8 +475,8 @@ def check_llm(ctx):
 
 
 CHECKS = [check_calendar, check_engine, check_quotes, check_evaluators, check_sentinel_queue, check_sentinel_ai,
-          check_daily_pipeline, check_premarket_plans, check_postclose, check_review, check_reconcile, check_backup, check_units, check_disk, check_cert,
-          check_webhook, check_llm]
+          check_daily_pipeline, check_premarket_plans, check_postclose, check_review, check_reconcile,
+          check_alert_audit, check_backup, check_units, check_disk, check_cert, check_webhook, check_llm]
 
 
 def run_checks(ctx):
