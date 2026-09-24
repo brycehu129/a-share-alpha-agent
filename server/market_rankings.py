@@ -1,16 +1,21 @@
 """盘中板块强度与个股主力资金排行。只取公开行情，不落盘、不生成建议。"""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+import threading
+import time
 from urllib.parse import urlencode
 
 from collect_quotes import CST
 import market_review
 
 ENDPOINT = 'https://push2.eastmoney.com/api/qt/clist/get'
-FIELDS = 'f12,f14,f2,f3,f62,f184,f104,f105,f106'
+FIELDS = 'f12,f14,f2,f3,f62,f184,f100,f103,f104,f105,f106'
 BOARD_FILTERS = {'industry': 'm:90+t:2+f:!50', 'concept': 'm:90+t:3+f:!50'}
 STOCK_FILTER = 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23'
 DEFAULT_SIZE = 10
+STALE_OK_SECONDS = 900
+_cache_lock = threading.Lock()
+_ranking_cache = {}
 
 
 class RankingError(ValueError):
@@ -91,7 +96,12 @@ def parse_stocks(payload, label):
         symbol = market_review.symbol_of_code(code)
         if not symbol or symbol.startswith('bj') or not name or None in (price, change, main_net, ratio):
             continue
-        out.append({'symbol': symbol, 'code': code, 'name': name, 'price': round(price, 3),
+        industry = str(raw.get('f100') or '').strip()
+        industry = None if industry in ('', '-') else industry
+        concepts = [x.strip() for x in str(raw.get('f103') or '').replace('，', ',').split(',')
+                    if x.strip() and x.strip() != '-']
+        out.append({'symbol': symbol, 'code': code, 'name': name, 'industry': industry, 'concepts': concepts,
+                    'price': round(price, 3),
                     'change_pct': round(change, 2), 'main_net': main_net, 'main_net_pct': round(ratio, 2)})
     return out
 
@@ -115,24 +125,33 @@ def fetch_stocks(direction, http=None, size=DEFAULT_SIZE):
     return rows[:size]
 
 
-def current_rankings(now=None, http=None):
-    """四组并发、分别降级；调用即现取，不设服务端缓存。"""
+def current_rankings(now=None, http=None, now_ts=None):
+    """四组并发现取；失败时最多沿用 15 分钟内该组最近一次成功值并明确标 stale。"""
     now = now or datetime.now(CST)
+    now_ts = time.time() if now_ts is None else now_ts
     jobs = {'industry': lambda: fetch_sector('industry', http),
             'concept': lambda: fetch_sector('concept', http),
             'inflow': lambda: fetch_stocks('inflow', http),
             'outflow': lambda: fetch_stocks('outflow', http)}
-    values, errors = {}, {}
+    values, errors, stale = {}, {}, []
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {key: pool.submit(job) for key, job in jobs.items()}
         for key, future in futures.items():
             try:
                 values[key] = future.result()
+                with _cache_lock:
+                    _ranking_cache[key] = (now_ts, values[key])
             except Exception as exc:
-                values[key] = None
                 errors[key] = str(exc)[:200]
+                with _cache_lock:
+                    cached = _ranking_cache.get(key)
+                if cached and now_ts - cached[0] <= STALE_OK_SECONDS:
+                    values[key] = cached[1]
+                    stale.append(key)
+                else:
+                    values[key] = None
     return {'fetched_at': now.isoformat(),
             'sectors': {'industry': values['industry'], 'concept': values['concept']},
             'stocks': {'inflow': values['inflow'], 'outflow': values['outflow']},
-            'errors': errors,
+            'errors': errors, 'stale': stale,
             'source_note': '东方财富按成交额分档估算；主力＝超大单＋大单，非交易所披露。'}

@@ -17,8 +17,11 @@ const sector = computed(() => props.data && props.data.sectors && props.data.sec
 const sectorRows = computed(() => (sector.value && sector.value[sectorSide.value]) || [])
 const stockRows = computed(() => (props.data && props.data.stocks && props.data.stocks[stockSide.value]) || [])
 const errors = computed(() => (props.data && props.data.errors) || {})
-const sectorError = computed(() => errors.value[sectorKind.value] || '')
-const stockError = computed(() => errors.value[stockSide.value] || '')
+const stale = computed(() => (props.data && props.data.stale) || [])
+const sectorError = computed(() => !sector.value ? (errors.value[sectorKind.value] || '') : '')
+const stockError = computed(() => !stockRows.value.length ? (errors.value[stockSide.value] || '') : '')
+const sectorWarning = computed(() => stale.value.includes(sectorKind.value) ? errors.value[sectorKind.value] : '')
+const stockWarning = computed(() => stale.value.includes(stockSide.value) ? errors.value[stockSide.value] : '')
 </script>
 
 <template>
@@ -41,6 +44,7 @@ const stockError = computed(() => errors.value[stockSide.value] || '')
         </el-radio-group>
       </div>
       <p v-if="sectorError" class="muted error">该榜单暂不可用：{{ sectorError }}</p>
+      <p v-else-if="sectorWarning" class="muted warning">实时取数失败，显示最近一次成功数据：{{ sectorWarning }}</p>
       <el-table v-else :data="sectorRows" size="small" stripe>
         <el-table-column type="index" label="#" width="42" />
         <el-table-column label="板块" min-width="105" prop="name" show-overflow-tooltip />
@@ -67,9 +71,23 @@ const stockError = computed(() => errors.value[stockSide.value] || '')
         </el-radio-group>
       </div>
       <p v-if="stockError" class="muted error">该榜单暂不可用：{{ stockError }}</p>
+      <p v-else-if="stockWarning" class="muted warning">实时取数失败，显示最近一次成功数据：{{ stockWarning }}</p>
       <el-table v-else :data="stockRows" size="small" stripe @row-click="(row) => openStock(row.symbol, row.name)">
         <el-table-column type="index" label="#" width="42" />
-        <el-table-column label="股票" min-width="105"><template #default="{ row }"><span class="stock-name">{{ row.name }}</span><span class="stock-code num">{{ row.code }}</span></template></el-table-column>
+        <el-table-column label="股票 / 板块概念" min-width="190">
+          <template #default="{ row }">
+            <span class="stock-name">{{ row.name }}</span><span class="stock-code num">{{ row.code }}</span>
+            <span class="stock-tags">
+              <el-tag v-if="row.industry" size="small" type="info" effect="plain">{{ row.industry }}</el-tag>
+              <el-tooltip v-if="row.concepts && row.concepts.length" :content="row.concepts.join(' · ')" placement="top">
+                <span class="concept-tags">
+                  <el-tag v-for="concept in row.concepts.slice(0, 2)" :key="concept" size="small" effect="plain">{{ concept }}</el-tag>
+                  <span v-if="row.concepts.length > 2" class="more">+{{ row.concepts.length - 2 }}</span>
+                </span>
+              </el-tooltip>
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="现价" width="74" align="right"><template #default="{ row }"><span class="num">{{ fmtPrice(row.price) }}</span></template></el-table-column>
         <el-table-column label="涨跌幅" width="78" align="right"><template #default="{ row }"><RiseFall :value="row.change_pct" bare /></template></el-table-column>
         <el-table-column label="主力净额" width="98" align="right"><template #default="{ row }"><span :class="row.main_net >= 0 ? 'rise' : 'fall'">{{ fmtFlow(row.main_net) }}</span></template></el-table-column>
@@ -91,8 +109,12 @@ const stockError = computed(() => errors.value[stockSide.value] || '')
 .ranking-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .filters { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .error { margin: 8px 0; }
+.warning { margin: 8px 0; color: var(--el-color-warning); }
 .source { grid-column: 1 / -1; margin: -6px 0 0; }
 .warn { color: var(--el-color-warning); }
+.stock-tags, .concept-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 3px; }
+.stock-tags :deep(.el-tag) { max-width: 82px; overflow: hidden; text-overflow: ellipsis; }
+.more { color: var(--as-muted); font-size: 11px; }
 :deep(.el-table__row) { cursor: default; }
 .ranking-grid > :nth-child(2) :deep(.el-table__row) { cursor: pointer; }
 @media (max-width: 900px) { .ranking-grid { grid-template-columns: minmax(0, 1fr); } .source { grid-column: auto; } }

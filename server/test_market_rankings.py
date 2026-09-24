@@ -15,12 +15,15 @@ def sector(code, name, change, up, down, flat, flow_pct, flow=1e8):
             'f104': up, 'f105': down, 'f106': flat, 'f2': 100}
 
 
-def stock(code, name, flow):
+def stock(code, name, flow, industry='电子', concepts='芯片,人工智能,机器人'):
     return {'f12': code, 'f14': name, 'f2': 10.5, 'f3': 2.5, 'f62': flow, 'f184': 3.2,
-            'f104': 0, 'f105': 0, 'f106': 0}
+            'f100': industry, 'f103': concepts, 'f104': 0, 'f105': 0, 'f106': 0}
 
 
 class RankingTests(unittest.TestCase):
+    def setUp(self):
+        mr._ranking_cache.clear()
+
     def test_sector_score_uses_three_weighted_percentiles(self):
         rows = mr.parse_sectors(payload([
             sector('BK1', '强', 3, 8, 2, 0, 6),
@@ -43,6 +46,8 @@ class RankingTests(unittest.TestCase):
         rows = [stock('600001', '甲', 3e8), stock('000001', '乙', -2e8), stock('920001', '北', 9e8)]
         parsed = mr.parse_stocks(payload(rows), 'stocks')
         self.assertEqual([x['symbol'] for x in parsed], ['sh600001', 'sz000001'])
+        self.assertEqual(parsed[0]['industry'], '电子')
+        self.assertEqual(parsed[0]['concepts'], ['芯片', '人工智能', '机器人'])
 
     def test_partial_failure_does_not_drop_other_rankings(self):
         boards = [sector('BK1', '板块', 1, 6, 4, 0, 2)]
@@ -56,6 +61,20 @@ class RankingTests(unittest.TestCase):
         self.assertIsNone(out['sectors']['concept'])
         self.assertIn('concept', out['errors'])
         self.assertEqual(out['stocks']['inflow'][0]['name'], '个股')
+
+    def test_recent_success_is_used_when_a_source_temporarily_returns_502(self):
+        boards = [sector('BK1', '板块', 1, 6, 4, 0, 2)]
+        stocks = [stock('600001', '个股', 3e8)]
+        good = lambda url: json.dumps(payload(boards if 'm%3A90' in url else stocks)).encode()
+        first = mr.current_rankings(datetime(2026, 9, 24, 10, tzinfo=CST), good, now_ts=100)
+        self.assertFalse(first['stale'])
+        second = mr.current_rankings(datetime(2026, 9, 24, 10, 1, tzinfo=CST),
+                                     lambda _url: (_ for _ in ()).throw(OSError('502')), now_ts=160)
+        self.assertEqual(set(second['stale']), {'industry', 'concept', 'inflow', 'outflow'})
+        self.assertEqual(second['sectors']['industry']['strong'][0]['name'], '板块')
+        expired = mr.current_rankings(datetime(2026, 9, 24, 10, 20, tzinfo=CST),
+                                      lambda _url: (_ for _ in ()).throw(OSError('502')), now_ts=1001)
+        self.assertIsNone(expired['sectors']['industry'])
 
 
 if __name__ == '__main__':
