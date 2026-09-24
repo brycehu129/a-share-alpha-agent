@@ -113,6 +113,37 @@
     候选池策略本来就排除 ST——**是否排除/单独标注，待定**。
   - 是否升级成 `server/strategies/` 里的一个策略（产生候选、进影子账户），等留档数据说话，本期不做。
 
+### 18. Tushare / 小德发作为资金流备用源 — 暂时放弃（2026-09-24），但有一条要处理的隐患
+
+**放弃的原因**：探测时发现手上的凭证已失效，问题没测成，用户决定先不投入。下面两块分开看。
+
+**(a) 未回答的问题**（等有有效凭证再测，探测脚本当时写过、已随凭证一起删除）：
+- Tushare「打板专题」里的资金流与热榜（`ths_hot` / `dc_hot` / `kpl_list` / `limit_cpt_list` 等）
+  **是不是盘中更新**。常规的 `moneyflow*` 系列按文档都是日频盘后，顶不了盘中监控；
+  热榜类不确定，值得单独测一次。
+- 测法：同一接口对「今天」和「前一日」各调一次，**必须在交易时段内跑**——收盘后测会两个都有数据，
+  分不出盘中还是盘后。再看字段里有没有 `trade_time` / `ts` / `hot_time` 这类盘中时间戳。
+- 即便可行，Tushare 按积分计费且按分钟限频，每 5 分钟调一次是反方向；
+  它更合适的角色是**盘后对账**：用日频 `moneyflow` 校验东财盘中「主力净流入」那份
+  按单笔成交额分档的估算到底准不准——这个问题目前无人回答，却直接决定
+  抗跌扫描里「个股资金流强」这个条件有没有意义。
+
+**(b) 凭证隐患 — 需要在服务器上确认，与上面无关**：
+- 2026-09-24 实测本地那份 `XIAODEFA_TOKEN`：对 `api.tushare.pro` 返回 `40101 token 不对`
+  （它本就不是官方凭证），对 `t.xiaodefa.top` 返回 `2002 **token已过期**`，
+  6 个接口（index_basic / trade_cal / stock_basic / daily / moneyflow / ths_hot）无一例外。
+- **`tushare_probe.selected_source()` 只看凭证「有没有」，不看「有没有效」**：
+  `XIAODEFA_TOKEN` 非空就走第三方，过期了也**不会回落到官方 `TUSHARE_TOKEN`**。
+  `tushare_sync.py:181` 用的就是它。于是两个凭证都配着，却可能一个都用不上。
+- 若服务器上是同一份凭证，风险链是：`trade_cal` 停更 → 日历超出已同步范围 →
+  `session_brief.calendar_state()` 返回 `unknown` → `intraday_engine.gate()` 按设计**拒绝运行** →
+  盘中条件入场、止损、哨兵全停。日历通常一次同步一整年，所以可能尚未发作，属于定时炸弹。
+- **未验证**：服务器上是否同一份凭证、是否真的已在掉数据。确认方法：
+  `python3 -c "import json;d=json.load(open('.history/tushare_data/calendars/SSE.json'));r=d.get('rows') or d;print(max(x['cal_date'] for x in r))"`
+  看日历覆盖到哪天；以及 `journalctl -u alpha-shadow-daily.service | grep -iE "token|2002|40101"`。
+- **待定**：要不要让第三方返回 2002/40101 时自动改用官方凭证。仓库本来就在每条记录里存
+  实际 endpoint/source，混用来源是被预期且可追溯的；但这改动碰凭证选择逻辑，未经确认不动。
+
 ## 工程
 - **08:40 盘前流程耗时实测**：必须在 09:20 前跑完，否则当天没有计划。服务器上看：`journalctl -u alpha-shadow-daily.service --since "3 days ago" | grep -E "Starting|Finished|Deactivated"`。如果太慢，把选股/冻结拆成独立的轻量任务并提前触发。
 - **异地备份自动化**：目前靠手动下载。自动化需要一个你自己的、不进公开仓库的存储凭据。
