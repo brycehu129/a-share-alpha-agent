@@ -133,8 +133,14 @@ def index_changes(snapshot):
 
 # --- 组装 ---------------------------------------------------------------------
 
-def build_rows(stocks, sector_by_name, changes):
-    """把三段数据拼成逐股的一行。**不在这里过滤** —— 过滤是页面的事，留档要全量。"""
+def build_rows(stocks, resolve_sector, changes, sector_source=None):
+    """把三段数据拼成逐股的一行。**不在这里过滤** —— 过滤是页面的事，留档要全量。
+
+    `resolve_sector(stock) -> 板块行 | None`：板块归属的解析方式随数据源而变，
+    所以由调用方注入而不是写死——新浪要查映射表（48 个粗行业），东财直接用响应里的
+    f100（496 个细行业）。两家的行业名**对不上**，所以每行记下 `sector_source`，
+    免得事后拿两天不同来源的留档当同一口径比较。
+    """
     primary_change = changes.get(PRIMARY)
     market_down = None if primary_change is None else primary_change < 0
     rows = []
@@ -144,7 +150,7 @@ def build_rows(stocks, sector_by_name, changes):
         bench_change = changes.get(bench)
         if bench_change is None:                      # 同档基准取不到就退回主基准
             bench, bench_change, cap_known = PRIMARY, primary_change, False
-        sector = sector_by_name.get(s.get('industry')) if s.get('industry') else None
+        sector = resolve_sector(s)
         at_limit, one_word = limit_state(s)
         row = {
             'symbol': s['symbol'], 'code': s['code'], 'name': s['name'],
@@ -159,9 +165,13 @@ def build_rows(stocks, sector_by_name, changes):
             'holds_up': s['change_pct'] >= 0,
             'market_down': market_down,
             'sector_matched': sector is not None,
+            'sector_name': sector['name'] if sector else None,
+            'sector_source': sector_source,
             'sector_change_pct': sector['change_pct'] if sector else None,
             'sector_main_net_pct': sector['main_net_pct'] if sector else None,
             'sector_strength': sector['strength'] if sector else None,
+            # 两家的 strength 维度不同（新浪两维、东财三维），不可直接比较，所以标明出处
+            'sector_strength_basis': sector.get('strength_basis') if sector else None,
         }
         # 对沪深300 的抗跌度单独留一份：分档基准是新口径，旧口径要能对照，否则换了分档点
         # 之后前后几天的留档就不可比了。
@@ -230,19 +240,64 @@ def _with_cache(key, job, now_ts, errors, stale):
         return None
 
 
-def scan(now=None, http=None, quote_fn=None, now_ts=None, thresholds=None):
+def _sector_data(http, now_ts, errors, stale, sector_dir=None):
+    """板块数据：**东财优先，取不到退新浪**。返回
+    {'rows','total','scope','source','degraded','resolve'} 或 None。
+
+    为什么东财是主力而不是新浪（2026-09-24 实测，详见 sina_sectors 模块文档）：
+    东财每只股票的行业在响应里白送（f100），覆盖 100%，不需要映射表；而新浪那套
+    行业分类只覆盖约 49% 的沪深A股、科创板一只都没有，拿它当主力会把近一半候选
+    静默判成"板块未匹配"。东财一页只回 100 个板块这件事对本用途**不是缺陷**——
+    判据是"该股所属板块在主力净流入占比前 100 名内"这个成员判定，排不进前 100
+    本来就说明板块不够强，截断即过滤。
+
+    退到新浪时 `degraded=True`：口径变粗（48 vs 496）且约半数个股查不到归属，
+    调用方必须把这件事显式告诉用户，不能让它看起来和平时一样。
+    """
+    import sina_sectors
+
+    em = _with_cache('sectors_eastmoney',
+                     lambda: market_rankings.fetch_sector_rows('industry', http, fid='f184',
+                                                               retries=0),
+                     now_ts, errors, stale)
+    if em:
+        rows, total, scope = em
+        by_name = {r['name']: r for r in rows}
+        return {'rows': rows, 'total': total, 'scope': scope, 'source': 'eastmoney',
+                'degraded': False,
+                'resolve': lambda s: by_name.get(s.get('industry')) if s.get('industry') else None}
+
+    def sina():
+        rows, total, scope = sina_sectors.fetch_sectors(http)
+        membership = sina_sectors.load_map(sector_dir)
+        if not membership:
+            raise sina_sectors.SinaError('个股→行业映射表不存在或已过期，无法用新浪兜底')
+        return rows, total, scope, membership
+
+    got = _with_cache('sectors_sina', sina, now_ts, errors, stale)
+    if not got:
+        return None
+    rows, total, scope, membership = got
+    by_name = {r['name']: r for r in rows}
+    by_symbol = membership['by_symbol']
+    return {'rows': rows, 'total': total, 'source': 'sina', 'degraded': True,
+            'scope': '%s（兜底口径：仅覆盖 %d 只个股，科创板无归属）' % (scope, len(by_symbol)),
+            'resolve': lambda s: by_name.get(by_symbol.get(s['symbol']))}
+
+
+def scan(now=None, http=None, quote_fn=None, now_ts=None, thresholds=None, sector_dir=None):
     """跑一次扫描。永不抛出——定时任务里一次失败不能影响下一次。"""
     now = now or datetime.now(CST)
     now_ts = _time.time() if now_ts is None else now_ts
     quote_fn = quote_fn or live_quote.snapshot
     errors, stale = {}, []
 
-    # retries=0：东财按出口 IP 限流，请求越密封得越久。一轮已经要发 3 个请求，
-    # 失败时再重试只会把封禁拖长，而 stale 回退 + 5 分钟后的下一轮本来就兜得住。
-    sectors = _with_cache('sectors',
-                          lambda: market_rankings.fetch_sector_rows('industry', http, fid='f184',
-                                                                    retries=0),
-                          now_ts, errors, stale)
+    # 板块优先走新浪：48 个行业一次拿全（东财一页只回 100/496，永远是残缺的），
+    # 而且新浪是另一台主机、当天实测零限流。取不到才退回东财。
+    sectors = _sector_data(http, now_ts, errors, stale, sector_dir)
+
+    # retries=0：东财按出口 IP 限流，请求越密封得越久。失败时再重试只会把封禁拖长，
+    # 而 stale 回退 + 5 分钟后的下一轮本来就兜得住。
     by_amount = _with_cache('inflow_amount',
                             lambda: market_rankings.fetch_stocks('inflow', http, size=PAGE,
                                                                  fid='f62', pz=PAGE, retries=0),
@@ -253,14 +308,14 @@ def scan(now=None, http=None, quote_fn=None, now_ts=None, thresholds=None):
                            now_ts, errors, stale)
     quotes = _with_cache('indices', lambda: quote_fn(list(BENCHMARKS)), now_ts, errors, stale)
 
-    sector_rows, sector_total, sector_scope = sectors if sectors else ([], None, '')
-    sector_by_name = {r['name']: r for r in sector_rows}
     merged = {}
     for s in (by_amount or []) + (by_ratio or []):
         merged.setdefault(s['symbol'], s)
     changes = index_changes(quotes)
 
-    rows = build_rows(list(merged.values()), sector_by_name, changes)
+    resolve = sectors['resolve'] if sectors else (lambda _s: None)
+    rows = build_rows(list(merged.values()), resolve, changes,
+                      sector_source=sectors['source'] if sectors else None)
     t = {**DEFAULTS, **(thresholds or {})}
     hits = [r for r in rows if passes(r, t)]
     return {
@@ -271,11 +326,14 @@ def scan(now=None, http=None, quote_fn=None, now_ts=None, thresholds=None):
                    'market_down': None if PRIMARY not in changes else changes[PRIMARY] < 0},
         'universe': {'stocks_scanned': len(rows), 'from_amount': len(by_amount or []),
                      'from_ratio': len(by_ratio or []),
-                     'sectors_fetched': len(sector_rows), 'sectors_total': sector_total,
-                     'sector_scope': sector_scope,
+                     'sectors_fetched': len(sectors['rows']) if sectors else 0,
+                     'sectors_total': sectors['total'] if sectors else None,
+                     'sector_scope': sectors['scope'] if sectors else '',
+                     'sector_source': sectors['source'] if sectors else None,
+                     'sector_degraded': bool(sectors and sectors.get('degraded')),
                      # 板块那一次请求失败时，所有行的 sector_matched 都是 False，命中数会变成 0。
                      # 那是"没法判断"，不是"没有符合条件的票"——界面必须能把两者分开说。
-                     'sector_data_available': bool(sector_rows),
+                     'sector_data_available': bool(sectors),
                      'note': '每个榜单一页上限 %d 行，不是全市场扫描' % PAGE},
         'thresholds': t,
         'hits': hits, 'rows': rows,

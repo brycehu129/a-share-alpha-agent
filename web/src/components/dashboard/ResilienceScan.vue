@@ -50,6 +50,9 @@ const isStale = computed(() => ((props.scan && props.scan.stale) || []).length >
 // 那是「判断不了」，不是「没有符合条件的票」，必须分开说清楚。
 const sectorBlind = computed(() =>
   !!(props.scan && universe.value && universe.value.sector_data_available === false && requireSector.value))
+// 退到新浪兜底：口径从 496 个细行业变成 48 个粗行业，且只覆盖约半数个股（科创板为零）。
+// 不说清楚的话，用户会把"备用源盖不到"误读成"这些票的板块弱"。
+const sectorDegraded = computed(() => !!(universe.value && universe.value.sector_degraded))
 const fromRecord = computed(() => !!(props.scan && props.scan.from_record))
 const marketTag = computed(() => {
   const m = market.value
@@ -85,6 +88,14 @@ const marketTag = computed(() => {
       type="warning" show-icon :closable="false" style="margin-bottom: 12px">
       下面的命中数是 0，意思是<b>判断不了</b>，不是<b>没有符合条件的票</b>。要看抗跌+资金流两个条件的结果，
       先取消勾选「板块也在吸金且在涨」。
+    </el-alert>
+    <el-alert
+      v-else-if="sectorDegraded"
+      title="板块数据已切换到备用源（新浪），口径变粗"
+      type="warning" show-icon :closable="false" style="margin-bottom: 12px">
+      东财板块本轮取不到，改用新浪的 48 个粗行业（平时是东财的 496 个细行业）。
+      新浪这套分类只覆盖约半数沪深A股、<b>科创板没有归属</b>，所以这一轮标「板块未匹配」的会明显变多——
+      那是备用源盖不到，不是那只票的板块弱。
     </el-alert>
     <el-alert
       v-else-if="errorList.length" :title="`部分数据未取到：${errorList.join('；')}`"
@@ -162,7 +173,8 @@ const marketTag = computed(() => {
     <p class="source muted">
       <template v-if="universe">
         取样：主力净流入额前 {{ universe.from_amount }} 只 ∪ 净流入占比前 {{ universe.from_ratio }} 只，去重后 {{ universe.stocks_scanned }} 只；
-        板块 {{ universe.sector_scope }}<template v-if="universe.sectors_total">（全市场共 {{ universe.sectors_total }} 个）</template>。<br>
+        板块 {{ universe.sector_scope }}<template v-if="universe.sectors_total">（全市场共 {{ universe.sectors_total }} 个）</template>
+        <template v-if="universe.sector_source">· 板块源 {{ universe.sector_source === 'sina' ? '新浪（备用）' : '东方财富' }}</template>。<br>
       </template>
       {{ (scan && scan.source_note) || '' }}
     </p>

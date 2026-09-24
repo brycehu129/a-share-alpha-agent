@@ -1,0 +1,13 @@
+[Unit]
+Description=Alpha Shadow 行业映射表重建定时器（工作日 09:10）
+
+[Timer]
+# 盘前跑：成分股盘中不变，开盘前建好就够，且避开 08:40 日线流程那段必须在 09:20 前
+# 跑完的预算。不做交易日历判断——非交易日多跑一次只是浪费 130 秒，写出来的成分股
+# 与上一交易日相同，不会污染任何判断；而漏跑才是真问题（表过期后兜底就失效）。
+OnCalendar=Mon..Fri 09:10:00 Asia/Shanghai
+Persistent=false
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

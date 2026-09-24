@@ -1,0 +1,10 @@
+[Unit]
+Description=Alpha Shadow 个股→新浪行业映射表重建（抗跌扫描的板块兜底用）
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/alpha-shadow.env
+ExecStart=/bin/bash /opt/alpha-shadow/server/cron_sina_sectors.sh
+# 48 个板块逐个翻页约 100 次请求，实测约 130 秒；给到 5 分钟，超了就是接口出问题了。
+TimeoutStartSec=300

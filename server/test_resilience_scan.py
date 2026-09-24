@@ -28,11 +28,38 @@ def quotes(hs300=-1.5, zz500=-1.2, zz1000=-1.0, sse=-1.4):
         {'symbol': 'sh000852', 'change_pct': zz1000}, {'symbol': 'sh000001', 'change_pct': sse}]}
 
 
-def http_for(boards, stocks):
+def sina_sector(name, change_pct, flow_pct, net=1e8, code=None):
+    """新浪的数值全是字符串，涨跌幅与净流入占比是小数（0.0879 = 8.79%）。"""
+    return {'cate_type': '0', 'category': code or ('new_' + name), 'name': name,
+            'avg_price': '10.0', 'avg_changeratio': str(change_pct / 100),
+            'turnover': '100.0', 'inamount': '2e8', 'outamount': '1e8',
+            'netamount': str(net), 'ratioamount': str(flow_pct / 100),
+            'ts_symbol': 'sh600001', 'ts_name': '领涨', 'ts_trade': '10.0',
+            'ts_changeratio': '0.1', 'ts_ratioamount': '0.5'}
+
+
+def http_for(boards, stocks, sina_boards=None):
+    """按主机分派：新浪 vip.stock... 走新浪形状，东财 push2 走 clist 形状。
+    sina_boards=None 表示新浪取不到，用来测退回东财的兜底路径。"""
     def http(url):
+        if 'sina' in url:
+            if sina_boards is None:
+                raise OSError('sina down')
+            return json.dumps(sina_boards).encode()
         return json.dumps({'data': {'diff': boards if 'm%3A90' in url else stocks,
                                     'total': 496 if 'm%3A90' in url else 5561}}).encode()
     return http
+
+
+def with_map(tmpdir, mapping, trade_date=None):
+    """写一份个股→新浪行业的映射表，返回可传给 scan(sector_dir=) 的目录。"""
+    import sina_sectors
+    d = Path(tmpdir)
+    sina_sectors.save_map({'trade_date': trade_date or datetime.now(CST).date().isoformat(),
+                           'built_at': NOW.isoformat(), 'source': 'sina',
+                           'sector_count': len(set(mapping.values())),
+                           'symbol_count': len(mapping), 'by_symbol': mapping}, d)
+    return d
 
 
 class BenchmarkTests(unittest.TestCase):
@@ -60,10 +87,13 @@ class BuildRowTests(unittest.TestCase):
         parsed = mr.parse_stocks({'data': {'diff': stocks}}, 'x')
         scored = mr.score_sectors(mr.parse_sectors(
             {'data': {'diff': [sector(n, c, f) for n, c, f in boards]}}, 'industry'))
+        by_name = {r['name']: r for r in scored}
         # 注意用 is None 而不是 or：传 {} 表示"指数一个都没取到"，是一个要测的真实场景。
         if changes is None:
             changes = {'sh000300': -1.5, 'sh000905': -1.2, 'sh000852': -1.0, 'sh000001': -1.4}
-        return rs.build_rows(parsed, {r['name']: r for r in scored}, changes)
+        # 东财口径的解析方式：个股归属用响应里自带的 f100
+        resolve = lambda s: by_name.get(s.get('industry')) if s.get('industry') else None
+        return rs.build_rows(parsed, resolve, changes, sector_source='eastmoney')
 
     def test_excess_is_measured_against_the_size_matched_index(self):
         """流通市值 80 亿 → 中证1000（-1.0%）。个股 +0.5% 的抗跌度应是 1.5pp，
@@ -144,8 +174,9 @@ class ExclusionTests(unittest.TestCase):
         ]}}, 'x')
         scored = mr.score_sectors(mr.parse_sectors(
             {'data': {'diff': [sector('半导体', 1.8, 6.0)]}}, 'industry'))
-        rows = rs.build_rows(parsed, {r['name']: r for r in scored},
-                             {'sh000300': -1.5, 'sh000852': -1.0})
+        by_name = {r['name']: r for r in scored}
+        rows = rs.build_rows(parsed, lambda s: by_name.get(s.get('industry')),
+                             {'sh000300': -1.5, 'sh000852': -1.0}, sector_source='eastmoney')
         self.assertEqual(len(rows), 3)                                  # 全都留档
         by_name = {r['name']: r for r in rows}
         self.assertTrue(by_name['*ST尔雅']['is_st'])
@@ -190,6 +221,87 @@ class ThresholdTests(unittest.TestCase):
         self.assertFalse(rs.passes(falling, {'require_holds_up': True}))
 
 
+class SectorSourceTests(unittest.TestCase):
+    """板块数据源：新浪为主、东财兜底。两家行业名对不上，所以归属解析方式不同。"""
+
+    def setUp(self):
+        rs._cache.clear()
+
+    def test_eastmoney_is_primary_and_resolves_sector_from_the_same_response(self):
+        """东财是主力：每只股票的行业在响应里白送（f100），覆盖 100%，不需要映射表。"""
+        with tempfile.TemporaryDirectory() as d:
+            sector_dir = with_map(d, {'sh600001': '传媒娱乐'})
+            http = http_for([sector('出版', 1.8, 6.0)],
+                            [stock('600001', '甲', 1.0, 9e8, 8.0, industry='出版')],
+                            sina_boards=[sina_sector('传媒娱乐', -0.24, 8.79)])
+            out = rs.scan(NOW, http=http, quote_fn=lambda _s: quotes(), now_ts=100,
+                          sector_dir=sector_dir)
+            row = out['rows'][0]
+            self.assertEqual(out['universe']['sector_source'], 'eastmoney')
+            self.assertFalse(out['universe']['sector_degraded'])
+            self.assertEqual(row['sector_name'], '出版')
+            self.assertEqual(row['sector_change_pct'], 1.8)
+
+    def test_falls_back_to_sina_when_eastmoney_sectors_are_down(self):
+        """退到新浪时口径变粗（48 vs 496）且只覆盖约半数个股，所以必须标 degraded。"""
+        with tempfile.TemporaryDirectory() as d:
+            sector_dir = with_map(d, {'sh600001': '传媒娱乐'})
+
+            def http(url):
+                if 'sina' in url:
+                    return json.dumps([sina_sector('传媒娱乐', -0.24, 8.79)]).encode()
+                if 'm%3A90' in url:
+                    raise OSError('东财板块挂了')
+                return json.dumps({'data': {'diff': [stock('600001', '甲', 1.0, 9e8, 8.0,
+                                                           industry='出版')], 'total': 5561}}).encode()
+            out = rs.scan(NOW, http=http, quote_fn=lambda _s: quotes(), now_ts=100,
+                          sector_dir=sector_dir)
+            row = out['rows'][0]
+            self.assertEqual(out['universe']['sector_source'], 'sina')
+            self.assertTrue(out['universe']['sector_degraded'])
+            self.assertEqual(row['sector_name'], '传媒娱乐')     # 新浪粗口径
+            self.assertEqual(row['industry'], '出版')            # 东财口径仍原样留档
+            self.assertEqual(row['sector_strength_basis'], 'sina-2dim')
+            self.assertIn('科创板', out['universe']['sector_scope'])
+
+    def test_sina_fallback_needs_the_membership_map(self):
+        """新浪不在响应里给个股行业，没有映射表它就顶不了——此时应报缺失而不是假装可用。"""
+        with tempfile.TemporaryDirectory() as d:
+            def http(url):
+                if 'sina' in url:
+                    return json.dumps([sina_sector('传媒娱乐', -0.24, 8.79)]).encode()
+                if 'm%3A90' in url:
+                    raise OSError('东财板块挂了')
+                return json.dumps({'data': {'diff': [stock('600001', '甲', 1.0, 9e8, 8.0)],
+                                            'total': 5561}}).encode()
+            out = rs.scan(NOW, http=http, quote_fn=lambda _s: quotes(), now_ts=100,
+                          sector_dir=Path(d))                    # 目录里没有映射表
+            self.assertFalse(out['universe']['sector_data_available'])
+            self.assertIn('sectors_sina', out['errors'])
+
+    def test_stale_membership_map_is_rejected(self):
+        """过期的表比没有表更危险：成分股变了却照旧用，错得悄无声息。"""
+        import sina_sectors
+        with tempfile.TemporaryDirectory() as d:
+            with_map(d, {'sh600001': '传媒娱乐'}, trade_date='2026-01-01')
+            self.assertIsNone(sina_sectors.load_map(Path(d)))
+            self.assertIsNotNone(sina_sectors.load_map(Path(d), max_age_days=None))
+
+    def test_both_sources_down_leaves_rows_but_no_sector_columns(self):
+        with tempfile.TemporaryDirectory() as d:
+            def http(url):
+                if 'sina' in url or 'm%3A90' in url:
+                    raise OSError('板块源都挂了')
+                return json.dumps({'data': {'diff': [stock('600001', '甲', 1.0, 9e8, 8.0)],
+                                            'total': 5561}}).encode()
+            out = rs.scan(NOW, http=http, quote_fn=lambda _s: quotes(), now_ts=100,
+                          sector_dir=Path(d))
+            self.assertEqual(len(out['rows']), 1)
+            self.assertFalse(out['rows'][0]['sector_matched'])
+            self.assertIsNone(out['rows'][0]['sector_source'])
+            self.assertFalse(out['universe']['sector_data_available'])
+
+
 class ScanTests(unittest.TestCase):
     def setUp(self):
         rs._cache.clear()
@@ -224,7 +336,8 @@ class ScanTests(unittest.TestCase):
         self.assertFalse(first['stale'])
         boom = lambda _u: (_ for _ in ()).throw(OSError('502'))
         second = rs.scan(NOW, http=boom, quote_fn=lambda _s: quotes(), now_ts=160)
-        self.assertEqual(set(second['stale']), {'sectors', 'inflow_amount', 'inflow_ratio'})
+        # 板块源是两级（东财优先、新浪兜底），东财能沿用上一次成功值就不会走到新浪
+        self.assertEqual(set(second['stale']), {'sectors_eastmoney', 'inflow_amount', 'inflow_ratio'})
         self.assertEqual(second['universe']['stocks_scanned'], 1)
 
     def test_stale_data_expires_instead_of_being_shown_forever(self):
@@ -270,7 +383,10 @@ class ScanTests(unittest.TestCase):
         boom = lambda _u: (_ for _ in ()).throw(OSError('502'))
         out = rs.scan(NOW, http=boom, quote_fn=lambda _s: (_ for _ in ()).throw(OSError('x')), now_ts=100)
         self.assertEqual(out['rows'], [])
-        self.assertEqual(len(out['errors']), 4)
+        # 5 个取数点：东财板块、新浪板块（兜底）、按额个股、按占比个股、指数
+        self.assertEqual(set(out['errors']),
+                         {'sectors_eastmoney', 'sectors_sina', 'inflow_amount',
+                          'inflow_ratio', 'indices'})
 
 
 class RecordTests(unittest.TestCase):
