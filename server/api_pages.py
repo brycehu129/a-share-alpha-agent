@@ -57,6 +57,13 @@ def api_market_pulse_pools(query):
     return {"pulse_pools": market_review.fetch_pulse_pools()}
 
 
+@get("/api/market/rankings")
+def api_market_rankings(query):
+    """盘中行业/概念强度与个股主力资金流入流出榜；每次进入或手动刷新时现取。"""
+    import market_rankings
+    return {"rankings": market_rankings.current_rankings()}
+
+
 @get("/api/market/stock")
 def api_market_stock(query):
     """个股详情抽屉：行情快照、日 K + 均线、公司资料/概念、龙虎榜席位、它在复盘里的位置。"""

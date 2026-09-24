@@ -9,6 +9,7 @@ import { fmtTs, todayStr } from '../format'
 import IndexStrip from '../components/dashboard/IndexStrip.vue'
 import MarketGauge from '../components/dashboard/MarketGauge.vue'
 import MarketPulse from '../components/dashboard/MarketPulse.vue'
+import MarketRankings from '../components/dashboard/MarketRankings.vue'
 import NextDayWatch from '../components/dashboard/NextDayWatch.vue'
 import LimitBoards from '../components/dashboard/LimitBoards.vue'
 import LhbBoard from '../components/dashboard/LhbBoard.vue'
@@ -39,6 +40,10 @@ const review = computed(() => (reviewResp.value ? reviewResp.value.review : null
 const pulsePools = ref(null)
 const pulsePoolsLoading = ref(false)
 const pulsePoolsError = ref('')
+const rankings = ref(null)
+const rankingsLoading = ref(false)
+const rankingsError = ref('')
+const rankingsStale = ref(false)
 const pulsePoolMessage = computed(() => {
   if (pulsePoolsError.value) return pulsePoolsError.value
   const errors = (pulsePools.value && pulsePools.value.errors) || {}
@@ -56,12 +61,30 @@ async function reloadPulsePools() {
     pulsePoolsLoading.value = false
   }
 }
-onMounted(() => { if (tab.value === 'market') reloadPulsePools() })
-watch(tab, (next, prev) => { if (next === 'market' && prev !== 'market') reloadPulsePools() })
+async function reloadRankings() {
+  rankingsLoading.value = true
+  try {
+    const resp = await get('/api/market/rankings')
+    rankings.value = resp.rankings
+    rankingsError.value = ''
+    rankingsStale.value = false
+  } catch (e) {
+    rankingsError.value = e.message || String(e)
+    rankingsStale.value = !!rankings.value
+  } finally {
+    rankingsLoading.value = false
+  }
+}
+function reloadMarketExtras() {
+  reloadPulsePools()
+  reloadRankings()
+}
+onMounted(() => { if (tab.value === 'market') reloadMarketExtras() })
+watch(tab, (next, prev) => { if (next === 'market' && prev !== 'market') reloadMarketExtras() })
 function refresh() {
   refreshDashboard()
   reloadReview()
-  if (tab.value === 'market') reloadPulsePools()
+  if (tab.value === 'market') reloadMarketExtras()
 }
 
 const SESSION = { weekend: '周末休市', pre_open: '盘前', call_auction: '集合竞价', morning: '上午盘中', lunch_break: '午间休市', afternoon: '下午盘中', closing: '收盘处理', post_close: '盘后' }
@@ -92,7 +115,7 @@ const today = todayStr()
         <el-tag v-if="d && tab === 'market'" :type="liveTag.type" round>{{ liveTag.text }}</el-tag>
         <el-tag v-if="failedParts.length && tab === 'market'" type="warning" effect="plain" round>暂无：{{ failedParts.join('、') }}</el-tag>
         <span v-if="live">页面数据更新于 <span class="num">{{ fmtTs(live.fetched_at) }}</span></span>
-        <el-button :icon="Refresh" round :loading="loading || reviewLoading || pulsePoolsLoading" @click="refresh">刷新</el-button>
+        <el-button :icon="Refresh" round :loading="loading || reviewLoading || pulsePoolsLoading || rankingsLoading" @click="refresh">刷新</el-button>
       </div>
     </div>
 
@@ -128,6 +151,7 @@ const today = todayStr()
               :pool-time="pulsePools ? pulsePools.fetched_at : ''"
               :pool-error="pulsePoolMessage"
             />
+            <MarketRankings :data="rankings" :loading="rankingsLoading" :stale="rankingsStale" :error="rankingsError" />
           </div>
         </div>
       </el-tab-pane>

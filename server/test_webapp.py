@@ -658,6 +658,13 @@ class MarketReviewApiTests(ServerCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["review"]["date"], "2026-09-21")
 
+    def test_market_rankings_endpoint_returns_independent_payload(self):
+        expected = {"fetched_at": "now", "sectors": {}, "stocks": {}, "errors": {}}
+        with patch("market_rankings.current_rankings", return_value=expected):
+            status, payload = self.json("GET", "/api/market/rankings")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["rankings"], expected)
+
     def test_stock_endpoint_validates_the_symbol_and_returns_detail(self):
         status, payload = self.json("GET", "/api/market/stock?symbol=600721")
         self.assertEqual(status, 400)
