@@ -33,7 +33,27 @@ class RankingTests(unittest.TestCase):
         ranked = mr.rank_sectors(rows, 2)
         self.assertEqual([x['name'] for x in ranked['strong']], ['强', '中'])
         self.assertEqual([x['strength'] for x in ranked['strong']], [100.0, 50.0])
-        self.assertEqual(ranked['weak'][0]['strength'], 0.0)
+
+    def test_weak_side_is_not_offered_because_one_page_cannot_support_it(self):
+        """单页只有按 fid 排序的前 100 行，从中挑"最弱"得到的是"第 91–100 强"。
+        与其给一个误导的答案，不如不提供——见 rank_sectors 的文档。"""
+        rows = mr.parse_sectors(payload([sector('BK1', '甲', 3, 8, 2, 0, 6),
+                                         sector('BK2', '乙', -2, 2, 8, 0, -5)]), 'industry')
+        self.assertNotIn('weak', mr.rank_sectors(rows))
+
+    def test_total_reports_the_interface_total_not_the_page_size(self):
+        """接口自报 496 个板块、本页只回 2 个时，total 必须是 496。
+        历史上这里上报本页行数，于是界面声称"共 100 个板块"而实际有 496 个。"""
+        raw = {'data': {'diff': [sector('BK1', '甲', 3, 8, 2, 0, 6),
+                                 sector('BK2', '乙', 1, 5, 5, 0, 1)], 'total': 496}}
+        rows = mr.parse_sectors(raw, 'industry')
+        ranked = mr.rank_sectors(rows, 2, total=mr._total(raw))
+        self.assertEqual(ranked['total'], 496)
+        self.assertEqual(ranked['fetched'], 2)
+
+    def test_total_is_none_safe_and_never_fakes_a_number(self):
+        self.assertIsNone(mr._total({'data': {'diff': []}}))
+        self.assertIsNone(mr._total({'data': {'total': 'x'}}))
 
     def test_ties_receive_the_same_average_percentile(self):
         rows = mr.parse_sectors(payload([

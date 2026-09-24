@@ -1,0 +1,13 @@
+[Unit]
+Description=Alpha Shadow 抗跌扫描定时器（交易时段每 5 分钟，第 45 秒）
+
+[Timer]
+# 第 45 秒：错开 intraday（整分钟第 0 秒）、flow（第 15 秒）、sentinel-analyst（第 30 秒）。
+# 写法同 intraday.timer / flow.timer，只求最不容易出错；时段外的多余触发由 intraday_engine.gate()
+# 在读任何网络之前就退出。东财对密集请求会限流，所以刻意不和 flow 挤在同一秒。
+OnCalendar=Mon..Fri 09..15:00/5:45 Asia/Shanghai
+Persistent=false
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

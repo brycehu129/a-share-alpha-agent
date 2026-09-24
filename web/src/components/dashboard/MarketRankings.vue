@@ -11,10 +11,18 @@ const props = defineProps({
   error: { type: String, default: '' },
 })
 const sectorKind = ref('industry')
-const sectorSide = ref('strong')
 const stockSide = ref('inflow')
 const sector = computed(() => props.data && props.data.sectors && props.data.sectors[sectorKind.value])
-const sectorRows = computed(() => (sector.value && sector.value[sectorSide.value]) || [])
+// 只有「最强」：接口一页最多 100 行，从中挑出的「最弱」其实是「第 91–100 强」，
+// 是误导而不是信息，所以后端已经不再返回 weak（见 market_rankings.rank_sectors）。
+const sectorRows = computed(() => (sector.value && sector.value.strong) || [])
+const sectorScope = computed(() => {
+  const s = sector.value
+  if (!s) return ''
+  return s.total && s.fetched && s.total > s.fetched
+    ? `${s.scope || ''}（全市场共 ${s.total} 个）`
+    : (s.scope || '')
+})
 const stockRows = computed(() => (props.data && props.data.stocks && props.data.stocks[stockSide.value]) || [])
 const errors = computed(() => (props.data && props.data.errors) || {})
 const stale = computed(() => (props.data && props.data.stale) || [])
@@ -29,7 +37,7 @@ const stockWarning = computed(() => stale.value.includes(stockSide.value) ? erro
     <el-card shadow="never">
       <template #header>
         <div class="card-title">
-          <span>今日板块强度</span>
+          <span>今日最强板块</span>
           <span class="sub">综合涨幅 40% · 上涨占比 30% · 主力净流入占比 30%</span>
         </div>
       </template>
@@ -38,10 +46,7 @@ const stockWarning = computed(() => stale.value.includes(stockSide.value) ? erro
           <el-radio-button value="industry">行业</el-radio-button>
           <el-radio-button value="concept">概念</el-radio-button>
         </el-radio-group>
-        <el-radio-group v-model="sectorSide" size="small">
-          <el-radio-button value="strong">最强 10</el-radio-button>
-          <el-radio-button value="weak">最弱 10</el-radio-button>
-        </el-radio-group>
+        <span v-if="sectorScope" class="scope muted">{{ sectorScope }}</span>
       </div>
       <p v-if="sectorError" class="muted error">该榜单暂不可用：{{ sectorError }}</p>
       <p v-else-if="sectorWarning" class="muted warning">实时取数失败，显示最近一次成功数据：{{ sectorWarning }}</p>
@@ -107,7 +112,8 @@ const stockWarning = computed(() => stale.value.includes(stockSide.value) ? erro
 
 <style scoped>
 .ranking-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.filters { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.filters { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.scope { font-size: 11px; }
 .error { margin: 8px 0; }
 .warning { margin: 8px 0; color: var(--el-color-warning); }
 .source { grid-column: 1 / -1; margin: -6px 0 0; }

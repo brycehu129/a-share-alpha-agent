@@ -47,7 +47,8 @@ WARN_CONFIRM_RUNS = 2
 CRIT_REMIND_H = 2
 WARN_REMIND_H = 12
 QUIET_START, QUIET_END = clock_time(22, 30), clock_time(7, 0)
-FREQUENT_UNITS = ('alpha-shadow-intraday', 'alpha-shadow-sentinel-analyst', 'alpha-shadow-flow')      # 高频（每分钟或每 5 分钟）：偶发失败不算严重
+FREQUENT_UNITS = ('alpha-shadow-intraday', 'alpha-shadow-sentinel-analyst', 'alpha-shadow-flow',
+                  'alpha-shadow-resilience')      # 高频（每分钟或每 5 分钟）：偶发失败不算严重
 LLM_FATAL = {'authentication_error', 'payment_required', 'permission_denied', 'model_not_found'}
 QUEUE_STUCK_MIN = 10
 DISK_WARN_PCT, DISK_CRIT_PCT = 15, 5

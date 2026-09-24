@@ -10,6 +10,7 @@ import IndexStrip from '../components/dashboard/IndexStrip.vue'
 import MarketGauge from '../components/dashboard/MarketGauge.vue'
 import MarketPulse from '../components/dashboard/MarketPulse.vue'
 import MarketRankings from '../components/dashboard/MarketRankings.vue'
+import ResilienceScan from '../components/dashboard/ResilienceScan.vue'
 import NextDayWatch from '../components/dashboard/NextDayWatch.vue'
 import LimitBoards from '../components/dashboard/LimitBoards.vue'
 import LhbBoard from '../components/dashboard/LhbBoard.vue'
@@ -75,9 +76,38 @@ async function reloadRankings() {
     rankingsLoading.value = false
   }
 }
+// 抗跌扫描：默认读留档（不打网络），只有点「重新扫描」才现扫一次。
+// 阈值只是显示过滤器，改了就带参数重取，让时间线按新阈值重算。
+const resilience = ref(null)
+const resilienceTimeline = ref([])
+const resilienceLoading = ref(false)
+const resilienceError = ref('')
+const resilienceThresholds = ref({})
+async function reloadResilience(refreshNow = false) {
+  resilienceLoading.value = true
+  try {
+    const params = new URLSearchParams(resilienceThresholds.value)
+    if (refreshNow) params.set('refresh', '1')
+    const qs = params.toString()
+    const resp = await get(`/api/market/resilience${qs ? '?' + qs : ''}`)
+    resilience.value = resp.scan
+    resilienceTimeline.value = resp.timeline || []
+    resilienceError.value = ''
+  } catch (e) {
+    resilienceError.value = e.message || String(e)
+  } finally {
+    resilienceLoading.value = false
+  }
+}
+function onResilienceThresholds(next) {
+  resilienceThresholds.value = next
+  reloadResilience(false)
+}
+
 function reloadMarketExtras() {
   reloadPulsePools()
   reloadRankings()
+  reloadResilience(false)
 }
 onMounted(() => { if (tab.value === 'market') reloadMarketExtras() })
 watch(tab, (next, prev) => { if (next === 'market' && prev !== 'market') reloadMarketExtras() })
@@ -115,7 +145,7 @@ const today = todayStr()
         <el-tag v-if="d && tab === 'market'" :type="liveTag.type" round>{{ liveTag.text }}</el-tag>
         <el-tag v-if="failedParts.length && tab === 'market'" type="warning" effect="plain" round>暂无：{{ failedParts.join('、') }}</el-tag>
         <span v-if="live">页面数据更新于 <span class="num">{{ fmtTs(live.fetched_at) }}</span></span>
-        <el-button :icon="Refresh" round :loading="loading || reviewLoading || pulsePoolsLoading || rankingsLoading" @click="refresh">刷新</el-button>
+        <el-button :icon="Refresh" round :loading="loading || reviewLoading || pulsePoolsLoading || rankingsLoading || resilienceLoading" @click="refresh">刷新</el-button>
       </div>
     </div>
 
@@ -152,6 +182,14 @@ const today = todayStr()
               :pool-error="pulsePoolMessage"
             />
             <MarketRankings :data="rankings" :loading="rankingsLoading" :stale="rankingsStale" :error="rankingsError" />
+            <ResilienceScan
+              :scan="resilience"
+              :timeline="resilienceTimeline"
+              :loading="resilienceLoading"
+              :error="resilienceError"
+              @rescan="reloadResilience(true)"
+              @thresholds="onResilienceThresholds"
+            />
           </div>
         </div>
       </el-tab-pane>

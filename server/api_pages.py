@@ -64,6 +64,63 @@ def api_market_rankings(query):
     return {"rankings": market_rankings.current_rankings()}
 
 
+@get("/api/market/resilience")
+def api_market_resilience(query):
+    """抗跌扫描：大盘往下时横住/向上、主力在买、且所属板块也在吸金的票。
+
+    默认返回**今天的留档时间线 + 最近一次留档**，不打网络——没有推送，14:00 打开也要看得到
+    10:15 发生过什么，这个职责由页面承担。`?refresh=1` 才现扫一次（手动触发）。
+    阈值可由 query 覆盖，只影响筛选与时间线重算，留档永远是全量。
+    """
+    import intraday_engine as ie
+    import resilience_scan
+    from collect_quotes import CST
+    from datetime import datetime
+
+    def _num(name):
+        raw = query.get(name)
+        if raw in (None, ""):
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            raise ApiError("%s 必须是数字" % name)
+
+    thresholds = {}
+    for name in ("excess_min_pp", "main_net_pct_min"):
+        value = _num(name)
+        if value is not None:
+            thresholds[name] = value
+    for name in ("require_holds_up", "require_sector"):
+        if query.get(name) in ("0", "1"):
+            thresholds[name] = query.get(name) == "1"
+
+    directory = ie.data_dir()
+    day = datetime.now(CST).date().isoformat()
+    if query.get("refresh") == "1":
+        scan = resilience_scan.scan(thresholds=thresholds)
+        try:
+            resilience_scan.record(directory, scan)
+        except Exception:
+            pass                                     # 留档失败不该让手动刷新整个失败
+    else:
+        rows = resilience_scan.read_rows(directory, day)
+        scan = None
+        if rows:
+            last = rows[-1]
+            full = [r for r in last.get("rows", [])]
+            hits = [r for r in full if resilience_scan.passes(
+                r, {**resilience_scan.DEFAULTS, **(last.get("thresholds") or {}), **thresholds})]
+            scan = {"generated_at": last["at"], "market": last.get("market"),
+                    "universe": last.get("universe"), "rows": full, "hits": hits,
+                    "errors": last.get("errors") or {}, "stale": last.get("stale") or [],
+                    "thresholds": {**resilience_scan.DEFAULTS, **(last.get("thresholds") or {}), **thresholds},
+                    "source_note": resilience_scan.SOURCE_NOTE, "from_record": True}
+    return {"scan": scan,
+            "timeline": resilience_scan.timeline(directory, day, thresholds or None),
+            "defaults": resilience_scan.DEFAULTS}
+
+
 @get("/api/market/stock")
 def api_market_stock(query):
     """个股详情抽屉：行情快照、日 K + 均线、公司资料/概念、龙虎榜席位、它在复盘里的位置。"""

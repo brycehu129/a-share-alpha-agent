@@ -1,4 +1,13 @@
-"""盘中板块强度与个股主力资金排行。只取公开行情，不落盘、不生成建议。"""
+"""盘中板块强度与个股主力资金排行。只取公开行情，不落盘、不生成建议。
+
+**接口有一个硬上限：`pz` 再大，服务端一页也只回 100 行**（2026-09-24 实测：行业板块
+total=496、个股 total=5561，pz=200/500 都只回 100）。所以这里每次请求拿到的都是
+"按 fid 排序的前 100 名"，不是全量——任何"全市场百分位"性质的结论都不能从单页得出。
+
+历史上这个上限被忽略过一次：`fetch_sector` 请求 pz=500 却只拿到按涨幅降序的前 100 个板块，
+再从这 100 个里挑"最弱 10"，于是看板上的"最弱板块"其实是第 91–100 强的板块。现在最弱侧
+已整体去掉（用户不关注最弱板块），`total` 也改为上报接口的真实总数而不是本次取回的行数。
+"""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import threading
@@ -9,10 +18,12 @@ from collect_quotes import CST
 import market_review
 
 ENDPOINT = 'https://push2.eastmoney.com/api/qt/clist/get'
-FIELDS = 'f12,f14,f2,f3,f62,f184,f100,f103,f104,f105,f106'
+# f20/f21=总市值/流通市值：抗跌度按市值分档配基准指数时要用（resilience_scan.py）。
+FIELDS = 'f12,f14,f2,f3,f62,f184,f100,f103,f104,f105,f106,f20,f21'
 BOARD_FILTERS = {'industry': 'm:90+t:2+f:!50', 'concept': 'm:90+t:3+f:!50'}
 STOCK_FILTER = 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23'
 DEFAULT_SIZE = 10
+PAGE_MAX = 100               # 服务端硬上限，见模块文档
 STALE_OK_SECONDS = 900
 _cache_lock = threading.Lock()
 _ranking_cache = {}
@@ -40,6 +51,14 @@ def _diff(payload, label):
     if not isinstance(rows, list):
         raise RankingError('%s响应结构异常（diff 不是列表）' % label)
     return rows
+
+
+def _total(payload):
+    """接口自报的符合条件总数（不是本页行数）。取不到返回 None，绝不拿本页行数冒充。"""
+    try:
+        return int(payload['data']['total'])
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def parse_sectors(payload, kind):
@@ -75,17 +94,28 @@ def _percentiles(rows, field):
     return result
 
 
-def rank_sectors(rows, size=DEFAULT_SIZE):
+def score_sectors(rows):
+    """给每个板块算三维合成强度。百分位只在**传进来的这一页**内计算——调用方必须清楚
+    这是"前 100 名内部的相对位置"，不是全市场百分位（见模块文档的 100 行上限）。"""
     pct = {field: _percentiles(rows, field) for field in ('change_pct', 'up_pct', 'main_net_pct')}
-    scored = []
-    for row in rows:
-        score = (pct['change_pct'][row['change_pct']] * .4 +
-                 pct['up_pct'][row['up_pct']] * .3 +
-                 pct['main_net_pct'][row['main_net_pct']] * .3)
-        scored.append({**row, 'strength': round(score, 1)})
-    strong = sorted(scored, key=lambda x: (-x['strength'], x['name']))[:size]
-    weak = sorted(scored, key=lambda x: (x['strength'], x['name']))[:size]
-    return {'strong': strong, 'weak': weak, 'total': len(scored)}
+    return [{**row, 'strength': round(pct['change_pct'][row['change_pct']] * .4 +
+                                      pct['up_pct'][row['up_pct']] * .3 +
+                                      pct['main_net_pct'][row['main_net_pct']] * .3, 1)}
+            for row in rows]
+
+
+def rank_sectors(rows, size=DEFAULT_SIZE, total=None, scope=None):
+    """只返回最强 N 个。
+
+    **不再返回"最弱"**：单页只有按 fid 排序的前 100 行，从中挑出的"最弱"是"第 91–100 强"，
+    是误导而不是信息。要真正的最弱板块必须另发一次 po=0 的请求——用户明确表示不关注最弱板块，
+    所以这里不花那次请求，直接不提供。
+    """
+    scored = score_sectors(rows)
+    return {'strong': sorted(scored, key=lambda x: (-x['strength'], x['name']))[:size],
+            'fetched': len(scored),
+            'total': total if total is not None else len(scored),
+            'scope': scope or '按涨幅降序的前 %d 个板块' % len(scored)}
 
 
 def parse_stocks(payload, label):
@@ -100,28 +130,55 @@ def parse_stocks(payload, label):
         industry = None if industry in ('', '-') else industry
         concepts = [x.strip() for x in str(raw.get('f103') or '').replace('，', ',').split(',')
                     if x.strip() and x.strip() != '-']
+        # 市值缺失就是缺失，不当 0——按市值分档配基准指数时，0 会把大盘股错判成微盘股。
         out.append({'symbol': symbol, 'code': code, 'name': name, 'industry': industry, 'concepts': concepts,
                     'price': round(price, 3),
-                    'change_pct': round(change, 2), 'main_net': main_net, 'main_net_pct': round(ratio, 2)})
+                    'change_pct': round(change, 2), 'main_net': main_net, 'main_net_pct': round(ratio, 2),
+                    'total_cap': _num(raw.get('f20')), 'float_cap': _num(raw.get('f21'))})
     return out
 
 
 def _fetch(params, http=None):
+    # pz 超过 PAGE_MAX 没有意义（服务端只回 100 行），夹住是为了让调用方读代码时就知道上限，
+    # 而不是以为自己拿到了 500 行。
+    params = {**params, 'pz': min(int(params.get('pz', PAGE_MAX)), PAGE_MAX)}
     query = {'pn': 1, 'np': 1, 'fltt': 2, 'invt': 2, 'fields': FIELDS, **params}
     return market_review.get_json(ENDPOINT + '?' + urlencode(query), http)
 
 
-def fetch_sector(kind, http=None):
-    payload = _fetch({'pz': 500, 'po': 1, 'fid': 'f3', 'fs': BOARD_FILTERS[kind]}, http)
-    return rank_sectors(parse_sectors(payload, kind))
+FID_LABEL = {'f3': '涨幅', 'f184': '主力净流入占比', 'f62': '主力净流入额'}
 
 
-def fetch_stocks(direction, http=None, size=DEFAULT_SIZE):
-    payload = _fetch({'pz': max(size * 2, 20), 'po': 1 if direction == 'inflow' else 0,
-                      'fid': 'f62', 'fs': STOCK_FILTER}, http)
+def fetch_sector_rows(kind, http=None, fid='f3'):
+    """取一页板块并打分，**不截断到 top N**。返回 (scored_rows, total, scope)。
+
+    resilience_scan 需要整页做"这只股票的板块在不在强势集合里"的查表，所以不能只拿 10 条。
+    """
+    payload = _fetch({'pz': PAGE_MAX, 'po': 1, 'fid': fid, 'fs': BOARD_FILTERS[kind]}, http)
+    rows = score_sectors(parse_sectors(payload, kind))
+    scope = '按%s降序的前 %d 个板块' % (FID_LABEL.get(fid, fid), len(rows))
+    return rows, _total(payload), scope
+
+
+def fetch_sector(kind, http=None, fid='f3', size=DEFAULT_SIZE):
+    """默认按涨幅降序取一页（100 个板块）再打分，返回最强 size 个。fid 可改成 f184 按主力
+    净流入占比取——"大资金流入的板块"和"涨得多的板块"不是同一批。"""
+    rows, total, scope = fetch_sector_rows(kind, http, fid)
+    return {'strong': sorted(rows, key=lambda x: (-x['strength'], x['name']))[:size],
+            'fetched': len(rows), 'total': total if total is not None else len(rows), 'scope': scope}
+
+
+def fetch_stocks(direction, http=None, size=DEFAULT_SIZE, fid='f62', pz=None):
+    """direction 决定排序方向（inflow=降序取流入最多，outflow=升序取流出最多）。
+
+    fid 可改：`f62` 是主力净流入**额**（偏大盘股），`f184` 是净流入**占比**（对中小票友好）。
+    resilience_scan 两个都取再取并集——pz 上限 100 之下，只按额排会系统性漏掉中小强势票。
+    """
+    payload = _fetch({'pz': pz or max(size * 2, 20), 'po': 1 if direction == 'inflow' else 0,
+                      'fid': fid, 'fs': STOCK_FILTER}, http)
     rows = parse_stocks(payload, direction)
-    rows.sort(key=lambda x: (-x['main_net'], x['code']) if direction == 'inflow'
-              else (x['main_net'], x['code']))
+    key = 'main_net' if fid == 'f62' else 'main_net_pct'
+    rows.sort(key=lambda x: (-x[key], x['code']) if direction == 'inflow' else (x[key], x['code']))
     return rows[:size]
 
 
