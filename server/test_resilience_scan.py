@@ -431,6 +431,52 @@ class RecordTests(unittest.TestCase):
             self.assertEqual([r['name'] for r in relaxed], ['甲'])
 
 
+class VerifyTests(unittest.TestCase):
+    """`--verify` 把"上线时没验成的三件事"固化成一条命令，所以它自己也要有测试。"""
+
+    def setUp(self):
+        rs._cache.clear()
+
+    def test_clean_run_passes_every_check(self):
+        with tempfile.TemporaryDirectory() as d:
+            http = http_for([sector('半导体', 1.8, 6.0)],
+                            [stock('600001', '甲', 1.0, 9e8, 8.0, industry='半导体')])
+            out = rs.verify(NOW, http=http, sector_dir=Path(d))
+            self.assertTrue(out['ok'], out['checks'])
+            by = {c['check']: c['status'] for c in out['checks']}
+            self.assertEqual(by['sector_match_rate'], 'pass')
+            self.assertEqual(by['exclusions'], 'pass')
+
+    def test_low_match_rate_is_reported_as_a_failure(self):
+        """f100 与板块名对不上正是当天没能验证的假设，低匹配率必须报 fail 而不是悄悄过。"""
+        with tempfile.TemporaryDirectory() as d:
+            http = http_for([sector('半导体', 1.8, 6.0)],
+                            [stock('600001', '甲', 1.0, 9e8, 8.0, industry='查无此板块')])
+            out = rs.verify(NOW, http=http, sector_dir=Path(d))
+            by = {c['check']: c for c in out['checks']}
+            self.assertEqual(by['sector_match_rate']['status'], 'fail')
+            self.assertIn('查无此板块', by['sector_match_rate']['note'])
+            self.assertFalse(out['ok'])
+
+    def test_an_excluded_stock_leaking_into_hits_is_a_failure(self):
+        """这一条守的是"排除真的生效"——真漏了必须红，不能只靠单元测试。"""
+        with tempfile.TemporaryDirectory() as d:
+            http = http_for([sector('半导体', 1.8, 6.0)],
+                            [stock('600001', '一字板', 10.0, 9e8, 20.0, high=11.0, low=11.0)])
+            out = rs.verify(NOW, http=http, sector_dir=Path(d),)
+            by = {c['check']: c for c in out['checks']}
+            self.assertEqual(by['exclusions']['status'], 'pass')   # 被正确排除 → 命中里没有
+            self.assertIn('一字板 1 只', by['exclusions']['note'])
+
+    def test_unreachable_eastmoney_is_reported_not_hidden(self):
+        with tempfile.TemporaryDirectory() as d:
+            boom = lambda _u: (_ for _ in ()).throw(OSError('502'))
+            out = rs.verify(NOW, http=boom, sector_dir=Path(d))
+            by = {c['check']: c['status'] for c in out['checks']}
+            self.assertEqual(by['eastmoney_reachable'], 'fail')
+            self.assertEqual(by['sector_match_rate'], 'skip')
+
+
 class NoPushTests(unittest.TestCase):
     def test_module_never_imports_a_push_path(self):
         """本需求的硬要求：这个模块不推送任何东西。用源码断言，而不是靠记得。"""

@@ -411,13 +411,86 @@ def run(history, now=None, directory=None, force=False, http=None, calendar_fn=N
     return summary
 
 
+# --- 实盘自检 -----------------------------------------------------------------
+
+def verify(now=None, http=None, sector_dir=None):
+    """跑一轮真实扫描，逐条核对那些**只能在交易时段用真数据验证**的假设。
+
+    2026-09-24 上线时有三件事没验成（东财当天把开发机限流封了一下午），这个函数把
+    "当时要验什么"固化下来，免得靠人记：
+
+      A. 东财的 f100（个股所属行业）与板块清单的名字**精确匹配率**——漏斗最后一层全靠它。
+         当天只有一轮 16/16 命中全匹配的旁证，不是全量统计。
+      B. 一字涨停与 ST **确实不会进命中列表**（代码有测试，但没在真数据上跑过）。
+      C. 服务器的限流表现与开发机是不是一回事（ROADMAP 第 12 项：境外机房可能不同）。
+
+    每条给 pass / fail / skip 和一句人话。**必须在交易时段跑**：收盘后板块与个股的
+    涨跌幅都定格，一字板判据仍有效，但"此刻资金流"和限流表现都不具代表性。
+    """
+    now = now or datetime.now(CST)
+    session = live_quote.clock_session(now)
+    in_session = session in ('morning', 'afternoon')
+    out = scan(now, http=http, sector_dir=sector_dir)
+    rows, hits, u = out['rows'], out['hits'], out['universe']
+    checks = []
+
+    def add(key, status, note):
+        checks.append({'check': key, 'status': status, 'note': note})
+
+    if u['sector_source'] != 'eastmoney':
+        add('eastmoney_reachable', 'fail',
+            '东财板块没取到，本轮走的是 %s 兜底：%s' % (u['sector_source'],
+                                                out['errors'].get('sectors_eastmoney', '')))
+    else:
+        add('eastmoney_reachable', 'pass', '东财板块与个股榜单都取到了')
+
+    if not rows:
+        add('sector_match_rate', 'skip', '一只股票都没取到，无法统计（多半是东财被限流）')
+        add('exclusions', 'skip', '同上')
+    else:
+        matched = sum(r['sector_matched'] for r in rows)
+        rate = matched / len(rows) * 100
+        unmatched = sorted({r['industry'] for r in rows if not r['sector_matched'] and r['industry']})
+        add('sector_match_rate', 'pass' if rate >= 90 else 'fail',
+            '%d/%d = %.1f%% 的个股匹配到板块%s' % (
+                matched, len(rows), rate,
+                '；未匹配的行业名示例：' + '、'.join(unmatched[:8]) if unmatched else ''))
+
+        st_rows = [r for r in rows if r['is_st']]
+        ow_rows = [r for r in rows if r['one_word_limit']]
+        bad = [r['name'] for r in hits if r['is_st'] or r['one_word_limit']]
+        add('exclusions', 'fail' if bad else 'pass',
+            '留档里 ST %d 只、一字板 %d 只；命中里 %s' % (
+                len(st_rows), len(ow_rows),
+                '混进了 ' + '、'.join(bad) if bad else '两者都是 0（符合预期）'))
+
+    add('trading_session', 'pass' if in_session else 'skip',
+        '当前时段 %s%s' % (session, '' if in_session else '——限流表现与资金流不具代表性，结论仅供参考'))
+    return {'generated_at': now.isoformat(), 'session': session, 'checks': checks,
+            'universe': u, 'errors': out['errors'], 'stale': out['stale'],
+            'ok': all(c['status'] != 'fail' for c in checks)}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--history', type=Path, default=Path(os.environ.get('HISTORY_DIR', '.history')))
     p.add_argument('--force-session', action='store_true', help='忽略时段闸门（本地调试用）')
     p.add_argument('--no-record', action='store_true', help='只扫描不留档')
+    p.add_argument('--verify', action='store_true',
+                   help='实盘自检：核对板块匹配率、一字板/ST 排除、限流表现（须在交易时段跑）')
     p.add_argument('--json', action='store_true')
     a = p.parse_args()
+    if a.verify:
+        result = verify()
+        if a.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            mark = {'pass': 'PASS', 'fail': 'FAIL', 'skip': 'SKIP'}
+            print('实盘自检 %s · 时段 %s' % (result['generated_at'], result['session']))
+            for c in result['checks']:
+                print('  [%s] %-20s %s' % (mark[c['status']], c['check'], c['note']))
+            print('\n总体：%s' % ('通过' if result['ok'] else '有未通过项，见上'))
+        return 0 if result['ok'] else 1
     started = _time.monotonic()
     if a.no_record:
         result = scan()
