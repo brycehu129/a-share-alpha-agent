@@ -45,7 +45,10 @@ const tone = (v) => (v > 0 ? 'rise' : v < 0 ? 'fall' : 'flat')
     <template #header>
       <div class="card-title">
         <span>大盘脉搏</span>
-        <span class="sub">沪深北全市场 · 实时取数<template v-if="poolDate">；涨跌停 {{ poolDate }}</template></span>
+        <span class="sub">
+          沪深北全市场 · 实时取数<template v-if="poolDate">；涨跌停 {{ poolDate }}</template>
+          · 页面刷新 <span class="num">{{ live && live.fetched_at ? fmtTs(live.fetched_at) : '—' }}</span>
+        </span>
       </div>
     </template>
 
