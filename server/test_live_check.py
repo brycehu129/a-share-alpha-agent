@@ -1,7 +1,9 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import live_check
 from tushare_sync import save
@@ -128,6 +130,11 @@ class CheckTests(unittest.TestCase):
         self.history = Path(tempfile.mkdtemp())
         save(self.history / 'alpha_data/series/sh600000.json',
              {'symbol': 'sh600000', 'bars': bars([10] * 20), 'fetched_at': '2026-09-15T16:00:00+08:00'})
+        # check() 会顺手给持仓行的移动止损记一次历史最高价（book_state.touch_peak）；不隔离的话
+        # 会写到这台机器上真实的 server/data/private/book_state.json。
+        env = patch.dict(os.environ, {'PRIVATE_DATA_DIR': str(self.history / 'private')})
+        env.start()
+        self.addCleanup(env.stop)
 
     def test_holding_facts_and_roles(self):
         result = live_check.check(

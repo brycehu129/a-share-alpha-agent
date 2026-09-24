@@ -177,6 +177,51 @@ def _save(kind, rows, directory=None):
     return rows
 
 
+def load_account(directory=None):
+    """账户资金（权益基数、可用现金）。不同于 holdings/watchlist/trades：这是单个 dict，不是列表，
+    所以不复用 load()/_save()（那两个假定内容是 JSON 数组）。没填过就返回 None——不猜一个默认值，
+    下游该显式说「未填写账户资金，无法给出股数建议」。"""
+    path = _path('account', directory)
+    if not os.path.exists(path):
+        return None
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise BookError('账户资金文件内容损坏（不是 JSON 对象）: ' + path)
+    return data
+
+
+def save_account(equity_base, cash, directory=None, now=None):
+    equity_base = _positive(equity_base, '账户权益', MAX_SHARES * MAX_PRICE)
+    try:
+        cash = float(str(cash).strip())
+    except (TypeError, ValueError) as exc:
+        raise BookError('可用现金必须是数字') from exc
+    if cash < 0 or cash != cash or cash in (float('inf'), float('-inf')):
+        raise BookError('可用现金不能为负')
+    if cash > equity_base:
+        raise BookError('可用现金不能超过账户权益')
+    data = {'equity_base': equity_base, 'cash': round(cash, 2), 'updated_at': (now or datetime.now(CST)).isoformat()}
+    path = _path('account', directory)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    handle, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix='.tmp')
+    try:
+        with os.fdopen(handle, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return data
+
+
 def upsert(kind, entry, directory=None):
     """同一只股票只保留一条：再次录入就是修改，不会留下两条互相矛盾的成本价。"""
     rows = [r for r in load(kind, directory) if r.get('symbol') != entry['symbol']]
@@ -291,6 +336,8 @@ def sell(form, directory=None, now=None):
                        realized_pnl=round((entry['price'] - cost) * shares, 2))
     _append_trade(trade, directory)
     if shares == held:
+        import book_state                # 延迟 import：避免和 book_state.default_dir() 互相依赖成环
+        book_state.clear(entry['symbol'], directory)   # 整笔卖完：下次再买是全新一笔仓位，不该继承峰值/补仓计数
         return remove('holdings', entry['symbol'], directory)
     # 显式列出字段而不是 {**current}：旧版本录入的行带着 hold_type/止损/目标/做T底仓，趁这次改写把它们丢掉。
     return upsert('holdings', {'symbol': current['symbol'], 'name': current.get('name') or '', 'shares': held - shares,

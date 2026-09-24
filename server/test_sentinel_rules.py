@@ -52,6 +52,29 @@ class HoldingSignalTests(unittest.TestCase):
         self.assertFalse(by_key(hit, 'target')['active'])
         self.assertTrue(by_key(self.sigs(armed, quote(last=12.1)), 'target')['active'])
 
+    def test_a_trailing_stop_gets_its_own_kind_and_says_so(self):
+        """止损位现在可能来自移动止损（book_levels.effective_stop），不只是贴着成本价——
+        这种情况要单独一个 kind（trail_stop_hit），文案也要说清楚是跟着历史高点走的，不是
+        "跌破成本 X%"，那句话在这种场景下是错的（移动止损常常还在成本价上方）。"""
+        levels = {'stop_pct': 0.05, 'target_pct': 0.075, 'nominal': False, 'atr_pct': 0.04}
+        h = holding(stop_price=11.5, target_price=12.0, levels=levels, stop_source='trail', peak_price=12.5)
+        hit = self.sigs(h, quote(last=11.4))
+        stop = by_key(hit, 'stop')
+        self.assertEqual(stop['kind'], 'sentinel.trail_stop_hit')
+        self.assertTrue(stop['active'])
+        self.assertEqual(stop['severity'], 'urgent')
+        self.assertIn('移动止损', stop['detail'])
+        self.assertIn('12.50', stop['detail'])
+        self.assertNotIn('成本', stop['detail'])
+
+    def test_a_breakeven_stop_keeps_the_plain_stop_hit_kind(self):
+        levels = {'stop_pct': 0.05, 'target_pct': 0.075, 'nominal': False, 'atr_pct': 0.04}
+        h = holding(stop_price=10.05, target_price=12.0, levels=levels, stop_source='breakeven')
+        hit = self.sigs(h, quote(last=10.0))
+        stop = by_key(hit, 'stop')
+        self.assertEqual(stop['kind'], 'sentinel.stop_hit')
+        self.assertIn('保本止损', stop['detail'])
+
     def test_estimated_levels_are_labelled_as_such(self):
         h = holding(stop_price=9.5, levels={'stop_pct': 0.05, 'nominal': True})
         self.assertIn('典型波动估算', by_key(self.sigs(h, quote(last=9.4)), 'stop')['detail'])

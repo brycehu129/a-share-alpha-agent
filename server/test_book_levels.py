@@ -46,6 +46,36 @@ class ExitLevelsTests(unittest.TestCase):
         self.assertEqual(with_today, bl.exit_levels(series, 10.0))
 
 
+class EffectiveStopTests(unittest.TestCase):
+    """calm 系列日线：ATR14%=2%，stop_pct=0.03（下限），target_pct=0.045，
+    breakeven_arm_pct = max(0.02, 0.5×0.045) = 0.0225 → 武装线 = 成本×1.0225。"""
+    LEVELS = bl.exit_levels(bars(high=10.1, low=9.9), 10.0)
+
+    def test_no_peak_means_only_the_cost_stop(self):
+        s = bl.effective_stop(10.0, 500, self.LEVELS)
+        self.assertEqual(s, {'price': 9.7, 'source': 'cost'})
+
+    def test_a_peak_below_breakeven_arm_only_offers_the_trailing_stop(self):
+        # 峰值 10.15 < 武装线 10.225：保本不启动；移动止损 = 10.15×(1-2×0.02) = 9.744 → 9.74，紧于成本止损 9.7。
+        s = bl.effective_stop(10.0, 500, self.LEVELS, peak_price=10.15)
+        self.assertEqual(s, {'price': 9.74, 'source': 'trail'})
+
+    def test_a_peak_at_or_above_breakeven_arm_switches_to_breakeven(self):
+        """保本价含真实双边费用，比移动止损（9.888）和成本止损（9.7）都紧，越赚钱止损跟得越紧。"""
+        import conditional_exec
+        from alpha_model import POLICY
+        expected = conditional_exec.breakeven_price(10.0, 500, 5000.0, POLICY)
+        s = bl.effective_stop(10.0, 500, self.LEVELS, peak_price=10.30)
+        self.assertEqual(s, {'price': expected, 'source': 'breakeven'})
+        self.assertGreater(expected, 9.888)      # 真的比只看往返成本近似值更紧
+
+    def test_trailing_stop_only_uses_the_typical_atr_when_the_real_one_is_unavailable(self):
+        nominal_levels = bl.exit_levels(bars(n=10), 10.0)     # 日线不足，退回典型 ATR 3.5%
+        s = bl.effective_stop(10.0, 500, nominal_levels, peak_price=10.3)   # 低于这份规格的保本武装线 10.394
+        self.assertEqual(s['source'], 'trail')
+        self.assertAlmostEqual(s['price'], round(10.3 * (1 - 2 * 0.035), 2), places=2)
+
+
 class EnrichTests(unittest.TestCase):
     H = {'symbol': 'sh600519', 'name': '茅台', 'shares': 500, 'cost_price': 10.0}
 
@@ -63,6 +93,16 @@ class EnrichTests(unittest.TestCase):
 
     def test_bought_today_means_no_base(self):
         self.assertEqual(bl.enrich({**self.H, 'sellable_shares': 0}, bars())['t_base_shares'], 0)
+
+    def test_no_peak_price_defaults_to_the_cost_stop_and_says_so(self):
+        e = bl.enrich(self.H, bars(high=10.1, low=9.9))
+        self.assertEqual((e['stop_price'], e['stop_source'], e['peak_price']), (9.7, 'cost', None))
+
+    def test_a_peak_price_can_tighten_the_stop_and_is_surfaced_on_the_row(self):
+        e = bl.enrich(self.H, bars(high=10.1, low=9.9), peak_price=10.30)
+        self.assertEqual(e['stop_source'], 'breakeven')
+        self.assertGreater(e['stop_price'], e['cost_price'])          # 越赚钱止损跟得越紧，甚至能高于成本价
+        self.assertEqual(e['peak_price'], 10.30)
 
 
 if __name__ == '__main__':

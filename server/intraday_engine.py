@@ -44,12 +44,21 @@ from collect_quotes import CST
 
 STALE_SECONDS = 180          # 报价时间距采集超过这个数就不算"新鲜"，不交给评估器
 GAP_SECONDS = 180            # 相邻两轮的有效交易间隔超过它，记一次 gap
-MAX_EVENTS_PER_TICK = 5      # 每轮最多推几条；超出的顺延到下一轮，不丢
+MAX_EVENTS_PER_TICK = 5      # 每轮最多推几条（节点信号不占这个额度，见 apply_signals）；超出的顺延到下一轮，不丢
 DEFAULT_REARM_SECONDS = 300  # 边沿信号变回"假"后，至少安静这么久才允许再次触发
 DEFAULT_COOLDOWN_SECONDS = 3600
 FINAL_TICK_BEFORE = clock_time(15, 3)   # 15:00 收盘后的最后一轮，抓收盘价与量
 
-SEVERITY_ORDER = {'urgent': 0, 'normal': 1}
+# 三档：urgent 立即推、不占每股每日上限；action 合并推，占上限；watch 只留档+页面，不进实时推送。
+# 'normal' 是 action 的旧名字，兼容 conditional_exec.py 等既有调用方，normalize_signal 里做别名映射。
+SEVERITY_ORDER = {'urgent': 0, 'action': 1, 'watch': 2}
+SEVERITY_ALIAS = {'normal': 'action'}
+# 每股每天最多推几条「哨兵」action 级别的告警（urgent 不计入、node 不计入）；超出后当天该股后续
+# action 级信号降级为 watch（只留档，不再刷屏）。只作用于 kind 以 'sentinel.' 开头的信号——
+# conditional_exec 的虚拟盘成交事件是另一个账户，不受这个上限约束。
+MAX_SENTINEL_ALERTS_PER_SYMBOL_PER_DAY = 6
+SENTINEL_KIND_PREFIX = 'sentinel.'
+NODE_KIND_PREFIX = 'sentinel.node_'
 EVALUATORS = []
 
 
@@ -294,8 +303,10 @@ def normalize_signal(sig):
     for field in ('key', 'symbol', 'kind'):
         if not sig.get(field):
             raise ValueError('信号缺少必填字段 %s: %r' % (field, sig))
+    severity = sig.get('severity', 'action')
+    severity = SEVERITY_ALIAS.get(severity, severity)
     out = {'active': bool(sig.get('active')), 'mode': sig.get('mode', 'edge'),
-           'severity': sig.get('severity', 'normal'), 'carry': bool(sig.get('carry', False)),
+           'severity': severity, 'carry': bool(sig.get('carry', False)),
            'rearm_s': sig.get('rearm_s', DEFAULT_REARM_SECONDS),
            'cooldown_s': sig.get('cooldown_s', DEFAULT_COOLDOWN_SECONDS),
            'detail': sig.get('detail'), 'level': sig.get('level'),
@@ -352,9 +363,21 @@ def update_levels(state, sig, quote):
 def apply_signals(state, signals, quotes, now):
     """两阶段：先算出所有想推的，按严重级别排序、按每轮上限截断，**只有真正推出去的
     才提交状态**。被上限挤掉的不标记已推——下一轮它们仍是"从未推过/刚转真"，会顺延推出，
-    而不是悄悄丢失。返回 (events, deferred_keys, flap_suppressed_keys)。"""
+    而不是悄悄丢失。
+
+    **节点信号（kind 以 'sentinel.node_' 开头）不占每轮上限**：它们从不实时推送（见 sentinel.py
+    的 actionable 过滤），只用来触发情景研判；如果和普通信号一起挤 MAX_EVENTS_PER_TICK，被挤掉后
+    又不会顺延（node_due() 只在跨节点的那一轮为真），那一次节点的情景研判就永久丢了
+    （ROADMAP 第 11 项）。所以节点信号单独一条通道，只要触发就必定进 events。
+
+    **每股每日 action 级上限**（`MAX_SENTINEL_ALERTS_PER_SYMBOL_PER_DAY`，只管 kind 以
+    'sentinel.' 开头、且不是 urgent/node 的信号）：超出后该信号本轮降级为 watch（不再实时推，
+    只留档），不影响 urgent。conditional_exec 的虚拟盘事件 kind 不带这个前缀，不受影响。
+
+    返回 (events, deferred_keys, flap_suppressed_keys)。"""
     now_iso = now.isoformat()
     plan, flapped, seen = [], [], set()
+    pushed = state.setdefault('pushed_by_symbol', {})
     for raw in signals:
         sig = normalize_signal(raw)
         if sig['key'] in seen:
@@ -370,16 +393,27 @@ def apply_signals(state, signals, quotes, now):
         fire, flap = decide(rec, sig, now)
         if flap:
             flapped.append(sig['key'])
-        plan.append((sig, rec, fire))
-    candidates = sorted((p for p in plan if p[2]), key=lambda p: (SEVERITY_ORDER[p[0]['severity']], p[0]['key']))
-    emit = candidates[:MAX_EVENTS_PER_TICK]
-    deferred = [p[0]['key'] for p in candidates[MAX_EVENTS_PER_TICK:]]
-    emitted_keys = {p[0]['key'] for p in emit}
+        is_node = sig['kind'].startswith(NODE_KIND_PREFIX)
+        is_sentinel = sig['kind'].startswith(SENTINEL_KIND_PREFIX)
+        if fire and is_sentinel and not is_node and sig['severity'] == 'action' \
+                and pushed.get(sig['symbol'], 0) >= MAX_SENTINEL_ALERTS_PER_SYMBOL_PER_DAY:
+            sig['severity'] = 'watch'      # 当天该股 action 级配额已用完，降级为只留档
+        plan.append((sig, rec, fire, is_node))
+    fired = [(s, r, n) for s, r, f, n in plan if f]
+    node_emit = [(s, r) for s, r, n in fired if n]
+    others = sorted(((s, r) for s, r, n in fired if not n),
+                    key=lambda p: (SEVERITY_ORDER[p[0]['severity']], p[0]['key']))
+    emit_others = others[:MAX_EVENTS_PER_TICK]
+    deferred = [s['key'] for s, r in others[MAX_EVENTS_PER_TICK:]]
+    emit = node_emit + emit_others
+    emitted_keys = {s['key'] for s, r in emit}
     events = []
-    for sig, rec, fire in plan:
+    for sig, rec, fire, is_node in plan:
         if sig['key'] in emitted_keys:
             rec['last_fired_at'] = now_iso
             rec['fired'] = rec.get('fired', 0) + 1
+            if sig['kind'].startswith(SENTINEL_KIND_PREFIX) and not is_node and sig['severity'] == 'action':
+                pushed[sig['symbol']] = pushed.get(sig['symbol'], 0) + 1
         if sig['key'] in deferred:
             continue                                   # 保持"未武装的旧状态"，下一轮再判
         if sig['active']:
@@ -390,7 +424,7 @@ def apply_signals(state, signals, quotes, now):
             if rec.get('active') or rec.get('inactive_since') is None:
                 rec['inactive_since'] = now_iso
             rec['active'] = False
-    for sig, rec, fire in emit:
+    for sig, rec in emit:
         q = quotes.get(sig['symbol']) or {}
         events.append({
             'key': sig['key'], 'symbol': sig['symbol'], 'kind': sig['kind'],

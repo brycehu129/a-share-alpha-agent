@@ -24,9 +24,19 @@ import copy
 EXEC_MODE = 'conditional-intraday-v1'
 SPEC_VERSION = 'exec-spec-2'
 ROUND_TRIP_COST_PCT = 0.31   # 与 STRATEGY.md 成本假设一致：滑点0.1%×2 + 佣金0.03%×2 + 过户费 + 卖出税0.05%
+# 买卖两侧拆开：回本进度要知道现在卖出净剩多少，不能只有往返合计。
+# 买入：滑点0.1% + 佣金0.03%（过户费0.001%记入四舍五入）；卖出：买入两项 + 印花税0.05%。
+BUY_COST_PCT = 0.13
+SELL_COST_PCT = ROUND_TRIP_COST_PCT - BUY_COST_PCT   # 0.18；两者之和必须等于 ROUND_TRIP_COST_PCT，有测试守住
 BASE_EXECUTION_VERSION = 'exec-0.3'
 NOMINAL_ATR_PCT = 0.035      # 没有具体股票时（提议页预览、测试）用的典型 ATR14%
 ATR_CLAMP = (0.015, 0.08)    # 解析时对 ATR 本身也夹一下：数据异常不能生成离谱的止损
+
+# 真实持仓的移动止损倍数（book_levels.effective_stop 用）。**不在 TUNABLE_PARAMS 白名单里**：
+# 那份白名单是候选池策略的执行规格，走"提议→确认"、按 execution_version 冻结分组；这个只管
+# 你自己账本里的持仓，性质和 sentinel_rules.py 里的经验阈值（T_MARKET_STRONG 等）一样——
+# 起始默认值，没有回测，调整不需要走提议流程。
+TRAIL_ATR_MULT = 2.0
 
 TRADED_TRACKS = ('breakout', 'pullback')
 

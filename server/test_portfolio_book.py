@@ -133,6 +133,16 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(book.load('holdings', self.dir), [])
         self.assertEqual(len(book.load('trades', self.dir)), 2)
 
+    def test_selling_everything_also_clears_the_peak_and_add_count_state(self):
+        """下次再买是全新一笔仓位，不该继承上一轮的移动止损峰值或补仓计数。"""
+        import book_state
+        self.watch()
+        self.buy()
+        book_state.touch_peak('sh600519', 1400.0, NOW, directory=self.dir)
+        book_state.record_add('sh600519', NOW, self.dir)
+        self.sell()
+        self.assertEqual(book_state.get('sh600519', self.dir), {})
+
     def test_cannot_sell_more_than_held_or_something_not_held(self):
         self.watch()
         self.buy(shares='100')
@@ -213,6 +223,43 @@ class StorageTests(unittest.TestCase):
         self.watch('000001', '平安银行')
         self.buy()
         self.assertEqual(book.all_symbols(self.dir), ['sh600519', 'sz000001'])   # 同时持有又自选，只算一次
+
+
+class AccountTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+
+    def test_unset_returns_none_not_a_guessed_default(self):
+        self.assertIsNone(book.load_account(self.dir))
+
+    def test_save_and_load_round_trip(self):
+        book.save_account(100000, 30000, self.dir, NOW)
+        data = book.load_account(self.dir)
+        self.assertEqual((data['equity_base'], data['cash']), (100000, 30000))
+        self.assertEqual(data['updated_at'], NOW.isoformat())
+
+    def test_cash_cannot_exceed_equity(self):
+        with self.assertRaises(book.BookError):
+            book.save_account(100000, 200000, self.dir, NOW)
+
+    def test_negative_cash_rejected(self):
+        with self.assertRaises(book.BookError):
+            book.save_account(100000, -1, self.dir, NOW)
+
+    def test_zero_equity_rejected(self):
+        with self.assertRaises(book.BookError):
+            book.save_account(0, 0, self.dir, NOW)
+
+    def test_write_is_atomic_and_leaves_no_temp_files(self):
+        book.save_account(100000, 30000, self.dir, NOW)
+        self.assertEqual([n for n in os.listdir(self.dir) if n.endswith('.tmp')], [])
+
+    def test_corrupt_file_raises_not_silently_returns_none(self):
+        os.makedirs(self.dir, exist_ok=True)
+        with open(os.path.join(self.dir, 'account.json'), 'w') as f:
+            f.write('[1, 2, 3]')       # 是数组不是对象
+        with self.assertRaises(book.BookError):
+            book.load_account(self.dir)
 
 
 if __name__ == '__main__':

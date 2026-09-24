@@ -15,20 +15,47 @@
 
 这些是**规则给出的提示，不是投资建议**：所有阈值都来自策略里已有的口径，未经前瞻验证；系统不下单。
 """
+import add_advisor
 import sentinel_rules as sr
 
-EXIT_KINDS = ('stop_hit', 'low20_break_volume', 'near_limit_down')
+EXIT_KINDS = ('stop_hit', 'trail_stop_hit', 'low20_break_volume', 'near_limit_down')
 REDUCE_KINDS = ('target_hit', 'ma20_break', 'ma60_break', 'volume_surge_down')
 T_KINDS = ('t_sell_high', 't_buy_low')
 INTRADAY_HINT_KINDS = ('intraday_support_reclaim', 'intraday_resistance_reject')
 
 WATCH_LABEL = {'buy': '具备买入信号', 'blocked': '暂不宜买入', 'wait': '暂无买入信号', 'nodata': '数据不足'}
-HOLDING_LABEL = {'exit': '建议彻底卖出', 'reduce': '可暂时卖出', 't': '具备做T条件', 'hold': '继续持有',
-                 'nodata': '数据不足'}
+HOLDING_LABEL = {'exit': '建议彻底卖出', 'reduce': '可暂时卖出', 't': '具备做T条件', 'add': '可考虑补仓',
+                 'hold': '继续持有', 'nodata': '数据不足'}
 
 
 def _active(signals):
     return {x['kind'].split('.', 1)[1]: x for x in signals if x['active']}
+
+
+# 分批减仓比例：exit 是整笔（1.0）；reduce 按触发原因分级——同时跌破两条均线但还在成本之上，
+# 说明趋势走坏但还没伤到本金，先落袋一半；单条均线、止盈位、放量下跌这些相对轻一档的信号，先卖 1/3。
+REDUCE_SIZE_BOTH_MA = 0.5
+REDUCE_SIZE_DEFAULT = 1.0 / 3
+
+
+def _reduce_size_pct(active, both_ma):
+    return REDUCE_SIZE_BOTH_MA if both_ma else REDUCE_SIZE_DEFAULT
+
+
+def _size_shares(h, size_pct):
+    """size_pct 换算成实际股数：按最小交易单位向下取整，且不超过今天可卖数量（T+1）。
+    彻底卖出（size_pct=1.0）例外——整笔卖出允许不是整手（portfolio_book.sell() 本来就放行
+    "卖出数量等于全部持仓"这一种奇数股场景），不应该因为凑不满一手就少卖。"""
+    import portfolio_book
+    held, sellable = int(h['shares']), int(h.get('sellable_shares', h['shares']))
+    if size_pct >= 1.0:
+        note = None if sellable == held else 'T+1：今天买入的部分暂不能卖，先卖可卖的 %d 股' % sellable
+        return {'shares': sellable, 'note': note}
+    lot = portfolio_book.lot_size(h['symbol'])
+    shares = min(sellable, int(held * size_pct)) // lot * lot
+    if shares == 0:
+        return {'shares': 0, 'note': '可卖数量不足一手，只能整笔卖出或暂不动'}
+    return {'shares': shares, 'note': None}
 
 
 def watch_verdict(w, q, facts, limits, market_pause=None):
@@ -51,9 +78,14 @@ def watch_verdict(w, q, facts, limits, market_pause=None):
     return {'action': 'wait', 'label': WATCH_LABEL['wait'], 'track': track, 'reasons': reasons}
 
 
-def holding_verdict(h, q, facts, limits, env_fn=None, day=None):
+def holding_verdict(h, q, facts, limits, env_fn=None, day=None, add_result=None):
     """h：book_levels.enrich 之后的持仓行（带系统止损/止盈位与可做T底仓）。
-    env_fn：做T 的环境（大盘/板块/资金流），只在价格位置满足时才会被调用（可能联网）。"""
+    env_fn：做T 的环境（大盘/板块/资金流），只在价格位置满足时才会被调用（可能联网）。
+    add_result：add_advisor.evaluate(...) 算好的补仓评估（调用方备齐账户资金/分诊/大盘板块/资金流
+    等一整套上下文后传进来）；不传就没有"可考虑补仓"这一档，和 env_fn 不传就没有做T一样。
+
+    优先级：彻底卖出 > 可暂时卖出 > 具备做T条件 > 可考虑补仓 > 继续持有——任何卖出信号在场
+    都不会同时给补仓提示（add_advisor.evaluate 内部也会否决，这里的优先级是双重保险）。"""
     last = float(q['last'])
     day = day or sr.day_facts(q)
     t = sr.t_evaluate(h, q, day, env_fn, limits)
@@ -71,11 +103,15 @@ def holding_verdict(h, q, facts, limits, env_fn=None, day=None):
             reasons.insert(0, '同时跌破 MA20 与 MA60，趋势走坏；现价仍在成本价之上，可先落袋一部分')
     elif any(k in active for k in T_KINDS):
         action, reasons = 't', details(T_KINDS)
+    elif add_result and add_result.get('ok'):
+        action, reasons = 'add', add_advisor.preview_text(add_result['preview'])
     else:
         action = 'hold'
         reasons = details(INTRADAY_HINT_KINDS) or ['未触发任何卖出或做T条件']
         reasons += _t_notes(t)
-    if action in ('reduce', 't', 'hold'):
+        if add_result and add_result.get('veto') is None and add_result.get('support'):
+            reasons.append('分诊与形态尚可，但%s，暂不建议补仓' % add_result['support'])
+    if action in ('reduce', 't', 'add', 'hold'):
         for detail in details(INTRADAY_HINT_KINDS):
             if detail not in reasons:
                 reasons.append(detail)
@@ -85,6 +121,14 @@ def holding_verdict(h, q, facts, limits, env_fn=None, day=None):
                'stop_price': h.get('stop_price'), 'target_price': h.get('target_price'),
                'to_stop_pct': round((last / h['stop_price'] - 1) * 100, 2) if h.get('stop_price') else None,
                'to_target_pct': round((h['target_price'] / last - 1) * 100, 2) if h.get('target_price') else None}
+    if action in ('exit', 'reduce'):
+        size_pct = 1.0 if action == 'exit' else _reduce_size_pct(active, both_ma)
+        size = _size_shares(h, size_pct)
+        verdict.update(size_pct=round(size_pct, 4), size_shares=size['shares'])
+        if size['note']:
+            reasons.append(size['note'])
+    elif action == 'add':
+        verdict['add_shares'] = add_result['add_shares']
     caveats = []
     if t['unavailable'] and action in ('hold', 't'):
         caveats.append(t['unavailable'])
@@ -153,22 +197,28 @@ def rules_doc():
 
     holding_groups = [
         {'action': 'exit', 'label': HOLDING_LABEL['exit'], 'when': '满足任意一条',
-         'intro': '风险已经兑现，或趋势走坏且已经亏损：不再等，整笔卖出。',
+         'intro': '风险已经兑现，或趋势走坏且已经亏损：不再等，卖出今天可卖的全部（size_pct=100%）。',
          'rules': [
-             {'text': '触及系统止损位：现价 ≤ 成本价 ×（1 − 止损幅度）。止损幅度 = 这只股票自己的 ATR14 波动率 × %s，'
-                      '夹在 %s–%s 之间；波动率算不出来（日线不足）时按典型波动 %s 估算，并在页面标明。'
-                      % (atr_mult, _pct(stop_lo), _pct(stop_hi), _pct(nominal, 1))},
+             {'text': '触及系统止损位：现价 ≤ 止损位。止损位是三条里最紧（最高）的一条——'
+                      '成本止损 = 成本价 ×（1 − 止损幅度），止损幅度 = 这只股票自己的 ATR14 波动率 × %s，'
+                      '夹在 %s–%s 之间（波动率算不出来时按典型波动 %s 估算）；'
+                      '保本止损 = 浮盈曾达到止盈幅度一半后启动，价位已扣除真实双边费用；'
+                      '移动止损 = 历史最高价 ×（1 − %s × ATR14%%），只在观测到过峰值后才启动。'
+                      '越赚钱，止损跟得越紧——这是为了不让"触及止盈位就该走"这件事因为一次犹豫变成"倒回亏损"。'
+                      % (atr_mult, _pct(stop_lo), _pct(stop_hi), _pct(nominal, 1), exec_spec.TRAIL_ATR_MULT)},
              {'text': '放量跌破 20 日低点：现价低于近 20 日最低收盘价，且量比 ≥ %s。' % sr.VOLUME_RATIO_BREAK},
              {'text': '逼近跌停：距跌停价 ≤ %s。' % _pct(sr.NEAR_LIMIT_PCT)},
              {'text': '趋势走坏且已亏损：同时跌破 MA20 与 MA60，并且现价低于成本价。'},
          ]},
         {'action': 'reduce', 'label': HOLDING_LABEL['reduce'], 'when': '满足任意一条（且不满足上面任何一条）',
-         'intro': '先卖一部分，留一部分看后面怎么走。',
+         'intro': '先卖一部分，留一部分看后面怎么走；卖出比例（size_pct）默认 1/3，同时跌破两条均线但还在'
+                  '成本价之上时是 1/2——趋势走坏但本金没伤到，落袋得更多一点。股数按最小交易单位向下取整，'
+                  '且不超过今天可卖数量（T+1），不足一手会明说。',
          'rules': [
              {'text': '触及系统止盈位：现价 ≥ 成本价 ×（1 + 止盈幅度）。止盈幅度 = 止损幅度 × %s，封顶 %s。' % (r, _pct(cap))},
              {'text': '跌破 MA20，或跌破 MA60。'},
              {'text': '放量下跌：量比 ≥ %s，且当日跌幅 ≥ %s。' % (sr.VOLUME_RATIO_SURGE, _pct(abs(sr.SURGE_DROP_PCT)))},
-             {'text': '同时跌破 MA20 与 MA60，但现价仍在成本价之上：趋势走坏，先落袋一部分。'},
+             {'text': '同时跌破 MA20 与 MA60，但现价仍在成本价之上：趋势走坏，先落袋一半。'},
          ]},
         {'action': 't', 'label': HOLDING_LABEL['t'], 'when': '三层全部满足（且不满足上面任何一条）',
          'intro': 'A 股 T+1：只能用今天之前买的老仓先卖、低位再买回，净持仓不变。这里只是位置提示，系统不知道你是否已执行。',
@@ -190,6 +240,22 @@ def rules_doc():
                   '「大盘」= 上证与沪深300 的平均（创业板/科创板个股用创业板指）；「板块」= 同行业最多 %d 只股票当日涨跌幅的中位数（代理指标，不是官方板块指数）。'
                   % t_context.PEER_SAMPLE,
               ]},
+         ]},
+        {'action': 'add', 'label': HOLDING_LABEL['add'], 'when': '硬否决全部不命中，且支持条件全部满足（且不满足上面任何一条）',
+         'intro': '摊低的是成本线，不是风险——补仓仓位由"补仓后总风险不超预算"反推，亏得越深/波动越大，能补的股数'
+                  '反而越少，不是越跌越买。',
+         'rules': [
+             {'text': '硬否决（任一命中就不给提示）：本行已经是彻底卖出或可暂时卖出；分诊为"趋势已坏"或分诊不出结果；'
+                      '大盘趋势评分低于暂停线；大盘 ≤ %s 或板块 ≤ %s（系统性杀跌）；已涨停或距涨停 ≤ %s；'
+                      '补仓次数已达上限（%d 次）；距上次买入不足 %d 个交易日；现价距上次买入价跌幅不够 %s 倍 ATR；'
+                      '账户未填写权益/现金；资金流数据缺失。'
+                      % (_pct(sr.T_MARKET_CRASH, 1), _pct(sr.T_SECTOR_DUMP), _pct(sr.NEAR_LIMIT_PCT),
+                         add_advisor.ADD_MAX_TIMES, add_advisor.ADD_MIN_GAP_DAYS, add_advisor.ADD_MIN_DROP_ATR)},
+             {'text': '支持条件（必须全部满足）：分诊结果是"仍是回调"或"区间震荡"；命中回调反弹形态的价格门槛；'
+                      '主力资金近 30 分钟没有明显净流出。'},
+             {'text': '仓位：补仓后（新的加权成本、新的止损位）算出的最大亏损不超过账户权益的 %s（单笔风险预算），'
+                      '总仓位不超过账户权益的 %s（单只上限），现金不够也买不了——取能同时满足这三条的最大整手数。'
+                      % (_pct(add_advisor.RISK_PER_TRADE_PCT), _pct(add_advisor.MAX_WEIGHT_PCT))},
          ]},
         {'action': 'hold', 'label': HOLDING_LABEL['hold'], 'when': '以上都不满足',
          'intro': '页面会写明现价离系统止损位、止盈位还有多远；价格位置已到做T的高/低位、但环境不允许时，会写明是哪一项否决。分时数据可用时，还会补充上穿支撑/跌回阻力下方这类盘中观察提示。',

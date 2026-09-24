@@ -10,6 +10,7 @@
 信号的 key 里带股票代码和类型，引擎据此做边沿/冷却去重；带 carry 的信号是"持续状态"
 （已跌破成本价、已跌破MA20），跨日继承，避免每天早上把同一个状态当成新事件再推一遍。
 """
+import exec_spec
 import intraday_formula
 import live_check
 
@@ -78,15 +79,24 @@ def holding_signals(h, q, facts, limits):
     pct = (last / cost - 1) * 100
     out = [sig('below-cost', s, 'below_cost', last < cost,
                '%s 跌破成本价 %.2f（现价 %.2f，浮亏 %.2f%%）' % (name, cost, last, -pct), carry=True,
-               rearm_s=LEVEL_REARM_S)]
+               severity='watch', rearm_s=LEVEL_REARM_S)]
 
     stop, target = h.get('stop_price'), h.get('target_price')
     levels = h.get('levels') or {}
     basis = '按波动率(ATR)计算' if not levels.get('nominal') else '按典型波动估算'
     if stop:
-        out.append(sig('stop', s, 'stop_hit', last <= stop,
-                       '%s 触及系统止损位 %.2f（成本 %.2f 下方 %.1f%%，%s；现价 %.2f）' % (
-                           name, stop, cost, levels.get('stop_pct', 0) * 100, basis, last),
+        # 止损位现在是三条（成本/保本/移动）里最紧的一条（book_levels.effective_stop），来源见
+        # h['stop_source']。触及移动止损单独给一个 kind（sentinel.trail_stop_hit）——它和贴着
+        # 成本价的止损是两件不同的事："越赚钱越紧"这件事本身就值得在留档里能单独筛出来看。
+        source = h.get('stop_source', 'cost')
+        kind = 'trail_stop_hit' if source == 'trail' else 'stop_hit'
+        trail_atr = levels.get('atr_pct') or exec_spec.NOMINAL_ATR_PCT
+        basis_text = {'cost': '成本 %.2f 下方 %.1f%%，%s' % (cost, levels.get('stop_pct', 0) * 100, basis),
+                     'breakeven': '保本止损（浮盈曾达标后启动，价位已扣真实双边费用）',
+                     'trail': '移动止损（跟随历史最高价 %.2f，回撤 %.1f%%）' % (
+                         h.get('peak_price') or 0, exec_spec.TRAIL_ATR_MULT * trail_atr * 100)}[source]
+        out.append(sig('stop', s, kind, last <= stop,
+                       '%s 触及系统止损位 %.2f（%s；现价 %.2f）' % (name, stop, basis_text, last),
                        severity='urgent', carry=True, rearm_s=LEVEL_REARM_S,
                        level={'price': float(stop), 'direction': 'down'}))
     if target:
@@ -96,11 +106,13 @@ def holding_signals(h, q, facts, limits):
                        carry=True, rearm_s=LEVEL_REARM_S, level={'price': float(target), 'direction': 'up'}))
 
     if facts.get('ma20'):
+        # carry 状态信号，统一用 LEVEL_REARM_S（30分钟）：默认 300s 的话价格贴着均线磨蹭
+        # 一天能推 40+ 次，和止损位当初放宽到 1800s 是同一个理由（见 LEVEL_REARM_S 的注释）。
         out.append(sig('ma20-break', s, 'ma20_break', last < facts['ma20'],
-                       '%s 跌破 MA20 %.2f（现价 %.2f）' % (name, facts['ma20'], last), carry=True))
+                       '%s 跌破 MA20 %.2f（现价 %.2f）' % (name, facts['ma20'], last), carry=True, rearm_s=LEVEL_REARM_S))
     if facts.get('ma60'):
         out.append(sig('ma60-break', s, 'ma60_break', last < facts['ma60'],
-                       '%s 跌破 MA60 %.2f（现价 %.2f）' % (name, facts['ma60'], last), carry=True))
+                       '%s 跌破 MA60 %.2f（现价 %.2f）' % (name, facts['ma60'], last), carry=True, rearm_s=LEVEL_REARM_S))
 
     ratio, change = _f(q.get('volume_ratio')), _f(q.get('change_pct'))
     out.append(sig('vol-surge-down', s, 'volume_surge_down',
@@ -116,7 +128,7 @@ def holding_signals(h, q, facts, limits):
                        '%s 逼近跌停：距跌停 %.2f%%' % (name, limits['to_limit_down_pct']), severity='urgent'))
     if limits.get('to_limit_up_pct') is not None:
         out.append(sig('near-limit-up', s, 'near_limit_up', limits['to_limit_up_pct'] <= NEAR_LIMIT_PCT,
-                       '%s 逼近涨停：距涨停 %.2f%%' % (name, limits['to_limit_up_pct'])))
+                       '%s 逼近涨停：距涨停 %.2f%%' % (name, limits['to_limit_up_pct']), severity='watch'))
     out.append(high20_signal(s, name, last, ratio, facts))
     return [x for x in out if x]
 
@@ -138,11 +150,11 @@ def intraday_reversal_signals(h, q, day):
         sig('intraday-support-reclaim', s, 'intraday_support_reclaim',
             bool(day.get('buy_cross_support')) and bullish,
             '%s 上穿盘中支撑 %.2f（现价 %.2f，MACD 转多），%s' % (name, support, last, support_note),
-            rearm_s=INTRADAY_SIGNAL_REARM_S),
+            severity='watch', rearm_s=INTRADAY_SIGNAL_REARM_S),
         sig('intraday-resistance-reject', s, 'intraday_resistance_reject',
             bool(day.get('sell_cross_resistance')) and bearish,
             '%s 跌回盘中阻力 %.2f 下方（现价 %.2f，MACD 转弱），%s' % (name, resistance, last, sell_note),
-            rearm_s=INTRADAY_SIGNAL_REARM_S),
+            severity='watch', rearm_s=INTRADAY_SIGNAL_REARM_S),
     ]
 
 
@@ -197,10 +209,10 @@ def watch_signals(w, q, facts, limits, market_pause=None):
     ratio, change = _f(q.get('volume_ratio')), _f(q.get('change_pct'))
     out.append(sig('vol-surge', s, 'volume_surge',
                    ratio is not None and ratio >= VOLUME_RATIO_SURGE and change is not None and abs(change) >= 3,
-                   '%s 量比突增：量比 %s，涨跌 %.2f%%' % (name, ratio, change or 0), rearm_s=1800))
+                   '%s 量比突增：量比 %s，涨跌 %.2f%%' % (name, ratio, change or 0), severity='watch', rearm_s=1800))
     if limits.get('to_limit_up_pct') is not None:
         out.append(sig('near-limit-up', s, 'near_limit_up', limits['to_limit_up_pct'] <= NEAR_LIMIT_PCT,
-                       '%s 逼近涨停：距涨停 %.2f%%' % (name, limits['to_limit_up_pct'])))
+                       '%s 逼近涨停：距涨停 %.2f%%' % (name, limits['to_limit_up_pct']), severity='watch'))
     out.append(high20_signal(s, name, last, ratio, facts))
     return [x for x in out if x]
 
@@ -210,7 +222,8 @@ def high20_signal(symbol, name, last, ratio, facts):
         return None
     return sig('high20-break', symbol, 'high20_break_volume',
                ratio is not None and ratio >= VOLUME_RATIO_BREAK and last > facts['high20_close'],
-               '%s 放量突破 20 日高点 %.2f（现价 %.2f，量比 %s）' % (name, facts['high20_close'], last, ratio))
+               '%s 放量突破 20 日高点 %.2f（现价 %.2f，量比 %s）' % (name, facts['high20_close'], last, ratio),
+               severity='watch')
 
 
 def node_signals(symbol, name, node_due):

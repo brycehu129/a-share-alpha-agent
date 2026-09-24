@@ -73,7 +73,7 @@ class Harness:
                              send_fn=lambda text: self.sent.append(text) or {'sent': True, 'chunks': 1},
                              minute_fn=lambda sym, now: minute(), directory=self.dir,
                              flow_fn=flow_fn, flow_dir=self.dir / 'intraday',
-                             sector_fn=lambda sym, day: self.sector)
+                             sector_fn=lambda sym, day: self.sector, book_state_dir=self.dir / 'book_state')
 
 
 def keys(signals, active=None):
@@ -187,8 +187,9 @@ class AfterTickTests(unittest.TestCase):
         r = h.s.after_tick({'events': [event()], 'dry_run': False}, now=NOW)
         self.assertEqual(r['alerts'], 1)
         text = h.sent[0]
-        for needle in ('【紧急】', '测试股', 'sz000001', '9.40', '触及止损', '成本 10.00', '系统止损位 9.47', '支撑/阻力', 'MACD', '不下单'):
+        for needle in ('【紧急】', '测试股', 'sz000001', '9.40', '触及止损', '成本 10.00', '系统止损位 9.47', '支撑/阻力', 'MACD'):
             self.assertIn(needle, text)
+        self.assertNotIn('不构成投资建议', text)      # 2026-09-24 起不再附免责声明
 
     def test_only_sentinel_events_are_pushed(self):
         """候选池执行器的成交事件（paper-entry 等）不是自选股提醒，不能推到你的手机上。"""
@@ -201,6 +202,25 @@ class AfterTickTests(unittest.TestCase):
         h = Harness(); self.prime(h)
         h.s.after_tick({'events': [event()], 'dry_run': True}, now=NOW)
         self.assertEqual(h.sent, [])
+
+    def test_watch_tier_events_are_logged_but_not_pushed(self):
+        """观察级信号（below_cost 等）不实时推送，但仍然写进 audit trail，标 pushed=false。"""
+        h = Harness(); self.prime(h)
+        r = h.s.after_tick({'events': [event(kind='sentinel.below_cost', severity='watch', detail='跌破成本')],
+                            'dry_run': False}, now=NOW)
+        self.assertEqual(r['alerts'], 0)
+        self.assertEqual(h.sent, [])
+        alerts = json.loads(next(sn.sdir(h.dir).glob('alerts-*.jsonl')).read_text().splitlines()[0])
+        self.assertEqual(alerts['push'], {'sent': False, 'reason': '本轮只有观察级信号，不实时推送'})
+        self.assertEqual(alerts['blocks'][0]['pushed'], False)
+        self.assertIn('跌破成本', alerts['blocks'][0]['text'])
+
+    def test_a_watch_event_alongside_an_actionable_one_still_pushes_the_actionable_part(self):
+        h = Harness(); self.prime(h)
+        r = h.s.after_tick({'events': [event(), event(kind='sentinel.below_cost', severity='watch', detail='跌破成本')],
+                            'dry_run': False}, now=NOW)
+        self.assertEqual(r['alerts'], 1)
+        self.assertIn('触及止损', h.sent[0])
 
     def test_multiple_symbols_in_one_tick_share_one_message_urgent_first(self):
         h = Harness(holdings=[HOLD, {**HOLD, 'symbol': 'sz000002', 'name': '另一只'}])
@@ -354,15 +374,43 @@ class FormatTests(unittest.TestCase):
                            {'label': '破位', 'direction': 'down', 'trigger_price': 9.2, 'trigger_condition': '放量跌破',
                             'target_low': 8.9, 'target_high': 9.0, 'invalidate_price': 9.5}]}
 
-    def test_scenarios_carry_all_numbers_and_the_honest_caveats(self):
+    def test_scenarios_carry_all_numbers_including_the_invalidate_price(self):
+        """失效价是情景唯一能自证对错的字段，2026-09-22 那版精简砍掉了它；这里必须带回来，
+        连同 current_read、每个情景的名字，都要出现在推送里——早先的测试反而断言它们缺席，是错的。"""
         t = sn.format_scenarios(self.ENTRY, '测试股', 9.4)
-        for needle in ('速判', '9.70', '9.90–10.00', '9.20', '不是胜率', '后台可看完整价位与收盘对账', '不构成投资建议'):
+        for needle in ('9.70', '9.90–10.00', '9.30', '9.20', '8.90–9.00', '9.50',   # 触发/目标/失效价全在
+                       '反抽', '破位', '现状：现价9.40跌破成本', '不是胜率'):
             self.assertIn(needle, t)
-        for absent in ('情景A', '现状：', '反抽', '破位'):
-            self.assertNotIn(absent, t)
+        self.assertNotIn('情景A', t)             # 旧的字母编号已经去掉，用情景自己的 label
 
     def test_no_percentage_win_rate_is_ever_printed(self):
         self.assertNotRegex(sn.format_scenarios(self.ENTRY, '测试股', 9.4), r'胜率\s*\d|概率\s*\d|\d+\s*%的')
+
+    def test_current_read_is_truncated(self):
+        entry = {**self.ENTRY, 'current_read': 'x' * 200}
+        t = sn.format_scenarios(entry, '测试股', 9.4)
+        self.assertLessEqual(len(t.split('现状：')[1].split('\n')[0]), 80)
+
+    def test_holding_and_trigger_lines_are_included_when_given(self):
+        holding = {'shares': 1000, 'cost_price': 9.5, 'combined_pct': 3.5, 'effective_cost': 9.18,
+                  't_base_shares': 1000}
+        triggers = [{'kind': 'sentinel.high20_break_volume', 'detail': 'd'}]
+        t = sn.format_scenarios(self.ENTRY, '测试股', 9.4, change_pct=1.2, holding=holding, triggers=triggers)
+        self.assertIn('（+1.20%）', t)
+        self.assertIn('持仓 1000股 成本 9.50｜综合 +3.50%｜等效成本 9.18｜可卖老仓 1000', t)
+        self.assertIn('触发：放量突破20日高点', t)
+
+    def test_message_wraps_multiple_stocks_with_one_header_and_no_trailing_disclaimer(self):
+        """2026-09-24 起去掉了末尾的免责声明/存档提示——用户反馈是噪音；情景照常存档、
+        照常在 15:20 对账，只是不再每条消息都念一遍。"""
+        blocks = [(self.ENTRY, '测试股', 9.4, None, None, None),
+                 ({**self.ENTRY, 'symbol': 'sz000002'}, '另一只', 9.4, None, None, None)]
+        msg = sn.format_scenario_message(blocks, '14:31')
+        self.assertEqual(msg.count('【情景研判'), 1)
+        self.assertIn('【情景研判 14:31】共 2 只', msg)
+        self.assertEqual(msg.count('▌'), 2)
+        self.assertNotIn('系统只提醒、不下单', msg)
+        self.assertNotIn('自动对账', msg)
 
     def test_glance_line_surfaces_the_nearest_up_down_levels_and_action(self):
         text = sn.scenario_glance({
@@ -469,12 +517,16 @@ class AnalyzePendingTests(unittest.TestCase):
         self.assertEqual(h.status(), {'p-sz000001': 'budget'})
 
     def test_one_analysis_run_sends_one_merged_message_not_one_per_stock(self):
-        """回放里 13 次研判推了 29 条消息——一天几十条，违背"只推可操作事件"。"""
+        """回放里 13 次研判推了 29 条消息——一天几十条，违背"只推可操作事件"。抬头只出现一次
+        （带时间戳和只数），每只股票用 ▌ 分隔，末尾不再有免责声明/存档提示（2026-09-24 起去掉）。"""
         h = AnalyzeHarness([pending_item('sz000001'), pending_item('sz000002')])
         h.run(data={'stocks': [good_entry('sz000001'), good_entry('sz000002')], 'data_caveats': []},
               snap=lambda syms: {'quotes': [quote('sz000001', last=9.4), quote('sz000002', last=9.4)], 'failures': []})
         self.assertEqual(len(h.sent), 1)
-        self.assertEqual(h.sent[0].count('【情景研判】'), 2)
+        self.assertEqual(h.sent[0].count('【情景研判'), 1)
+        self.assertIn('共 2 只', h.sent[0])
+        self.assertEqual(h.sent[0].count('▌'), 2)
+        self.assertNotIn('系统只提醒、不下单', h.sent[0])
 
     def test_scenario_issue_time_follows_the_passed_clock_not_the_wall_clock(self):
         """早先用 datetime.now()：回放/测试里情景的发布时间和它所属的交易日时间轴脱钩，收盘对账时

@@ -88,19 +88,28 @@ def _row_verdicts(holdings, watchlist, quotes):
     """每只股票的系统结论。以本地日线 + 已取到的报价为主；持仓股在能取到当日分时的情况下
     补充分时支撑/阻力与分钟级 MACD 观察。单只算不出来就只影响那一行（给一个说明文案），
     绝不让整页失败。"""
+    import add_advisor
     import book_levels
     import book_state
+    import book_triage
     import book_verdict
     import intraday_engine
     import live_check
     import minute_data
+    import portfolio_book
     import t_context
     from collect_quotes import CST
     from datetime import datetime
     history = history_dir()
     flow_dir = intraday_engine.data_dir()
-    pause = book_verdict.market_pause(history) if watchlist else None
+    pause = book_verdict.market_pause(history) if (watchlist or holdings) else None
+    account = portfolio_book.load_account()
     minute_cache = {}
+
+    def days_since(iso):
+        if not iso:
+            return None
+        return (datetime.now(CST).date() - datetime.fromisoformat(iso).date()).days
 
     def minute_for(symbol, quote_date):
         if symbol not in minute_cache:
@@ -132,7 +141,26 @@ def _row_verdicts(holdings, watchlist, quotes):
                         sym, quotes, qd,
                         lambda s_, d_: t_context.sector_change(history, s_, d_, cache_dir=flow_dir),
                         lambda s_, d_: t_context.flow_facts(flow_dir, s_, d_)))
-                    out[("holding", row["symbol"])] = book_verdict.holding_verdict(enriched, q, facts, limits, env_fn, day=day)
+                    verdict = book_verdict.holding_verdict(enriched, q, facts, limits, env_fn, day=day)
+                    # 补仓提示只在没有卖出信号在场时才值得算——否则一定会被 add_advisor 自己的否决挡掉，
+                    # 白算一次；分诊也只在算得出来时才有意义（日线不足时 triage() 已经明说了）。
+                    if facts and verdict["action"] in ("hold", "t"):
+                        prior_bars = [b for b in bars if b.get("date", "") < (q.get("quote_date") or "")]
+                        levels = enriched["levels"]
+                        triage_result = book_triage.triage(row["cost_price"], float(q["last"]), prior_bars, facts,
+                                                           levels.get("stop_pct", 0.08), levels.get("atr_pct") or 0.035)
+                        if triage_result["bucket"] in add_advisor.SUPPORTED_BUCKETS and account:
+                            env = env_fn()
+                            setup = book_verdict.sr.buy_setup(q, facts)
+                            add_state = book_state.get(row["symbol"])
+                            add_result = add_advisor.evaluate(
+                                enriched, q, facts, limits, triage_result, verdict["action"],
+                                market_pause=pause, market=env.get("market"), sector=env.get("sector"),
+                                flow=env.get("flow"), add_state=add_state, account=account,
+                                last_buy_price=row["cost_price"], days_since_last_add=days_since(add_state.get("last_add_at")),
+                                buy_setup_ok=setup["track"] == "pullback" and setup["passed"])
+                            verdict = book_verdict.holding_verdict(enriched, q, facts, limits, env_fn, day=day, add_result=add_result)
+                    out[("holding", row["symbol"])] = verdict
                 else:
                     out[("watch", row["symbol"])] = book_verdict.watch_verdict(row, q, facts, limits, pause)
             except Exception as exc:     # 单只失败不拖垮整页；原因写进结论里，别静默

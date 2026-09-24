@@ -86,7 +86,7 @@ class PayloadTests(unittest.TestCase):
             {'results': [{'id': 'r1', 'outcome': 'triggered_and_hit'}, {'id': 'r2', 'outcome': 'not_triggered'}]}))
         j = sv.sentinel_payload(DAY, self.dir)['judgments'][0]
         self.assertEqual((j['symbol'], j['action_hint'], j['scenario_count']), ('sz000001', '高位做T', 2))
-        self.assertIn('止损观察 + 09:45 节点', j['source'])
+        self.assertIn('触及止损位 + 09:45 节点', j['source'])
         self.assertIn('上破 10.20 看 10.40–10.60', j['glance'])
         self.assertIn('下破 9.80 转弱', j['glance'])
         self.assertEqual(j['outcome'], '1触发且命中 / 1未触发')

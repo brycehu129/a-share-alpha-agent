@@ -138,6 +138,45 @@ class SignalDecisionTests(unittest.TestCase):
         self.assertIn('zzz-urgent', [e['key'] for e in events])
         self.assertEqual(len(deferred), 1)
 
+    def test_normal_is_an_alias_for_action(self):
+        e = ie.normalize_signal(sig(True, severity='normal'))
+        self.assertEqual(e['severity'], 'action')
+
+    def test_node_signals_are_never_squeezed_out_of_the_tick_cap(self):
+        """节点信号只在跨节点的那一轮存在，被挤掉又不会顺延——ROADMAP 第 11 项。5 个 urgent
+        全部先到、还带着 3 个节点信号，节点必须全部保留，不占 MAX_EVENTS_PER_TICK 的名额。"""
+        st = ie.new_state('2026-09-21')
+        urgents = [sig(True, key='u%d' % i, symbol='sz00000%d' % i, severity='urgent')
+                  for i in range(ie.MAX_EVENTS_PER_TICK)]
+        nodes = [sig(True, key='node%d' % i, kind='sentinel.node_0945') for i in range(3)]
+        events, deferred, _ = self.fire(st, urgents + nodes, at(10, 0))
+        self.assertEqual(len(events), ie.MAX_EVENTS_PER_TICK + 3)
+        self.assertEqual(deferred, [])
+        self.assertEqual(sum(1 for e in events if e['kind'] == 'sentinel.node_0945'), 3)
+
+    def test_per_symbol_daily_cap_downgrades_action_signals_to_watch(self):
+        """每股每日 action 级上限：超出后当天该股后续 action 信号降级为 watch，不再占用
+        实时推送通道（severity 变成 'watch'），但仍然作为事件返回（不丢）。"""
+        st = ie.new_state('2026-09-21')
+        for i in range(ie.MAX_SENTINEL_ALERTS_PER_SYMBOL_PER_DAY):
+            events, _, _ = self.fire(st, [sig(True, key='k%d' % i, kind='sentinel.ma20_break')], at(10, i))
+            self.assertEqual(events[0]['severity'], 'action')
+        over, _, _ = self.fire(st, [sig(True, key='k-over', kind='sentinel.ma20_break')], at(10, 30))
+        self.assertEqual(over[0]['severity'], 'watch')
+
+    def test_urgent_signals_are_not_capped_by_the_per_symbol_daily_limit(self):
+        st = ie.new_state('2026-09-21')
+        for i in range(ie.MAX_SENTINEL_ALERTS_PER_SYMBOL_PER_DAY + 3):
+            events, _, _ = self.fire(st, [sig(True, key='k%d' % i, kind='sentinel.stop_hit', severity='urgent')], at(10, i))
+            self.assertEqual(events[0]['severity'], 'urgent')
+
+    def test_non_sentinel_kinds_are_not_capped(self):
+        """conditional_exec 的虚拟盘事件不带 'sentinel.' 前缀，不受这个上限约束。"""
+        st = ie.new_state('2026-09-21')
+        for i in range(ie.MAX_SENTINEL_ALERTS_PER_SYMBOL_PER_DAY + 3):
+            events, _, _ = self.fire(st, [sig(True, key='k%d' % i, kind='paper-entry')], at(10, i))
+            self.assertEqual(events[0]['severity'], 'action')
+
     def test_event_carries_audit_evidence(self):
         st = ie.new_state('2026-09-21')
         q = quote(last='9.50')

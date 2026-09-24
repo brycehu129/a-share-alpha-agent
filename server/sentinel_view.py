@@ -19,14 +19,6 @@ DAY_RE = re.compile(r'\d{4}-\d{2}-\d{2}')
 SYMBOL_RE = re.compile(r'(sh|sz)\d{6}')
 HINT_LABEL = {'hold': '继续持有', 'add': '买入/加仓', 'reduce': '减仓', 'wait': '观望',
               't_sell_high': '高位做T', 't_buy_low': '低位做T'}
-TRIGGER_LABEL = {
-    'sentinel.stop_hit': '止损观察',
-    'sentinel.target_hit': '目标观察',
-    'sentinel.below_cost': '跌破成本',
-    'sentinel.node_0945': '09:45 节点',
-    'sentinel.node_1305': '13:05 节点',
-    'sentinel.node_1430': '14:30 节点',
-}
 
 
 def safe_day(raw):
@@ -97,35 +89,24 @@ def scenario_rows(scenarios, symbol=None):
 
 
 def _pick_scenario(rows, direction):
-    items = [r['scenario'] for r in rows if r['scenario']['direction'] == direction]
-    if not items:
+    """两份独立实现过一样的"挑最近情景"逻辑，字符串还一度不一致（兜底文案）——统一到
+    sentinel.py（哨兵推送格式的权威来源），这里只是按 scenario_ledger.load_joined() 的行形状
+    （{'scenario':..., 'price_at_issue':...}）转一层再委托过去。函数内 import：sentinel.py
+    顶部无条件 `import fcntl`，只在真调用时才付这个代价（Windows 本地也不受影响）。"""
+    if not rows:
         return None
-    last = rows[0]['price_at_issue']
-    if direction == 'up':
-        items = [sc for sc in items if sc['trigger_price'] > last]
-        return min(items, key=lambda sc: sc['trigger_price']) if items else None
-    items = [sc for sc in items if sc['trigger_price'] < last]
-    return max(items, key=lambda sc: sc['trigger_price']) if items else None
+    import sentinel
+    return sentinel._nearest_scenario([r['scenario'] for r in rows], direction, rows[0]['price_at_issue'])
 
 
 def _glance(rows):
-    up = _pick_scenario(rows, 'up')
-    down = _pick_scenario(rows, 'down')
-    parts = []
-    if up:
-        parts.append('上破 %.2f 看 %.2f–%.2f' % (up['trigger_price'], up['target_low'], up['target_high']))
-    if down:
-        parts.append('下破 %.2f 转弱' % down['trigger_price'])
-    return '；'.join(parts) if parts else '暂无明确触发价'
+    import sentinel
+    return sentinel.render_glance(_pick_scenario(rows, 'up'), _pick_scenario(rows, 'down'))
 
 
 def _kind_label(kind):
-    if kind in TRIGGER_LABEL:
-        return TRIGGER_LABEL[kind]
-    tail = str(kind or '').split('.')[-1]
-    if tail.startswith('node_') and len(tail) == 9:
-        return '%s:%s 节点' % (tail[5:7], tail[7:9])
-    return tail.replace('_', ' ')
+    import sentinel
+    return sentinel.kind_label(kind)
 
 
 def _source_label(rows):

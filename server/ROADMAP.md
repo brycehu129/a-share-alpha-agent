@@ -50,15 +50,15 @@
 ### 9. 哨兵触发规则优化（资金流）— 待讨论
 - **现状**：`sentinel_rules.py` 的规则全部基于价格、日线均线/高低点、量比；主力/大单/内外盘/委比已经在采集并展示在告警文字和抽屉里，但**不触发任何告警**。（止损/止盈位、做T底仓、买入信号现在由系统按成本价、ATR、成交流水和策略形态自动算，不再需要你声明。）
 - **待定**：是否新增"主力累计净流入由正转负""大单持续流出""外盘占比明显失衡"等触发；阈值、重新武装间隔、是否分持仓/自选。先看几天留存（`bars-` / `flow-`）里这些量的分布再定阈值，不要拍脑袋。
-- **注意**：新规则会让告警变多，而引擎每轮最多推 5 个事件（见第 11 项）。
+- **注意**：新规则会让告警变多。2026-09-23 起有了三档分级（urgent/action/watch）和每股每日 action 级上限（默认 6 条，见 STRATEGY.md「自选股哨兵」节），新增的资金流触发建议直接定级为 action 或 watch，不要都设成 urgent；引擎每轮最多推 5 个事件的上限仍在，但节点信号已单独放行（第 11 项）。
 
 ### 10. 龙虎榜 / 涨跌停池每日同步 — 待确认（会改仓库外部可见的配置）
 - **现状**：`tushare-extra-sync.yml` 只有 `workflow_dispatch`，只回补过近 11 个交易日；看板显示"最近一次有数据的交易日"并标日期，今天看到的是 09-16。
 - **草案**：给该 workflow 加 `schedule`（建议北京时间 19:30，龙虎榜盘后才出）。需要确认 Actions 的 token 配额与 40 分钟时限够用。
 
-### 11. 节点事件疑似被"每轮 5 条"上限挤掉 — 待核实（未证实）
-- **疑点**：`intraday_engine.MAX_EVENTS_PER_TICK=5`（`apply_signals`）；边沿信号被挤掉会顺延，但 09:45 / 13:05 / 14:30 的节点信号只在跨过节点的那一轮存在（`node_due`），被挤掉后没有顺延，该股该节点的情景研判就丢了。页头"情景只有 32 条"可能与此有关。
-- **核实**：在服务器上看 `intraday/events-<日期>.jsonl` 与 `sentinel/done/*.json`，统计节点事件被挤掉的次数；确认后再决定是把节点信号改成可顺延，还是把节点事件排除出 5 条上限。
+### 11. 节点事件疑似被"每轮 5 条"上限挤掉 — 已修复（2026-09-23）
+- **原疑点**：`intraday_engine.MAX_EVENTS_PER_TICK=5`（`apply_signals`）；边沿信号被挤掉会顺延，但 09:45 / 13:05 / 14:30 的节点信号只在跨过节点的那一轮存在（`node_due`），被挤掉后没有顺延，该股该节点的情景研判就丢了。页头"情景只有 32 条"可能与此有关。
+- **修复**：`apply_signals` 把 `kind` 以 `sentinel.node_` 开头的信号单独一条通道，不占 `MAX_EVENTS_PER_TICK` 的额度，触发必进；测试见 `test_intraday_engine.test_node_signals_are_never_squeezed_out_of_the_tick_cap`。**没有回溯验证过去丢了多少次**——这条只保证以后不再丢。
 
 ### 12. 资金流上线后的观察项 — 待观察
 - **东方财富资金流是非官方接口**：服务器（境外机房）可能被限流或屏蔽。已设计成降级（取不到只显示腾讯的内外盘/委比并写明原因），但要看几天的 `flow-<日期>.jsonl` 里 `error` 行占比；成功率太低就并入第 1 项（备用行情源）一起找备源。
@@ -69,6 +69,25 @@
 - `SourceFooter.vue` 读 `research.mapping_mapped / mapping_universe`，导出的实际是 `research.mapping.{mapped_count,universe_count}`，页面显示 `undefined`。
 - 盘前 09:15 快照里平盘家数虚高，看板宽度面板已加提示，但没有按时段隐藏。
 - 告警抽屉的分时资金流表每 30 分钟一行，只是数据表；如需要看走势线再另做，并且只画事实、不画预测线。
+
+## 2026-09-23 持仓告警重构后遗留（待做）
+
+回本进度（综合盈亏/等效成本，`book_pnl.py`）与哨兵三档分级/每股每日上限/节点信号保护已上线（见 STRATEGY.md「自选股哨兵」节）。同一轮规划里**尚未做**的部分：
+
+### 14. 情景研判推送格式改版 — 已完成大半（2026-09-23）
+- **已做**：抬头加时间戳与只数（`【情景研判 14:31】共 2 只`）；每只加触发原因（`触发：放量突破20日高点`）；加回 `current_read`（截 80 字）；每个情景一行必须带失效价（此前被砍掉，是情景唯一能自证对错的字段）；持仓股带综合盈亏/等效成本/可卖老仓（接 `book_pnl.py`）；免责声明只在消息末尾出现一次（此前每只重复）；`sentinel.scenario_glance` 与 `sentinel_view._glance` 已合并到 `sentinel.py`（`_nearest_scenario` / `render_glance` / `kind_label`），`sentinel_view.py` 改成延迟 import 委托过去，不在模块顶层拉 `sentinel.py` 的 `fcntl` 依赖。
+- **未做**：AI 预算（`SENTINEL_AI_MAX_PER_DAY`）目前仍是先到先得，节点事件可能把预算耗尽；按严重级别排序 pending 队列（urgent 优先）需要把现在"一次 analyze_fn 调用处理全部待研判项"的批处理设计拆成按优先级分批调用，改动面比格式改版大，单独留着。
+
+### 15. 规则层告警的结果对账 — 未做（只做了机制层面的分级与限流）
+- `scenario_ledger.py` 只对账 AI 情景；`stop_hit`、高抛低吸、`buy_signal` 这些规则告警发出去之后对不对，仍然没有机械记录。原料齐全：`alerts-<日期>.jsonl`、`intraday/bars-<日期>.jsonl`、`intraday/state-<日期>.json`（含"差一点"的 `closest_pct`），可以完整重放。
+- 待做（`alert_ledger.py`，纪律参考 `scenario_ledger.py`）：① 机制核对——重放留档的报价/事实，断言当时规则确实成立、文字里的数字没错、没有重复/漏发、rearm 没被违反；② 结果标签——只用告警**之后**的分钟数据判定"避损/错杀/无结论"这一类结果（阈值以 ATR 为单位），样本 <20 只给计数；③ 15:20 随现有的 `cron_sentinel_reconcile.sh` 一起跑，出日报，周五并入情景周报。
+
+### 16. 持仓策略增强 — 大部分已完成（2026-09-24）
+- **移动止损/保本止损**：已做。`book_levels.effective_stop` 把成本止损/保本止损（复用 `conditional_exec.breakeven_price` 的二分求解，不是近似）/移动止损（`exec_spec.TRAIL_ATR_MULT=2.0`，新常量，不在 `TUNABLE_PARAMS` 白名单里——那份白名单是候选池策略的提议流程，这个只管真实持仓，性质和 `sentinel_rules.py` 的经验阈值一样）取最紧的一条；历史最高价存 `book_state.json`（`book_state.touch_peak`，首次调用会用本地日线把开仓以来的高点补齐）。新信号 `sentinel.trail_stop_hit`（urgent），已归入 `book_verdict.EXIT_KINDS`。
+- **亏损仓分诊**：已做，`book_triage.py`。按均线结构分 `broken`/`pullback`/`range`/`healthy` 四档，纯函数没有 I/O；测试守住"分诊不能把 exit 降级"这条安全边界。
+- **分批减仓比例**：已做。`book_verdict.holding_verdict` 给 `reduce`/`exit` 结论加 `size_pct`（触及止盈位或破一条均线 1/3、同时破两条均线但仍在成本上 1/2、`exit` 100%）和 `size_shares`（按最小交易单位取整、封顶今天可卖数量，不足一手会明说）。
+- **规则化补仓提示**：已做，`add_advisor.py`（独立模块，不是 `sentinel_rules.add_signal`——仓位计算需要账户资金/分诊/大盘板块/资金流一整套上下文，放进纯规则的 `sentinel_rules.py` 会破坏它"没有 I/O、只吃已算好的事实"的约定）。完整的硬否决 + 支持条件 + 反马丁格尔仓位算法（风险预算封顶，亏得越深/波动越大能补的股数越少）；`book_verdict.holding_verdict` 接 `add_result`，优先级 `exit > reduce > t > add > hold`；`api_pages._row_verdicts` 已接入，账户资金页面（`GET/POST /api/book/account`，第一期就有）填了才会算。**页面能看到"可考虑补仓"，但企业微信还不会推送**——`add_advisor.evaluate()` 没有接进 `sentinel.py` 的 `evaluate()`/`intraday_engine` 事件管线，没有 `sentinel.add_signal` 这个哨兵信号，`alert_ledger.py` 的 `LABELED_KINDS`/`REARM_BY_KIND` 也还没收录它。
+- **做T闭环**（`t_cycle.py`）— 仍未做：高抛提示发出后开一个"待买回"周期，算出目标买回价，盘中触及时提醒（`sentinel.t_buyback_ready`），15:20 按"若按提示执行"对账净收益（样本 <20 不给百分比）。孤立的 `t_buy_low`（当天没有对应高抛）本质是"加仓时点提示"，设计上应该合并进补仓判断，不再单独当做T信号——目前还是老样子，独立存在。
 
 ## 工程
 - **08:40 盘前流程耗时实测**：必须在 09:20 前跑完，否则当天没有计划。服务器上看：`journalctl -u alpha-shadow-daily.service --since "3 days ago" | grep -E "Starting|Finished|Deactivated"`。如果太慢，把选股/冻结拆成独立的轻量任务并提前触发。

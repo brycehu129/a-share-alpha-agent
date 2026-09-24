@@ -105,6 +105,68 @@ class HoldingVerdictTests(unittest.TestCase):
         self.assertIn('系统止盈位', target['reasons'][0])
         self.assertEqual(self.verdict(holding(), quote(last=9.6, prev=10.0, ratio=3.0))['action'], 'reduce')   # 放量下跌 -4%
 
+    def test_exit_sells_the_entire_sellable_position(self):
+        v = self.verdict(holding(sellable_shares=700), quote(last=9.4))
+        self.assertEqual(v['action'], 'exit')
+        self.assertEqual((v['size_pct'], v['size_shares']), (1.0, 700))
+        self.assertIn('T+1', v['reasons'][-1])       # 说明还有 300 股今天买的卖不了
+
+    def test_exit_with_the_full_position_sellable_has_no_extra_note(self):
+        v = self.verdict(holding(), quote(last=9.4))          # 默认 sellable = 全部 1000 股
+        self.assertEqual((v['size_pct'], v['size_shares']), (1.0, 1000))
+        self.assertNotIn('T+1', v['reasons'][-1])
+
+    def test_reduce_on_a_single_broken_average_sells_a_third_rounded_to_a_lot(self):
+        below20 = self.verdict(holding(), quote(last=9.9), facts={**CALM, 'ma20': 10.5})
+        self.assertAlmostEqual(below20['size_pct'], 1 / 3, places=4)
+        self.assertEqual(below20['size_shares'], 300)          # 1000/3=333，向下取整到 100 的整数倍
+
+    def test_reduce_with_both_averages_broken_but_still_above_cost_sells_half(self):
+        broken = {**CALM, 'ma20': 10.5, 'ma60': 11.0}
+        v = self.verdict(holding(), quote(last=10.3), facts=broken)
+        self.assertEqual(v['action'], 'reduce')
+        self.assertEqual((v['size_pct'], v['size_shares']), (0.5, 500))
+
+    def test_reduce_shares_are_capped_by_what_is_actually_sellable_today(self):
+        v = self.verdict(holding(sellable_shares=200), quote(last=11.1))    # 止盈触发，1/3 理论上是 333
+        self.assertEqual(v['action'], 'reduce')
+        self.assertEqual(v['size_shares'], 200)                              # 但今天只有 200 股可卖，封顶在这里
+
+    def test_less_than_one_lot_sellable_says_so_instead_of_selling_zero_silently(self):
+        v = self.verdict(holding(sellable_shares=50), quote(last=9.9), facts={**CALM, 'ma20': 10.5})
+        self.assertEqual(v['size_shares'], 0)
+        self.assertIn('不足一手', v['reasons'][-1])
+
+    def test_a_supported_add_result_becomes_the_add_action_when_otherwise_quiet(self):
+        import add_advisor
+        add_result = {'ok': True, 'add_shares': 200,
+                      'preview': {'old_cost': 10.0, 'new_cost': 9.6, 'old_stop': 9.5, 'new_stop': 9.1,
+                                 'old_max_loss': 500.0, 'new_max_loss': 480.0}}
+        v = self.verdict(holding(), quote(last=10.0))
+        self.assertEqual(v['action'], 'hold')            # 没传 add_result 就还是老样子
+        v = bv.holding_verdict(holding(), quote(last=10.0), CALM, {}, add_result=add_result)
+        self.assertEqual((v['action'], v['label']), ('add', '可考虑补仓'))
+        self.assertEqual(v['add_shares'], 200)
+        self.assertIn('摊低的是成本线，不是风险', v['reasons'][-1])
+
+    def test_a_sell_signal_always_outranks_an_add_suggestion(self):
+        add_result = {'ok': True, 'add_shares': 200, 'preview': {
+            'old_cost': 10.0, 'new_cost': 9.6, 'old_stop': 9.5, 'new_stop': 9.1, 'old_max_loss': 500.0, 'new_max_loss': 480.0}}
+        v = bv.holding_verdict(holding(), quote(last=9.4), CALM, {}, add_result=add_result)   # 触及止损
+        self.assertEqual(v['action'], 'exit')
+
+    def test_a_declined_add_result_leaves_the_row_on_hold_with_a_note(self):
+        add_result = {'ok': False, 'veto': None, 'support': '分诊为"趋势已坏"，不是回调也不是区间震荡'}
+        v = bv.holding_verdict(holding(), quote(last=10.0), CALM, {}, add_result=add_result)
+        self.assertEqual(v['action'], 'hold')
+        self.assertIn('暂不建议补仓', v['reasons'][-1])
+
+    def test_hold_and_t_verdicts_carry_no_size_fields(self):
+        v = self.verdict(holding(), quote(last=10.0))
+        self.assertEqual(v['action'], 'hold')
+        self.assertNotIn('size_pct', v)
+        self.assertNotIn('size_shares', v)
+
     ENV_SPIKE = {'market': 0.2, 'market_name': '沪深300', 'sector': 0.3, 'sector_name': '银行', 'sector_n': 30,
                  'flow': {'main': -3e7, 'main_30m': -1e7, 'as_of': '1030'}}
     WIDE_HIGH = dict(last=10.5, prev=10.0, high=10.6, low=9.6)          # 振幅 10%，区间位置 90%，涨 5%

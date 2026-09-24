@@ -24,6 +24,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import book_levels
+import book_state
 from collect_quotes import CST
 from dashboard_export import latest
 from shortterm_model import BREAKOUT, PULLBACK
@@ -160,21 +161,29 @@ def entry_band(forecast, quote):
             'eligible_from': forecast.get('eligible_from'), 'as_of': forecast.get('as_of')}
 
 
-def holding_facts(holding, quote):
+def holding_facts(holding, quote, trades=None):
     """持仓事实。holding 应是 book_levels.enrich 之后的行：止损/止盈位是系统按策略（ATR）从成本价算的，
-    做T底仓是今天可卖的老仓——都不是用户声明的，下游据此措辞。没 enrich 过就是 None，不代填默认值。"""
+    做T底仓是今天可卖的老仓——都不是用户声明的，下游据此措辞。没 enrich 过就是 None，不代填默认值。
+
+    trades 传了才会算综合盈亏（浮动+已实现）与等效成本（book_pnl.py）——旧调用方不传就还是原来的
+    浮动盈亏口径，不强制所有调用方都先取一遍成交流水。"""
     last = _f(quote.get('last'))
     cost, shares = float(holding['cost_price']), int(holding['shares'])
     value = round(last * shares, 2)
     pnl = round((last - cost) * shares, 2)
     stop, target = holding.get('stop_price'), holding.get('target_price')
-    return {'shares': shares, 'cost_price': cost, 'market_value': value,
-            'unrealized_pnl': pnl, 'unrealized_pct': round((last / cost - 1) * 100, 4),
-            'opened_on': holding.get('opened_on'), 'note': holding.get('note') or None,
-            'stop_price': stop, 'target_price': target,
-            't_base_shares': holding.get('t_base_shares') or 0,
-            'to_stop_pct': round((last / stop - 1) * 100, 4) if stop else None,
-            'to_target_pct': round((target / last - 1) * 100, 4) if target else None}
+    out = {'shares': shares, 'cost_price': cost, 'market_value': value,
+           'unrealized_pnl': pnl, 'unrealized_pct': round((last / cost - 1) * 100, 4),
+           'opened_on': holding.get('opened_on'), 'note': holding.get('note') or None,
+           'stop_price': stop, 'target_price': target,
+           't_base_shares': holding.get('t_base_shares') or 0,
+           'to_stop_pct': round((last / stop - 1) * 100, 4) if stop else None,
+           'to_target_pct': round((target / last - 1) * 100, 4) if target else None}
+    if trades is not None:
+        import book_pnl
+        realized = book_pnl.realized_pnl(trades, holding['symbol'])
+        out.update(book_pnl.combined(holding, quote, realized))
+    return out
 
 
 def check(history, quotes, holdings=None, watchlist=None, agent=None):
@@ -237,8 +246,10 @@ def check(history, quotes, holdings=None, watchlist=None, agent=None):
             row['plan']['paper_eligible'] = forecast.get('paper_eligible')
             row['plan']['plan_reasons'] = forecast.get('plan_reasons', [])
         if symbol in holdings:
+            peak = book_state.touch_peak(symbol, _f(quote.get('last')), datetime.now(CST), bars,
+                                         holdings[symbol].get('opened_on'))
             row['holding'] = holding_facts(
-                book_levels.enrich(holdings[symbol], bars, quote.get('quote_date')), quote)
+                book_levels.enrich(holdings[symbol], bars, quote.get('quote_date'), peak_price=peak), quote)
         if symbol in watchlist:
             row['watch'] = {'note': watchlist[symbol].get('note') or None}
         rows.append(row)
