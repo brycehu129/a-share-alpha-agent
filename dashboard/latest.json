@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-09-24T07:12:06.708446+08:00",
+  "exported_at": "2026-09-24T08:19:00.477475+08:00",
   "market": {
     "generated_at": "2026-09-23T20:18:06.221504+08:00",
     "status": "success",
@@ -5733,7 +5733,7 @@
     ]
   },
   "sync": {
-    "generated_at": "2026-09-24T07:10:34.743637+08:00",
+    "generated_at": "2026-09-24T08:17:33.973594+08:00",
     "status": "partial",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
@@ -5747,7 +5747,7 @@
     "stock_counts": null
   },
   "analysis": {
-    "generated_at": "2026-09-24T07:10:53.416169+08:00",
+    "generated_at": "2026-09-24T08:17:51.635872+08:00",
     "status": "ready",
     "start_date": "20260826",
     "end_date": "20260923",
@@ -6012,21 +6012,21 @@
     },
     {
       "kind": "sync",
-      "id": "20260923231004-1",
-      "generated_at": "2026-09-24T07:10:34.743637+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260923231004-1.md"
+      "id": "20260924001704-1",
+      "generated_at": "2026-09-24T08:17:33.973594+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20260924001704-1.md"
     },
     {
       "kind": "analysis",
-      "id": "20260923231004-1",
-      "generated_at": "2026-09-24T07:10:53.416169+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260923231004-1.md"
+      "id": "20260924001704-1",
+      "generated_at": "2026-09-24T08:17:51.635872+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20260924001704-1.md"
     },
     {
       "kind": "盘前/收盘日报",
-      "id": "20260923231004-1",
-      "generated_at": "2026-09-24T07:11:43.703498+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260923231004-1.md"
+      "id": "20260924001704-1",
+      "generated_at": "2026-09-24T08:18:40.204056+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/briefs/20260924001704-1.md"
     },
     {
       "kind": "候选预测与虚拟组合",
