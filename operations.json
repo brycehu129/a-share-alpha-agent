@@ -1,20 +1,16 @@
 {
   "reports": {
     "premarket": {
-      "id": "20260929051701-1",
+      "id": "20260929061702-1",
       "slot": "premarket",
       "report_date": "2026-09-29",
       "expected_date": "2026-09-28",
-      "started_at": "2026-09-29T13:17:37.730413+08:00",
-      "updated_at": "2026-09-29T13:24:07.114192+08:00",
-      "status": "failed",
+      "started_at": "2026-09-29T14:17:38.636463+08:00",
+      "updated_at": "2026-09-29T14:17:38.636463+08:00",
+      "status": "running",
       "data_date": null,
-      "issues": [
-        "整理任务未成功结束，请查看运行记录中的失败步骤。",
-        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
-      ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260929051701",
-      "finished_at": "2026-09-29T13:24:07.114192+08:00"
+      "issues": [],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260929061702"
     },
     "close": {
       "id": "20260928121702-1",
@@ -32,22 +28,18 @@
       "finished_at": "2026-09-28T20:24:22.868577+08:00"
     }
   },
-  "updated_at": "2026-09-29T13:24:07.114192+08:00",
+  "updated_at": "2026-09-29T14:17:38.636463+08:00",
   "latest_run": {
-    "id": "20260929051701-1",
+    "id": "20260929061702-1",
     "slot": "premarket",
     "report_date": "2026-09-29",
     "expected_date": "2026-09-28",
-    "started_at": "2026-09-29T13:17:37.730413+08:00",
-    "updated_at": "2026-09-29T13:24:07.114192+08:00",
-    "status": "failed",
+    "started_at": "2026-09-29T14:17:38.636463+08:00",
+    "updated_at": "2026-09-29T14:17:38.636463+08:00",
+    "status": "running",
     "data_date": null,
-    "issues": [
-      "整理任务未成功结束，请查看运行记录中的失败步骤。",
-      "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260929051701",
-    "finished_at": "2026-09-29T13:24:07.114192+08:00"
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20260929061702"
   },
   "calendar": [
     {
