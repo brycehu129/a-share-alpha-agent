@@ -32,27 +32,20 @@
       "finished_at": "2026-10-07T20:18:13.379145+08:00"
     }
   },
-  "updated_at": "2026-10-07T20:18:13.379145+08:00",
+  "updated_at": "2026-10-08T07:10:40.441935+08:00",
   "latest_run": {
-    "id": "20261007121711-1",
-    "slot": "close",
-    "report_date": "2026-10-07",
-    "expected_date": "2026-10-07",
-    "started_at": "2026-10-07T20:17:48.166889+08:00",
-    "updated_at": "2026-10-07T20:18:13.379145+08:00",
-    "status": "failed",
+    "id": "20261007231002-1",
+    "slot": "prepare",
+    "report_date": "2026-10-08",
+    "expected_date": "2026-09-30",
+    "started_at": "2026-10-08T07:10:40.441935+08:00",
+    "updated_at": "2026-10-08T07:10:40.441935+08:00",
+    "status": "running",
     "data_date": null,
-    "issues": [
-      "整理任务未成功结束，请查看运行记录中的失败步骤。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261007121711",
-    "finished_at": "2026-10-07T20:18:13.379145+08:00"
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261007231002"
   },
   "calendar": [
-    {
-      "date": "2026-09-07",
-      "state": "open"
-    },
     {
       "date": "2026-09-08",
       "state": "open"
@@ -295,6 +288,10 @@
     },
     {
       "date": "2026-11-07",
+      "state": "closed"
+    },
+    {
+      "date": "2026-11-08",
       "state": "closed"
     }
   ],
