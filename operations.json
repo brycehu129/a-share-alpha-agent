@@ -1,19 +1,16 @@
 {
   "reports": {
     "premarket": {
-      "id": "20261013004006-1",
+      "id": "20261013011702-1",
       "slot": "premarket",
       "report_date": "2026-10-13",
       "expected_date": "2026-10-12",
-      "started_at": "2026-10-13T08:40:40.069045+08:00",
-      "updated_at": "2026-10-13T08:48:16.223249+08:00",
-      "status": "failed",
+      "started_at": "2026-10-13T09:17:39.783198+08:00",
+      "updated_at": "2026-10-13T09:17:39.783198+08:00",
+      "status": "running",
       "data_date": null,
-      "issues": [
-        "整理任务未成功结束，请查看运行记录中的失败步骤。"
-      ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261013004006",
-      "finished_at": "2026-10-13T08:48:16.223249+08:00"
+      "issues": [],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261013011702"
     },
     "close": {
       "id": "20261012121701-1",
@@ -31,21 +28,18 @@
       "finished_at": "2026-10-12T20:25:17.029667+08:00"
     }
   },
-  "updated_at": "2026-10-13T08:48:16.223249+08:00",
+  "updated_at": "2026-10-13T09:17:39.783198+08:00",
   "latest_run": {
-    "id": "20261013004006-1",
+    "id": "20261013011702-1",
     "slot": "premarket",
     "report_date": "2026-10-13",
     "expected_date": "2026-10-12",
-    "started_at": "2026-10-13T08:40:40.069045+08:00",
-    "updated_at": "2026-10-13T08:48:16.223249+08:00",
-    "status": "failed",
+    "started_at": "2026-10-13T09:17:39.783198+08:00",
+    "updated_at": "2026-10-13T09:17:39.783198+08:00",
+    "status": "running",
     "data_date": null,
-    "issues": [
-      "整理任务未成功结束，请查看运行记录中的失败步骤。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261013004006",
-    "finished_at": "2026-10-13T08:48:16.223249+08:00"
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261013011702"
   },
   "calendar": [
     {
