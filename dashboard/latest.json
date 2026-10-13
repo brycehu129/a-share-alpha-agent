@@ -1,76 +1,76 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-10-12T09:47:50.867902+08:00",
+  "exported_at": "2026-10-13T09:31:47.673612+08:00",
   "market": {
-    "generated_at": "2026-10-12T09:18:27.289025+08:00",
+    "generated_at": "2026-10-13T09:18:21.357236+08:00",
     "status": "success",
-    "summary": "源数据日期 2026-10-12：所监测6个指数中，0个上涨、2个下跌、4个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
+    "summary": "源数据日期 2026-10-13：所监测6个指数中，0个上涨、0个下跌、6个持平。仅描述指数相对昨收表现，不推断全市场赚钱效应。",
     "quotes": [
       {
         "name": "上证指数",
         "symbol": "sh000001",
-        "last": "3813.73",
+        "last": "3797.21",
         "change_pct": "-0.00%",
-        "quote_at": "2026-10-12T09:18:00+08:00"
+        "quote_at": "2026-10-13T09:18:00+08:00"
       },
       {
         "name": "沪深300",
         "symbol": "sh000300",
-        "last": "4317.01",
-        "change_pct": "-0.01%",
-        "quote_at": "2026-10-12T09:18:00+08:00"
+        "last": "4287.98",
+        "change_pct": "0.00%",
+        "quote_at": "2026-10-13T09:18:00+08:00"
       },
       {
         "name": "科创50",
         "symbol": "sh000688",
-        "last": "1457.23",
-        "change_pct": "-0.00%",
-        "quote_at": "2026-10-12T09:18:00+08:00"
+        "last": "1426.72",
+        "change_pct": "0.00%",
+        "quote_at": "2026-10-13T09:18:00+08:00"
       },
       {
         "name": "中证1000",
         "symbol": "sh000852",
-        "last": "7155.45",
-        "change_pct": "-0.01%",
-        "quote_at": "2026-10-12T09:18:00+08:00"
+        "last": "7021.40",
+        "change_pct": "-0.00%",
+        "quote_at": "2026-10-13T09:18:00+08:00"
       },
       {
         "name": "深证成指",
         "symbol": "sz399001",
-        "last": "12641.86",
+        "last": "12384.87",
         "change_pct": "0.00%",
-        "quote_at": "2026-10-12T09:17:33+08:00"
+        "quote_at": "2026-10-13T09:17:42+08:00"
       },
       {
         "name": "创业板指",
         "symbol": "sz399006",
-        "last": "3043.33",
+        "last": "2963.82",
         "change_pct": "0.00%",
-        "quote_at": "2026-10-12T09:17:48+08:00"
+        "quote_at": "2026-10-13T09:17:57+08:00"
       }
     ],
     "universe": {
       "status": "success",
-      "listed": 5223,
-      "quoted": 5223,
+      "listed": 5224,
+      "quoted": 5224,
       "coverage_pct": 100.0,
       "dates": {
-        "2026-10-12": 5223
+        "2026-10-13": 5224
       },
       "breadth": {
-        "up": 1741,
-        "down": 2050,
-        "flat": 1432
+        "up": 1041,
+        "down": 3266,
+        "flat": 917
       }
     }
   },
   "research": {
-    "generated_at": "2026-10-12T09:22:51.240137+08:00",
+    "generated_at": "2026-10-13T09:22:59.753140+08:00",
     "status": "partial",
-    "factor_cutoff": "2026-10-09",
+    "factor_cutoff": "2026-10-12",
     "industry_provider": "新浪行业",
     "mapping": {
-      "universe_count": 5223,
+      "universe_count": 5224,
       "mapped_count": 2419,
       "conflicts": [
         "sz002617",
@@ -2860,6 +2860,7 @@
         "sz301655",
         "sz301656",
         "sz301658",
+        "sz301660",
         "sz301662",
         "sz301665",
         "sz301666",
@@ -5305,42 +5306,43 @@
         "sz002565": "new_zzhy"
       }
     },
-    "source_id": "20261012011702-1",
-    "source_generated_at": "2026-10-12T09:18:27.289025+08:00",
+    "source_id": "20261013011702-1",
+    "source_generated_at": "2026-10-13T09:18:21.357236+08:00",
     "sample_count": 0,
     "factor_count": 0,
     "rankings": [],
     "industries": []
   },
   "sync": {
-    "generated_at": "2026-10-12T09:17:48.459323+08:00",
+    "generated_at": "2026-10-13T09:17:42.036346+08:00",
     "status": "partial",
     "calendar_range": "20250101—20261231",
     "calendar_agree": true,
     "target_days": 60,
-    "saved_days": 54,
-    "pending_days": 6,
+    "saved_days": 53,
+    "pending_days": 7,
     "errors": [
       "stock_basic: authentication_error token已过期",
-      "20261009: daily: authentication_error token已过期"
+      "20261012: daily: authentication_error token已过期"
     ],
     "stock_counts": null
   },
   "analysis": {
-    "generated_at": "2026-10-12T09:23:19.066441+08:00",
+    "generated_at": "2026-10-13T09:23:33.789276+08:00",
     "status": "waiting_data",
-    "start_date": "20260903",
-    "end_date": "20261009",
+    "start_date": "20260904",
+    "end_date": "20261012",
     "missing_dates": [
       "20260924",
       "20260928",
       "20260929",
       "20260930",
       "20261008",
-      "20261009"
+      "20261009",
+      "20261012"
     ],
     "issues": [
-      "目标窗口缺少6个完整日线/因子检查点，暂不排名。"
+      "目标窗口缺少7个完整日线/因子检查点，暂不排名。"
     ],
     "rankings": [],
     "factor_count": 0
@@ -5348,27 +5350,27 @@
   "sources": [
     {
       "kind": "market",
-      "id": "20261012011702-1",
-      "generated_at": "2026-10-12T09:18:27.289025+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20261012011702-1.md"
+      "id": "20261013011702-1",
+      "generated_at": "2026-10-13T09:18:21.357236+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/reports/20261013011702-1.md"
     },
     {
       "kind": "research",
-      "id": "20261012011702-1",
-      "generated_at": "2026-10-12T09:22:51.240137+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20261012011702-1.md"
+      "id": "20261013011702-1",
+      "generated_at": "2026-10-13T09:22:59.753140+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/research/20261013011702-1.md"
     },
     {
       "kind": "sync",
-      "id": "20261012011702-1",
-      "generated_at": "2026-10-12T09:17:48.459323+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20261012011702-1.md"
+      "id": "20261013011702-1",
+      "generated_at": "2026-10-13T09:17:42.036346+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_data/runs/20261013011702-1.md"
     },
     {
       "kind": "analysis",
-      "id": "20261012011702-1",
-      "generated_at": "2026-10-12T09:23:19.066441+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20261012011702-1.md"
+      "id": "20261013011702-1",
+      "generated_at": "2026-10-13T09:23:33.789276+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/tushare_analysis/20261013011702-1.md"
     },
     {
       "kind": "盘前/收盘日报",
@@ -5378,18 +5380,21 @@
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20261012014703-1",
-      "generated_at": "2026-10-12T09:47:50.629172+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20261012014703-1.md"
+      "id": "20261013013102-1",
+      "generated_at": "2026-10-13T09:31:47.460394+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20261013013102-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-10-12T09:47:50.629172+08:00",
+    "generated_at": "2026-10-13T09:31:47.460394+08:00",
     "version": "select-0.5",
     "status": "ready",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
     "issues": [
-      "开盘观察执行记录；当日净值仍需收盘估值。未用当天完整日线决定成交。"
+      "开盘观察执行记录；当日净值仍需收盘估值。未用当天完整日线决定成交。",
+      "账户未完成上一交易日估值",
+      "账户未完成上一交易日估值",
+      "账户未完成上一交易日估值"
     ],
     "calibration": {
       "walk_forward_n": 0,
