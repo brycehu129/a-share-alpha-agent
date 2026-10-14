@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "exported_at": "2026-10-14T09:36:00.473553+08:00",
+  "exported_at": "2026-10-14T09:48:24.714382+08:00",
   "market": {
     "generated_at": "2026-10-14T09:18:49.624659+08:00",
     "status": "success",
@@ -5381,13 +5381,13 @@
     },
     {
       "kind": "候选预测与虚拟组合",
-      "id": "20261014013459-1",
-      "generated_at": "2026-10-14T09:36:00.138797+08:00",
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20261014013459-1.md"
+      "id": "20261014014703-1",
+      "generated_at": "2026-10-14T09:48:24.398638+08:00",
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/blob/market-data/agent/20261014014703-1.md"
     }
   ],
   "agent": {
-    "generated_at": "2026-10-14T09:36:00.138797+08:00",
+    "generated_at": "2026-10-14T09:48:24.398638+08:00",
     "version": "select-0.5",
     "status": "ready",
     "target": "下一可验证交易日开盘至第3个交易间隔收盘（1/2日辅助验收），扣0.5%假设往返成本后盈利且跑赢同期沪深300价格指数",
