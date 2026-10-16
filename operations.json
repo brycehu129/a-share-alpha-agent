@@ -17,36 +17,30 @@
       "finished_at": "2026-10-16T15:28:55.796467+08:00"
     },
     "close": {
-      "id": "20261016091712-1",
+      "id": "20261016101711-1",
       "slot": "close",
       "report_date": "2026-10-16",
       "expected_date": "2026-10-16",
-      "started_at": "2026-10-16T17:17:51.868021+08:00",
-      "updated_at": "2026-10-16T17:26:51.700080+08:00",
-      "status": "partial",
+      "started_at": "2026-10-16T18:17:51.470929+08:00",
+      "updated_at": "2026-10-16T18:17:51.470929+08:00",
+      "status": "running",
       "data_date": null,
-      "issues": [
-        "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
-      ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261016091712",
-      "finished_at": "2026-10-16T17:26:51.700080+08:00"
+      "issues": [],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261016101711"
     }
   },
-  "updated_at": "2026-10-16T17:26:51.700080+08:00",
+  "updated_at": "2026-10-16T18:17:51.470929+08:00",
   "latest_run": {
-    "id": "20261016091712-1",
+    "id": "20261016101711-1",
     "slot": "close",
     "report_date": "2026-10-16",
     "expected_date": "2026-10-16",
-    "started_at": "2026-10-16T17:17:51.868021+08:00",
-    "updated_at": "2026-10-16T17:26:51.700080+08:00",
-    "status": "partial",
+    "started_at": "2026-10-16T18:17:51.470929+08:00",
+    "updated_at": "2026-10-16T18:17:51.470929+08:00",
+    "status": "running",
     "data_date": null,
-    "issues": [
-      "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261016091712",
-    "finished_at": "2026-10-16T17:26:51.700080+08:00"
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261016101711"
   },
   "calendar": [
     {
