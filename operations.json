@@ -1,20 +1,16 @@
 {
   "reports": {
     "premarket": {
-      "id": "20261022061702-1",
+      "id": "20261022071702-1",
       "slot": "premarket",
       "report_date": "2026-10-22",
       "expected_date": "2026-10-21",
-      "started_at": "2026-10-22T14:17:47.898788+08:00",
-      "updated_at": "2026-10-22T14:22:20.977165+08:00",
-      "status": "partial",
+      "started_at": "2026-10-22T15:17:43.812085+08:00",
+      "updated_at": "2026-10-22T15:17:43.812085+08:00",
+      "status": "running",
       "data_date": null,
-      "issues": [
-        "行情日期尚未达到本报告要求，保留旧数据等待补齐。",
-        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
-      ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261022061702",
-      "finished_at": "2026-10-22T14:22:20.977165+08:00"
+      "issues": [],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261022071702"
     },
     "close": {
       "id": "20261021121702-1",
@@ -32,22 +28,18 @@
       "finished_at": "2026-10-21T20:28:37.475695+08:00"
     }
   },
-  "updated_at": "2026-10-22T14:22:20.977165+08:00",
+  "updated_at": "2026-10-22T15:17:43.812085+08:00",
   "latest_run": {
-    "id": "20261022061702-1",
+    "id": "20261022071702-1",
     "slot": "premarket",
     "report_date": "2026-10-22",
     "expected_date": "2026-10-21",
-    "started_at": "2026-10-22T14:17:47.898788+08:00",
-    "updated_at": "2026-10-22T14:22:20.977165+08:00",
-    "status": "partial",
+    "started_at": "2026-10-22T15:17:43.812085+08:00",
+    "updated_at": "2026-10-22T15:17:43.812085+08:00",
+    "status": "running",
     "data_date": null,
-    "issues": [
-      "行情日期尚未达到本报告要求，保留旧数据等待补齐。",
-      "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261022061702",
-    "finished_at": "2026-10-22T14:22:20.977165+08:00"
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261022071702"
   },
   "calendar": [
     {
