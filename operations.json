@@ -22,25 +22,31 @@
       "report_date": "2026-10-28",
       "expected_date": "2026-10-28",
       "started_at": "2026-10-28T17:17:50.818865+08:00",
-      "updated_at": "2026-10-28T17:17:50.818865+08:00",
-      "status": "running",
+      "updated_at": "2026-10-28T17:27:42.776469+08:00",
+      "status": "failed",
       "data_date": null,
-      "issues": [],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028091712"
+      "issues": [
+        "整理任务未成功结束，请查看运行记录中的失败步骤。"
+      ],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028091712",
+      "finished_at": "2026-10-28T17:27:42.776469+08:00"
     }
   },
-  "updated_at": "2026-10-28T17:17:50.818865+08:00",
+  "updated_at": "2026-10-28T17:27:42.776469+08:00",
   "latest_run": {
     "id": "20261028091712-1",
     "slot": "close",
     "report_date": "2026-10-28",
     "expected_date": "2026-10-28",
     "started_at": "2026-10-28T17:17:50.818865+08:00",
-    "updated_at": "2026-10-28T17:17:50.818865+08:00",
-    "status": "running",
+    "updated_at": "2026-10-28T17:27:42.776469+08:00",
+    "status": "failed",
     "data_date": null,
-    "issues": [],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028091712"
+    "issues": [
+      "整理任务未成功结束，请查看运行记录中的失败步骤。"
+    ],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028091712",
+    "finished_at": "2026-10-28T17:27:42.776469+08:00"
   },
   "calendar": [
     {
@@ -318,19 +324,19 @@
       "finished_at": "2026-10-28T15:27:29.894413+08:00"
     },
     "close": {
-      "id": "20261028081702-1",
+      "id": "20261028091712-1",
       "slot": "close",
       "report_date": "2026-10-28",
       "expected_date": "2026-10-28",
-      "started_at": "2026-10-28T16:17:47.107564+08:00",
-      "updated_at": "2026-10-28T16:28:30.352553+08:00",
+      "started_at": "2026-10-28T17:17:50.818865+08:00",
+      "updated_at": "2026-10-28T17:27:42.776469+08:00",
       "status": "failed",
       "data_date": null,
       "issues": [
         "整理任务未成功结束，请查看运行记录中的失败步骤。"
       ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028081702",
-      "finished_at": "2026-10-28T16:28:30.352553+08:00"
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028091712",
+      "finished_at": "2026-10-28T17:27:42.776469+08:00"
     },
     "close_final": {
       "id": "20261027121703-1",
