@@ -6,11 +6,15 @@
       "report_date": "2026-10-28",
       "expected_date": "2026-10-27",
       "started_at": "2026-10-28T09:17:51.855288+08:00",
-      "updated_at": "2026-10-28T09:17:51.855288+08:00",
-      "status": "running",
+      "updated_at": "2026-10-28T09:25:38.120841+08:00",
+      "status": "failed",
       "data_date": null,
-      "issues": [],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028011702"
+      "issues": [
+        "整理任务未成功结束，请查看运行记录中的失败步骤。",
+        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
+      ],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028011702",
+      "finished_at": "2026-10-28T09:25:38.120841+08:00"
     },
     "close": {
       "id": "20261027121703-1",
@@ -28,18 +32,22 @@
       "finished_at": "2026-10-27T20:28:37.915809+08:00"
     }
   },
-  "updated_at": "2026-10-28T09:17:51.855288+08:00",
+  "updated_at": "2026-10-28T09:25:38.120841+08:00",
   "latest_run": {
     "id": "20261028011702-1",
     "slot": "premarket",
     "report_date": "2026-10-28",
     "expected_date": "2026-10-27",
     "started_at": "2026-10-28T09:17:51.855288+08:00",
-    "updated_at": "2026-10-28T09:17:51.855288+08:00",
-    "status": "running",
+    "updated_at": "2026-10-28T09:25:38.120841+08:00",
+    "status": "failed",
     "data_date": null,
-    "issues": [],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028011702"
+    "issues": [
+      "整理任务未成功结束，请查看运行记录中的失败步骤。",
+      "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
+    ],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028011702",
+    "finished_at": "2026-10-28T09:25:38.120841+08:00"
   },
   "calendar": [
     {
@@ -347,19 +355,20 @@
       "finished_at": "2026-10-27T20:28:37.915809+08:00"
     },
     "premarket": {
-      "id": "20261028004016-1",
+      "id": "20261028011702-1",
       "slot": "premarket",
       "report_date": "2026-10-28",
       "expected_date": "2026-10-27",
-      "started_at": "2026-10-28T08:40:53.869008+08:00",
-      "updated_at": "2026-10-28T08:47:52.816814+08:00",
-      "status": "partial",
+      "started_at": "2026-10-28T09:17:51.855288+08:00",
+      "updated_at": "2026-10-28T09:25:38.120841+08:00",
+      "status": "failed",
       "data_date": null,
       "issues": [
-        "行情日期尚未达到本报告要求，保留旧数据等待补齐。"
+        "整理任务未成功结束，请查看运行记录中的失败步骤。",
+        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
       ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028004016",
-      "finished_at": "2026-10-28T08:47:52.816814+08:00"
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261028011702",
+      "finished_at": "2026-10-28T09:25:38.120841+08:00"
     },
     "prepare": {
       "id": "20261028001703-1",
