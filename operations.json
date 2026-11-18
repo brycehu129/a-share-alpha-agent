@@ -1,20 +1,16 @@
 {
   "reports": {
     "premarket": {
-      "id": "20261117071701-1",
+      "id": "20261118004006-1",
       "slot": "premarket",
-      "report_date": "2026-11-17",
-      "expected_date": "2026-11-16",
-      "started_at": "2026-11-17T15:17:37.974823+08:00",
-      "updated_at": "2026-11-17T15:20:02.269163+08:00",
-      "status": "failed",
+      "report_date": "2026-11-18",
+      "expected_date": "2026-11-17",
+      "started_at": "2026-11-18T08:40:41.225977+08:00",
+      "updated_at": "2026-11-18T08:40:41.225977+08:00",
+      "status": "running",
       "data_date": null,
-      "issues": [
-        "整理任务未成功结束，请查看运行记录中的失败步骤。",
-        "盘前报告延迟补生成；以实际生成时间为准，不代表开盘前已知，也不回填开盘成交。"
-      ],
-      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261117071701",
-      "finished_at": "2026-11-17T15:20:02.269163+08:00"
+      "issues": [],
+      "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261118004006"
     },
     "close": {
       "id": "20261117121706-1",
@@ -32,21 +28,18 @@
       "finished_at": "2026-11-17T20:20:07.657229+08:00"
     }
   },
-  "updated_at": "2026-11-18T08:18:08.259032+08:00",
+  "updated_at": "2026-11-18T08:40:41.225977+08:00",
   "latest_run": {
-    "id": "20261118001711-1",
-    "slot": "prepare",
+    "id": "20261118004006-1",
+    "slot": "premarket",
     "report_date": "2026-11-18",
     "expected_date": "2026-11-17",
-    "started_at": "2026-11-18T08:17:45.193490+08:00",
-    "updated_at": "2026-11-18T08:18:08.259032+08:00",
-    "status": "failed",
+    "started_at": "2026-11-18T08:40:41.225977+08:00",
+    "updated_at": "2026-11-18T08:40:41.225977+08:00",
+    "status": "running",
     "data_date": null,
-    "issues": [
-      "整理任务未成功结束，请查看运行记录中的失败步骤。"
-    ],
-    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261118001711",
-    "finished_at": "2026-11-18T08:18:08.259032+08:00"
+    "issues": [],
+    "url": "https://github.com/brycehu129/a-share-alpha-agent/actions/runs/20261118004006"
   },
   "calendar": [
     {
